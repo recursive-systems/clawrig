@@ -1,0 +1,74 @@
+name: Build Pi Image
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ARM64 Elixir release
+        run: bash deploy/build-release.sh
+
+      - name: Stage files for pi-gen
+        run: |
+          PIGEN_DIR=deploy/pi-gen
+          mkdir -p "$PIGEN_DIR/stage-clawrig/01-install-clawrig/files"
+          mkdir -p "$PIGEN_DIR/stage-clawrig/02-configure-networking/files"
+
+          cp deploy/bundle/clawrig.tar.gz \
+             "$PIGEN_DIR/stage-clawrig/01-install-clawrig/files/clawrig.tar.gz"
+          cp deploy/bundle/clawrig.service \
+             "$PIGEN_DIR/stage-clawrig/01-install-clawrig/files/clawrig.service"
+          cp deploy/bundle/dnsmasq-captive.conf \
+             "$PIGEN_DIR/stage-clawrig/02-configure-networking/files/dnsmasq-captive.conf"
+          cp deploy/bundle/clawrig-avahi.service \
+             "$PIGEN_DIR/stage-clawrig/02-configure-networking/files/clawrig-avahi.service"
+
+      - name: Clone pi-gen (arm64)
+        run: |
+          git clone --depth 1 --branch arm64 \
+            https://github.com/RPi-Distro/pi-gen.git deploy/pi-gen/pi-gen-repo
+
+      - name: Prepare pi-gen
+        run: |
+          PIGEN_DIR=deploy/pi-gen
+          PIGEN_REPO="$PIGEN_DIR/pi-gen-repo"
+
+          cp "$PIGEN_DIR/config" "$PIGEN_REPO/config"
+          rm -rf "$PIGEN_REPO/stage-clawrig"
+          cp -a "$PIGEN_DIR/stage-clawrig" "$PIGEN_REPO/stage-clawrig"
+
+          for stage in stage0 stage1 stage2; do
+            touch "$PIGEN_REPO/$stage/SKIP_IMAGES"
+          done
+
+      - name: Build Pi OS image
+        run: |
+          cd deploy/pi-gen/pi-gen-repo
+          PRESERVE_CONTAINER=1 ./build-docker.sh
+
+      - name: Prepare release assets
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          IMG_ZIP=$(ls deploy/pi-gen/pi-gen-repo/deploy/image_*.zip)
+          ASSET_NAME="clawrig-${TAG}-pi4-arm64.img.zip"
+          cp "$IMG_ZIP" "$ASSET_NAME"
+          echo "asset_name=$ASSET_NAME" >> "$GITHUB_OUTPUT"
+          echo "asset_path=$ASSET_NAME" >> "$GITHUB_OUTPUT"
+        id: assets
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: ${{ steps.assets.outputs.asset_path }}
