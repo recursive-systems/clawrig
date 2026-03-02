@@ -1,0 +1,22 @@
+<div class="wifi-card">
+  <div class="wifi-header">
+    <div class="wifi-logo">ClawRig</div>
+    <h1>Network Status</h1>
+  </div>
+
+  <div class="wifi-status">
+    <p>
+      Mode: <strong>{@status.mode}</strong>
+    </p>
+    <p :if={@status.connected_ssid}>
+      Connected to: <strong>{@status.connected_ssid}</strong>
+    </p>
+    <p :if={!@status.connected_ssid}>
+      Not connected to any network.
+    </p>
+  </div>
+
+  <a href="/wifi" class="wifi-btn-subtle">Back to Wi-Fi setup</a>
+
+  <meta http-equiv="refresh" content="5" />
+</div>

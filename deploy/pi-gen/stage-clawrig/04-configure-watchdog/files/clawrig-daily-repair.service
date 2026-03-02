@@ -1,0 +1,10 @@
+[Unit]
+Description=ClawRig Daily Self-Repair
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/var/lib/clawrig/.oobe-complete
+
+[Service]
+Type=oneshot
+ExecStart=/opt/clawrig/bin/clawrig-daily-repair.sh
+TimeoutStartSec=300

@@ -1,0 +1,35 @@
+<div class="wifi-card">
+  <div class="wifi-header">
+    <div class="wifi-logo">ClawRig</div>
+    <h1>Wi-Fi Setup</h1>
+    <p>Connect your Pi to your home network.</p>
+  </div>
+
+  <form method="post" action="/wifi/connect" class="wifi-form">
+    <input type="hidden" name="_csrf_token" value={Phoenix.Controller.get_csrf_token()} />
+
+    <div :if={assigns[:error]} class="wifi-error">
+      {@error}
+    </div>
+
+    <label class="wifi-label">Select network</label>
+    <div class="wifi-networks">
+      <label :for={net <- @networks} class="wifi-network">
+        <input type="radio" name="ssid" value={net.ssid} />
+        <span class="wifi-network-name">{net.ssid}</span>
+        <span class="wifi-signal"><.signal_bars signal={net.signal} /></span>
+        <span :if={net.security != ""} class="wifi-lock">&#128274;</span>
+      </label>
+    </div>
+
+    <label class="wifi-label" for="password">Password</label>
+    <input type="password" name="password" id="password" class="wifi-input" placeholder="Enter Wi-Fi password" autocomplete="off" />
+
+    <button type="submit" class="wifi-btn">Connect</button>
+  </form>
+
+  <form method="post" action="/wifi/scan" class="wifi-rescan">
+    <input type="hidden" name="_csrf_token" value={Phoenix.Controller.get_csrf_token()} />
+    <button type="submit" class="wifi-btn-subtle">Rescan networks</button>
+  </form>
+</div>

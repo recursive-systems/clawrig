@@ -1,0 +1,2 @@
+/* CSS is served as a static file from priv/static/assets/css/app.css.
+   For this project we don't use esbuild for CSS — we serve it directly. */

@@ -1,0 +1,36 @@
+FROM hexpm/elixir:1.19.5-erlang-28.2-debian-bookworm-20260202 AS build
+
+RUN apt-get update && apt-get install -y build-essential git curl && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+RUN mix local.hex --force && mix local.rebar --force
+
+ENV MIX_ENV=prod
+
+# Copy dependency manifests first for layer caching
+COPY mix.exs mix.lock ./
+RUN mix deps.get --only prod
+RUN mix deps.compile
+
+# Copy config (needed before compile)
+COPY config config
+
+# Copy static assets (CSS is pre-copied by build-release.sh)
+COPY priv priv
+
+# Copy application source
+COPY lib lib
+COPY assets assets
+COPY rel rel
+
+# Build JS assets and generate digest
+RUN mix assets.deploy
+
+# Compile and build release
+RUN mix compile
+RUN mix release
+
+# Package as tarball
+RUN cd _build/prod/rel && tar czf /app/clawrig.tar.gz clawrig/

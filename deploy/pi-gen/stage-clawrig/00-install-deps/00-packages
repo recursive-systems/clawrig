@@ -1,0 +1,3 @@
+dnsmasq
+avahi-daemon
+iptables-persistent

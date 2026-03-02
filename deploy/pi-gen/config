@@ -1,0 +1,17 @@
+IMG_NAME=clawrig
+RELEASE=trixie
+ARCH=arm64
+TARGET_HOSTNAME=clawrig
+FIRST_USER_NAME=pi
+FIRST_USER_PASS=clawrig
+ENABLE_SSH=1
+LOCALE_DEFAULT=en_US.UTF-8
+TIMEZONE_DEFAULT=America/Chicago
+KEYBOARD_KEYMAP=us
+KEYBOARD_LAYOUT="English (US)"
+
+# Build Lite image (stage0 + stage1 + stage2) then add our custom stage
+STAGE_LIST="stage0 stage1 stage2 stage-clawrig"
+
+# Only export the final image
+DEPLOY_COMPRESSION=zip

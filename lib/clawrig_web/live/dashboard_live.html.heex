@@ -1,0 +1,156 @@
+<section class="dashboard-shell">
+  <header class="dashboard-head">
+    <h1>ClawRig</h1>
+    <span class="version">v{@version}</span>
+  </header>
+
+  <nav class="dashboard-tabs" role="tablist">
+    <.link patch={~p"/"} class={tab_class(@live_action, :index)}>
+      Dashboard
+    </.link>
+    <.link patch={~p"/wifi"} class={tab_class(@live_action, :wifi)}>
+      Wi-Fi
+    </.link>
+    <.link patch={~p"/account"} class={tab_class(@live_action, :account)}>
+      Account
+    </.link>
+    <.link patch={~p"/telegram"} class={tab_class(@live_action, :telegram)}>
+      Telegram
+    </.link>
+    <.link patch={~p"/system"} class={tab_class(@live_action, :system)}>
+      System
+    </.link>
+  </nav>
+
+  <section class="dashboard-content" aria-live="polite">
+    <%!-- Dashboard / Index --%>
+    <div :if={@live_action == :index} class="dashboard-panel">
+      <h2>Dashboard</h2>
+      <div class="status-grid">
+        <div class="status-card">
+          <div class="status-label">OpenClaw Gateway</div>
+          <div class={["status-value", status_color(@gateway_status)]}>
+            {status_label(@gateway_status)}
+          </div>
+        </div>
+        <div class="status-card">
+          <div class="status-label">Internet</div>
+          <div class={["status-value", status_color(@internet)]}>
+            {status_label(@internet)}
+          </div>
+        </div>
+        <div class="status-card">
+          <div class="status-label">Wi-Fi Network</div>
+          <div class="status-value">
+            {@wifi_ssid || "Not connected"}
+          </div>
+        </div>
+        <div class="status-card">
+          <div class="status-label">OpenAI Account</div>
+          <div class={["status-value", status_color(@oauth_status)]}>
+            {status_label(@oauth_status)}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <%!-- Wi-Fi --%>
+    <div :if={@live_action == :wifi} class="dashboard-panel">
+      <h2>Wi-Fi</h2>
+
+      <div class="wifi-current">
+        <span class="wifi-current-label">Current network:</span>
+        <span class="wifi-current-ssid">{@wifi_ssid || "None"}</span>
+      </div>
+
+      <button class="btn primary" phx-click="scan_wifi">Scan for networks</button>
+
+      <p :if={@wifi_error} class="wifi-error">{@wifi_error}</p>
+
+      <div :if={@networks != []} class="wifi-list">
+        <div :for={network <- @networks} class="wifi-network">
+          <div class="wifi-network-info">
+            <span class="wifi-network-ssid">{network.ssid}</span>
+            <span class="wifi-network-signal">{network.signal}%</span>
+            <span :if={network.security != ""} class="wifi-network-security">{network.security}</span>
+          </div>
+          <form phx-submit="connect_wifi" class="wifi-connect-form">
+            <input type="hidden" name="ssid" value={network.ssid} />
+            <input
+              type="password"
+              name="password"
+              placeholder="Password"
+              class="wifi-password-input"
+              autocomplete="off"
+            />
+            <button type="submit" class="btn subtle">Connect</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <%!-- Account --%>
+    <div :if={@live_action == :account} class="dashboard-panel">
+      <h2>OpenAI Account</h2>
+
+      <div :if={@oauth_status == :connected} class="account-status">
+        <div class="account-connected">
+          <svg class="account-check-svg" viewBox="0 0 52 52">
+            <circle class="account-check-circle" cx="26" cy="26" r="24" fill="none"/>
+            <path class="account-check-mark" fill="none" d="M15 27l7 7 15-15"/>
+          </svg>
+          <span>Your OpenAI account is connected.</span>
+        </div>
+      </div>
+
+      <div :if={@oauth_status == :waiting} class="account-status">
+        <p>Complete sign-in in the browser window...</p>
+        <a :if={@oauth_url} href={@oauth_url} target="_blank" class="btn openai">
+          Open sign-in page
+        </a>
+      </div>
+
+      <div :if={@oauth_status not in [:connected, :waiting]} class="account-status">
+        <p>Sign in to connect your OpenAI account.</p>
+        <button class="btn openai" phx-click="start_oauth">
+          Sign in with OpenAI
+        </button>
+      </div>
+    </div>
+
+    <%!-- Telegram --%>
+    <div :if={@live_action == :telegram} class="dashboard-panel">
+      <h2>Telegram</h2>
+      <p class="coming-soon">Telegram configuration is coming in a future update.</p>
+    </div>
+
+    <%!-- System --%>
+    <div :if={@live_action == :system} class="dashboard-panel">
+      <h2>System</h2>
+
+      <div class="system-actions">
+        <button class="btn primary" phx-click="restart_gateway">Restart Gateway</button>
+        <button class="btn primary" phx-click="run_repair">Run Repair</button>
+        <button class="btn primary" phx-click="check_update">Check for Updates</button>
+        <button class="btn danger" phx-click="reboot"
+                data-confirm="Are you sure you want to reboot?">
+          Reboot
+        </button>
+      </div>
+
+      <div :if={@update_status} class="update-status">
+        <p :if={@update_status == :checking}>Checking for updates...</p>
+        <p :if={@update_status == :up_to_date}>System is up to date.</p>
+        <p :if={is_tuple(@update_status) and elem(@update_status, 0) == :error}>
+          {elem(@update_status, 1)}
+        </p>
+        <p :if={@update_status == :available}>An update is available.</p>
+      </div>
+
+      <div class="log-section">
+        <button class="btn subtle" phx-click="view_logs">View Logs</button>
+        <pre :if={@logs} class="log-viewer">{@logs}</pre>
+      </div>
+    </div>
+  </section>
+</section>

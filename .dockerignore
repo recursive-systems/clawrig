@@ -1,0 +1,12 @@
+_build/
+deps/
+cover/
+doc/
+tmp/
+.git/
+.elixir_ls/
+.fetch
+deploy/bundle/
+deploy/*.tar.gz
+erl_crash.dump
+test/
