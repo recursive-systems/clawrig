@@ -27,6 +27,7 @@ config :clawrig, dev_routes: true
 # Use MockCommands in dev (works on macOS without nmcli)
 config :clawrig, :system_commands, Clawrig.System.MacCommands
 config :clawrig, :state_path, "wizard-state.json"
+config :clawrig, :oobe_marker, ".oobe-complete"
 
 config :logger, :default_formatter, format: "[$level] $message\n"
 

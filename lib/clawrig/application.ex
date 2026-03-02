@@ -13,10 +13,23 @@ defmodule Clawrig.Application do
         Clawrig.Wizard.State,
         Clawrig.Updater,
         ClawrigWeb.Endpoint
-      ] ++ hotspot_task()
+      ] ++ oauth_listener() ++ hotspot_task()
 
     opts = [strategy: :one_for_one, name: Clawrig.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  # OAuth redirect URI is hardcoded to localhost:1455 (registered with OpenAI).
+  # In dev, the main app runs on 4090, so start a second listener on 1455.
+  defp oauth_listener do
+    port = 1455
+    main_port = Application.get_env(:clawrig, ClawrigWeb.Endpoint)[:http][:port] || 4090
+
+    if port != main_port do
+      [{Bandit, plug: ClawrigWeb.Endpoint, port: port, scheme: :http}]
+    else
+      []
+    end
   end
 
   defp hotspot_task do

@@ -23,84 +23,66 @@
   </nav>
 
   <section class="dashboard-content" aria-live="polite">
-    <%!-- Dashboard / Index --%>
-    <div :if={@live_action == :index} class="dashboard-panel">
-      <h2>Dashboard</h2>
+    <%!-- Dashboard / Status Overview --%>
+    <.dash_panel :if={@live_action == :index}>
       <div class="status-grid">
         <div class="status-card">
-          <div class="status-label">OpenClaw Gateway</div>
-          <div class={["status-value", status_color(@gateway_status)]}>
-            {status_label(@gateway_status)}
+          <span class={["status-dot", status_color(@gateway_status)]}></span>
+          <div class="status-info">
+            <span class="status-label">OpenClaw Gateway</span>
+            <span class={["status-value", status_color(@gateway_status)]}>
+              {status_label(@gateway_status)}
+            </span>
           </div>
         </div>
         <div class="status-card">
-          <div class="status-label">Internet</div>
-          <div class={["status-value", status_color(@internet)]}>
-            {status_label(@internet)}
+          <span class={["status-dot", status_color(@internet)]}></span>
+          <div class="status-info">
+            <span class="status-label">Internet</span>
+            <span class={["status-value", status_color(@internet)]}>
+              {status_label(@internet)}
+            </span>
           </div>
         </div>
         <div class="status-card">
-          <div class="status-label">Wi-Fi Network</div>
-          <div class="status-value">
-            {@wifi_ssid || "Not connected"}
+          <span class={["status-dot", if(@wifi_ssid, do: "status-ok", else: "status-warn")]}></span>
+          <div class="status-info">
+            <span class="status-label">Wi-Fi Network</span>
+            <span class={["status-value", if(@wifi_ssid, do: "status-ok", else: "status-warn")]}>
+              {@wifi_ssid || "Not connected"}
+            </span>
           </div>
         </div>
         <div class="status-card">
-          <div class="status-label">OpenAI Account</div>
-          <div class={["status-value", status_color(@oauth_status)]}>
-            {status_label(@oauth_status)}
+          <span class={["status-dot", status_color(@oauth_status)]}></span>
+          <div class="status-info">
+            <span class="status-label">OpenAI Account</span>
+            <span class={["status-value", status_color(@oauth_status)]}>
+              {status_label(@oauth_status)}
+            </span>
           </div>
         </div>
       </div>
-    </div>
+    </.dash_panel>
 
     <%!-- Wi-Fi --%>
-    <div :if={@live_action == :wifi} class="dashboard-panel">
-      <h2>Wi-Fi</h2>
-
-      <div class="wifi-current">
-        <span class="wifi-current-label">Current network:</span>
-        <span class="wifi-current-ssid">{@wifi_ssid || "None"}</span>
-      </div>
-
-      <button class="btn primary" phx-click="scan_wifi">Scan for networks</button>
-
-      <p :if={@wifi_error} class="wifi-error">{@wifi_error}</p>
-
-      <div :if={@networks != []} class="wifi-list">
-        <div :for={network <- @networks} class="wifi-network">
-          <div class="wifi-network-info">
-            <span class="wifi-network-ssid">{network.ssid}</span>
-            <span class="wifi-network-signal">{network.signal}%</span>
-            <span :if={network.security != ""} class="wifi-network-security">{network.security}</span>
-          </div>
-          <form phx-submit="connect_wifi" class="wifi-connect-form">
-            <input type="hidden" name="ssid" value={network.ssid} />
-            <input
-              type="password"
-              name="password"
-              placeholder="Password"
-              class="wifi-password-input"
-              autocomplete="off"
-            />
-            <button type="submit" class="btn subtle">Connect</button>
-          </form>
-        </div>
-      </div>
-    </div>
+    <.dash_panel :if={@live_action == :wifi} title="Wi-Fi Networks" back>
+      <:actions>
+        <button class="btn subtle btn-sm" phx-click="scan_wifi" phx-target="#wifi-scanner">Scan</button>
+      </:actions>
+      <.live_component module={ClawrigWeb.WifiComponent} id="wifi-scanner" wifi_ssid={@wifi_ssid} />
+    </.dash_panel>
 
     <%!-- Account --%>
-    <div :if={@live_action == :account} class="dashboard-panel">
-      <h2>OpenAI Account</h2>
-
-      <div :if={@oauth_status == :connected} class="account-status">
-        <div class="account-connected">
+    <.dash_panel :if={@live_action == :account} title="OpenAI Account" back>
+      <div :if={@oauth_status == :connected} class="account-status account-connected">
+        <div class="account-badge">
           <svg class="account-check-svg" viewBox="0 0 52 52">
             <circle class="account-check-circle" cx="26" cy="26" r="24" fill="none"/>
             <path class="account-check-mark" fill="none" d="M15 27l7 7 15-15"/>
           </svg>
-          <span>Your OpenAI account is connected.</span>
         </div>
+        <span>Your OpenAI account is connected.</span>
       </div>
 
       <div :if={@oauth_status == :waiting} class="account-status">
@@ -116,41 +98,53 @@
           Sign in with OpenAI
         </button>
       </div>
-    </div>
+    </.dash_panel>
 
     <%!-- Telegram --%>
-    <div :if={@live_action == :telegram} class="dashboard-panel">
-      <h2>Telegram</h2>
+    <.dash_panel :if={@live_action == :telegram} title="Telegram" back>
       <p class="coming-soon">Telegram configuration is coming in a future update.</p>
-    </div>
+    </.dash_panel>
 
     <%!-- System --%>
-    <div :if={@live_action == :system} class="dashboard-panel">
-      <h2>System</h2>
-
+    <.dash_panel :if={@live_action == :system} title="System" back>
       <div class="system-actions">
-        <button class="btn primary" phx-click="restart_gateway">Restart Gateway</button>
-        <button class="btn primary" phx-click="run_repair">Run Repair</button>
-        <button class="btn primary" phx-click="check_update">Check for Updates</button>
-        <button class="btn danger" phx-click="reboot"
-                data-confirm="Are you sure you want to reboot?">
-          Reboot
-        </button>
+        <div class="system-action-group">
+          <h3>Maintenance</h3>
+          <div class="system-btns">
+            <button class="btn subtle" phx-click="restart_gateway">Restart Gateway</button>
+            <button class="btn subtle" phx-click="run_repair">Run Repair</button>
+            <button class="btn subtle" phx-click="check_update">Check for Updates</button>
+          </div>
+        </div>
+        <div class="system-action-group system-danger-zone">
+          <h3>Danger Zone</h3>
+          <div class="system-btns">
+            <button class="btn danger" phx-click="reboot"
+                    data-confirm="Are you sure you want to reboot the device?">
+              Reboot Device
+            </button>
+          </div>
+        </div>
       </div>
 
       <div :if={@update_status} class="update-status">
-        <p :if={@update_status == :checking}>Checking for updates...</p>
-        <p :if={@update_status == :up_to_date}>System is up to date.</p>
-        <p :if={is_tuple(@update_status) and elem(@update_status, 0) == :error}>
+        <p :if={@update_status == :checking} class="update-checking">Checking for updates...</p>
+        <p :if={@update_status == :up_to_date} class="update-ok">System is up to date.</p>
+        <p :if={is_tuple(@update_status) and elem(@update_status, 0) == :error} class="update-err">
           {elem(@update_status, 1)}
         </p>
-        <p :if={@update_status == :available}>An update is available.</p>
+        <p :if={@update_status == :available} class="update-warn">An update is available.</p>
       </div>
 
       <div class="log-section">
-        <button class="btn subtle" phx-click="view_logs">View Logs</button>
-        <pre :if={@logs} class="log-viewer">{@logs}</pre>
+        <div class="dash-section-header">
+          <h3>Logs</h3>
+          <button class="btn subtle btn-sm" phx-click="view_logs">Refresh</button>
+        </div>
+        <div :if={@logs} class="log-viewer">
+          <pre>{@logs}</pre>
+        </div>
       </div>
-    </div>
+    </.dash_panel>
   </section>
 </section>

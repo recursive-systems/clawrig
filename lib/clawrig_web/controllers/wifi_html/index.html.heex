@@ -5,7 +5,7 @@
     <p>Connect your Pi to your home network.</p>
   </div>
 
-  <form method="post" action="/wifi/connect" class="wifi-form">
+  <form method="post" action="/portal/connect" class="wifi-form">
     <input type="hidden" name="_csrf_token" value={Phoenix.Controller.get_csrf_token()} />
 
     <div :if={assigns[:error]} class="wifi-error">
@@ -28,7 +28,7 @@
     <button type="submit" class="wifi-btn">Connect</button>
   </form>
 
-  <form method="post" action="/wifi/scan" class="wifi-rescan">
+  <form method="post" action="/portal/scan" class="wifi-rescan">
     <input type="hidden" name="_csrf_token" value={Phoenix.Controller.get_csrf_token()} />
     <button type="submit" class="wifi-btn-subtle">Rescan networks</button>
   </form>

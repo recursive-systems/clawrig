@@ -1,6 +1,11 @@
 defmodule ClawrigWeb.CoreComponents do
   use Phoenix.Component
 
+  use Phoenix.VerifiedRoutes,
+    endpoint: ClawrigWeb.Endpoint,
+    router: ClawrigWeb.Router,
+    statics: ClawrigWeb.static_paths()
+
   alias Phoenix.LiveView.JS
 
   attr :id, :string, doc: "the optional id of flash container"
@@ -35,6 +40,28 @@ defmodule ClawrigWeb.CoreComponents do
 
   def hide(js \\ %JS{}, selector) do
     JS.hide(js, to: selector, time: 200)
+  end
+
+  attr :title, :string, default: nil, doc: "panel heading"
+  attr :back, :boolean, default: false, doc: "show back link to dashboard index"
+  slot :actions, doc: "buttons rendered right-aligned in header row"
+  slot :inner_block, required: true
+
+  def dash_panel(assigns) do
+    ~H"""
+    <div class="dash-panel">
+      <div :if={@title || @back || @actions != []} class="dash-panel-header">
+        <div class="dash-panel-title-row">
+          <.link :if={@back} navigate={~p"/"} class="dash-back">&larr; Dashboard</.link>
+          <h2 :if={@title}>{@title}</h2>
+        </div>
+        <div :if={@actions != []} class="dash-panel-actions">
+          {render_slot(@actions)}
+        </div>
+      </div>
+      {render_slot(@inner_block)}
+    </div>
+    """
   end
 
   def translate_error({msg, opts}) do

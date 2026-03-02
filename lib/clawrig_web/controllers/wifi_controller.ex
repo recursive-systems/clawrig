@@ -5,7 +5,7 @@ defmodule ClawrigWeb.WifiController do
 
   def redirect_wifi(conn, _params) do
     conn
-    |> put_resp_header("location", "/wifi")
+    |> put_resp_header("location", "/portal")
     |> send_resp(302, "")
   end
 

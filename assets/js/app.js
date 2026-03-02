@@ -23,17 +23,21 @@ Hooks.AutoRun = {
 
 // OAuth popup hook
 Hooks.OAuthPopup = {
+  openPopup() {
+    const url = this.el.dataset.url
+    if (url) {
+      window.open(url, "openai_oauth", "width=500,height=700,left=200,top=80")
+      this.pollInterval = setInterval(() => {
+        this.pushEvent("check_oauth", {})
+      }, 1500)
+    }
+  },
   mounted() {
+    // Auto-open on mount since the URL is already ready
+    this.openPopup()
     this.el.addEventListener("click", (e) => {
       e.preventDefault()
-      const url = this.el.dataset.url
-      if (url) {
-        window.open(url, "openai_oauth", "width=500,height=700,left=200,top=80")
-        // Poll for completion
-        this.pollInterval = setInterval(() => {
-          this.pushEvent("check_oauth", {})
-        }, 1500)
-      }
+      this.openPopup()
     })
   },
   destroyed() {

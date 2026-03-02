@@ -34,10 +34,10 @@ defmodule ClawrigWeb.Router do
     get "/canonical.html", WifiController, :redirect_wifi
     get "/success.txt", WifiController, :redirect_wifi
 
-    get "/wifi", WifiController, :index
-    post "/wifi/scan", WifiController, :scan
-    post "/wifi/connect", WifiController, :connect
-    get "/wifi/status", WifiController, :status
+    get "/portal", WifiController, :index
+    post "/portal/scan", WifiController, :scan
+    post "/portal/connect", WifiController, :connect
+    get "/portal/status", WifiController, :status
   end
 
   # Phase 2: LiveView wizard (home network)
@@ -65,4 +65,5 @@ defmodule ClawrigWeb.Router do
 
     get "/callback", OAuthCallbackController, :callback
   end
+
 end

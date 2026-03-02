@@ -3,7 +3,6 @@ defmodule ClawrigWeb.DashboardLive do
 
   alias Clawrig.System.Commands
   alias Clawrig.Wizard.{OAuth, State}
-  alias Clawrig.Wifi.Manager, as: WifiManager
 
   @refresh_interval 10_000
 
@@ -20,8 +19,6 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:internet, false)
       |> assign(:wifi_ssid, nil)
       |> assign(:version, read_version())
-      |> assign(:networks, [])
-      |> assign(:wifi_error, nil)
       |> assign(:oauth_status, :unknown)
       |> assign(:oauth_url, nil)
       |> assign(:logs, nil)
@@ -40,29 +37,6 @@ defmodule ClawrigWeb.DashboardLive do
   # ---------- Events ----------
 
   @impl true
-  def handle_event("scan_wifi", _params, socket) do
-    case WifiManager.scan() do
-      {:ok, networks} ->
-        {:noreply, assign(socket, :networks, networks)}
-
-      _ ->
-        {:noreply, socket}
-    end
-  end
-
-  def handle_event("connect_wifi", %{"ssid" => ssid, "password" => password}, socket) do
-    case WifiManager.connect(ssid, password) do
-      :ok ->
-        {:noreply,
-         socket
-         |> assign(:wifi_ssid, ssid)
-         |> assign(:wifi_error, nil)}
-
-      {:error, reason} ->
-        {:noreply, assign(socket, :wifi_error, to_string(reason))}
-    end
-  end
-
   def handle_event("start_oauth", _params, socket) do
     {verifier, challenge} = OAuth.generate_pkce()
     state_param = Base.url_encode64(:crypto.strong_rand_bytes(16), padding: false)
@@ -141,6 +115,10 @@ defmodule ClawrigWeb.DashboardLive do
 
   def handle_info({:oauth_complete, _tokens}, socket) do
     {:noreply, assign(socket, :oauth_status, :connected)}
+  end
+
+  def handle_info({ClawrigWeb.WifiComponent, {:wifi_connected, ssid}}, socket) do
+    {:noreply, assign(socket, :wifi_ssid, ssid)}
   end
 
   # ---------- Private ----------

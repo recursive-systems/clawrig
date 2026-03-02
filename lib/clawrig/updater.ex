@@ -113,7 +113,7 @@ defmodule Clawrig.Updater do
   end
 
   defp oobe_complete? do
-    File.exists?("/var/lib/clawrig/.oobe-complete")
+    File.exists?(Application.get_env(:clawrig, :oobe_marker, "/var/lib/clawrig/.oobe-complete"))
   end
 
   defp do_check_and_update do

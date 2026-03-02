@@ -317,10 +317,11 @@ defmodule ClawrigWeb.WizardLive do
     {:ok, _receipt} = Launcher.write_receipt(state)
 
     # Mark OOBE as complete
-    File.mkdir_p!("/var/lib/clawrig")
-    File.write!("/var/lib/clawrig/.oobe-complete", "")
+    path = Application.get_env(:clawrig, :oobe_marker, "/var/lib/clawrig/.oobe-complete")
+    File.mkdir_p!(Path.dirname(path))
+    File.write!(path, "")
 
-    {:noreply, assign(socket, :finish_message, "Setup complete. Your Pi is ready.")}
+    {:noreply, socket |> put_flash(:info, "Setup complete!") |> redirect(to: "/")}
   end
 
   # Helpers
