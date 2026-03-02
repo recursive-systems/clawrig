@@ -1,0 +1,20 @@
+[Unit]
+Description=ClawRig Management Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+WorkingDirectory=/opt/clawrig
+ExecStart=/opt/clawrig/bin/clawrig start
+EnvironmentFile=/etc/clawrig.env
+Environment=PHX_SERVER=true
+Environment=PORT=4090
+Environment=CLAWRIG_STATE_PATH=/var/lib/clawrig/wizard-state.json
+User=pi
+Group=pi
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
