@@ -12,8 +12,6 @@ set -e
 # Output: deploy/pi-gen/pi-gen-repo/deploy/clawrig-*.img.zip
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OOBE_DIR="$(dirname "$SCRIPT_DIR")"
-REPO_DIR="$(dirname "$OOBE_DIR")"
 PIGEN_DIR="$SCRIPT_DIR/pi-gen"
 
 echo "============================================"

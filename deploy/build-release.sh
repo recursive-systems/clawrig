@@ -2,12 +2,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OOBE_DIR="$(dirname "$SCRIPT_DIR")"
-REPO_DIR="$(dirname "$OOBE_DIR")"
-
-echo "==> Copying CSS from wizard..."
-mkdir -p "$OOBE_DIR/priv/static/assets/css"
-cp "$REPO_DIR/wizard/public/style.css" "$OOBE_DIR/priv/static/assets/css/app.css"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 echo "==> Building ARM64 release via Docker..."
 # Use buildx if available (for cross-compilation on x86), otherwise plain docker build.
@@ -18,12 +13,12 @@ if docker buildx version &>/dev/null; then
     -f "$SCRIPT_DIR/Dockerfile.build" \
     -t clawrig-build \
     --load \
-    "$OOBE_DIR"
+    "$PROJECT_DIR"
 else
   docker build \
     -f "$SCRIPT_DIR/Dockerfile.build" \
     -t clawrig-build \
-    "$OOBE_DIR"
+    "$PROJECT_DIR"
 fi
 
 echo "==> Extracting tarball..."
@@ -40,7 +35,7 @@ cp "$SCRIPT_DIR/clawrig.tar.gz" "$BUNDLE_DIR/"
 cp "$SCRIPT_DIR/pi-setup.sh" "$BUNDLE_DIR/"
 cp "$SCRIPT_DIR/dnsmasq-captive.conf" "$BUNDLE_DIR/"
 cp "$SCRIPT_DIR/clawrig-avahi.service" "$BUNDLE_DIR/"
-cp "$REPO_DIR/systemd/clawrig.service" "$BUNDLE_DIR/"
+cp "$SCRIPT_DIR/systemd/clawrig.service" "$BUNDLE_DIR/"
 
 # Watchdog and self-healing files
 WATCHDOG_DIR="$SCRIPT_DIR/pi-gen/stage-clawrig/04-configure-watchdog/files"
