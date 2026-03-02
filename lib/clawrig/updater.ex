@@ -17,7 +17,7 @@ defmodule Clawrig.Updater do
   @version_file "/opt/clawrig/VERSION"
   @pubkey_path "/etc/clawrig/update-pubkey"
   @token_path "/etc/clawrig/github-token"
-  @repo "recursive-systems/openclaw_monorepo"
+  @repo "recursive-systems/clawrig"
   @api_base "https://api.github.com"
 
   @required_manifest_fields ~w(version tarball signature checksum released_at)
