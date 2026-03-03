@@ -1,29 +1,37 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..700;1,8..60,400&display=swap');
 
 :root {
-  --bg: #0e0f13;
-  --bg-2: #161821;
-  --card: rgba(22,24,33,0.92);
+  --bg: #0F172A;
+  --bg-2: #1E293B;
+  --card: rgba(30,41,59,0.92);
   --card-border: rgba(255,255,255,0.06);
-  --ink: #e8e6e3;
+  --ink: #F8FAFC;
   --ink-bright: #fff;
-  --muted: #7a7d8e;
+  --ink-secondary: #94A3B8;
+  --muted: #94A3B8;
+  --ink-muted: #64748B;
+  --ink-dim: #475569;
   --line: rgba(255,255,255,0.08);
-  --accent: #f0734c;
-  --accent-2: #ff9a76;
-  --accent-glow: rgba(240,115,76,0.15);
-  --ok: #3dd68c;
-  --ok-bg: rgba(61,214,140,0.1);
-  --ok-ink: #3dd68c;
-  --warn: #f0b429;
-  --warn-bg: rgba(240,180,41,0.1);
-  --warn-ink: #f0b429;
+  --accent: #EAB308;
+  --accent-2: #FACC15;
+  --accent-glow: rgba(234,179,8,0.12);
+  --signal-glow: rgba(234,179,8,0.15);
+  --border-hover: rgba(255,255,255,0.12);
+  --ok: #22C55E;
+  --ok-bg: rgba(34,197,94,0.1);
+  --ok-ink: #22C55E;
+  --warn: #F59E0B;
+  --warn-bg: rgba(245,158,11,0.1);
+  --warn-ink: #F59E0B;
   --err: #ef4444;
   --err-bg: rgba(239,68,68,0.1);
   --err-ink: #ef4444;
-  --radius: 16px;
-  --font-display: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
-  --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --radius: 14px;
+  --stitch-color: rgba(255,255,255,0.18);
+  --felt-shadow: inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(0,0,0,0.3);
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-headline: 'Fraunces', 'Georgia', serif;
+  --font-body: 'Source Serif 4', 'Georgia', serif;
 }
 
 * { box-sizing: border-box; margin: 0; }
@@ -50,12 +58,12 @@ body::before {
 body::after {
   content: '';
   position: fixed;
-  top: -30%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 800px;
-  height: 600px;
-  background: radial-gradient(ellipse, var(--accent-glow) 0%, transparent 70%);
+  top: -300px;
+  right: -250px;
+  width: 700px;
+  height: 700px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(234, 179, 8, 0.08), transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
@@ -77,7 +85,7 @@ body::after {
   border: 1px solid var(--card-border);
   border-radius: 20px;
   box-shadow:
-    0 0 0 1px rgba(255,255,255,0.03) inset,
+    var(--felt-shadow),
     0 24px 80px rgba(0,0,0,0.5),
     0 2px 8px rgba(0,0,0,0.3);
   display: grid;
@@ -106,9 +114,25 @@ h1 {
   gap: 10px;
 }
 
-h1::before {
-  content: '🦞';
-  font-size: 1.2rem;
+h1::before { content: none; }
+
+.shell-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.shell-wordmark {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink-bright);
+}
+
+.shell-wordmark .rig {
+  color: var(--accent);
 }
 
 .shell-head p { display: none; }
@@ -562,12 +586,12 @@ h2 {
 
 .btn.primary {
   background: var(--accent);
-  color: #fff;
-  box-shadow: 0 2px 12px rgba(240,115,76,0.25);
+  color: #0F172A;
+  box-shadow: 0 2px 16px var(--signal-glow), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.15);
 }
 .btn.primary:hover:not(:disabled) {
   background: var(--accent-2);
-  box-shadow: 0 4px 20px rgba(240,115,76,0.35);
+  box-shadow: 0 6px 28px rgba(234,179,8,0.25), inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.15);
 }
 
 .btn.ghost {
@@ -719,8 +743,8 @@ h2 {
 }
 
 @keyframes tg-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(240,115,76,0.2); }
-  50% { box-shadow: 0 0 0 14px rgba(240,115,76,0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(234,179,8,0.2); }
+  50% { box-shadow: 0 0 0 14px rgba(234,179,8,0); }
 }
 
 /* ─── Telegram numbered steps ─── */
@@ -749,7 +773,7 @@ h2 {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: rgba(240,115,76,0.12);
+  background: rgba(234,179,8,0.12);
   color: var(--accent-2);
   font-family: var(--font-display);
   font-size: 0.75rem;
@@ -1487,13 +1511,13 @@ h2 {
 }
 
 .wifi-status-banner.connected {
-  border-color: rgba(61,214,140,0.25);
-  background: rgba(61,214,140,0.06);
+  border-color: rgba(34,197,94,0.25);
+  background: rgba(34,197,94,0.06);
 }
 
 .wifi-status-banner.disconnected {
-  border-color: rgba(240,180,41,0.2);
-  background: rgba(240,180,41,0.04);
+  border-color: rgba(245,158,11,0.2);
+  background: rgba(245,158,11,0.04);
 }
 
 .wifi-status-icon {
@@ -1634,7 +1658,7 @@ h2 {
 }
 
 .wifi-net-active {
-  border-color: rgba(61,214,140,0.25);
+  border-color: rgba(34,197,94,0.25);
 }
 
 .wifi-net-selected {
