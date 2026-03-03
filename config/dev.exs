@@ -29,6 +29,7 @@ config :clawrig, dev_routes: true
 config :clawrig, :system_commands, Clawrig.System.MacCommands
 config :clawrig, :state_path, "wizard-state.json"
 config :clawrig, :oobe_marker, ".oobe-complete"
+config :clawrig, :device_code_module, Clawrig.Wizard.MockDeviceCode
 
 config :logger, :default_formatter, format: "[$level] $message\n"
 

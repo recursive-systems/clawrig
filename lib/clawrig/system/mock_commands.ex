@@ -33,17 +33,6 @@ defmodule Clawrig.System.MockCommands do
   end
 
   @impl true
-  def check_openclaw do
-    {:ok, "1.2.3"}
-  end
-
-  @impl true
-  def install_openclaw do
-    Process.sleep(2000)
-    {:ok, "1.2.3"}
-  end
-
-  @impl true
   def run_openclaw(args) do
     case args do
       ["gateway", "status"] -> {"RPC probe: ok\n", 0}

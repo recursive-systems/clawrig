@@ -58,15 +58,43 @@ defmodule ClawrigWeb.WifiComponent do
       <%!-- Connection status banner --%>
       <div class={["wifi-status-banner", if(@wifi_ssid, do: "connected", else: "disconnected")]}>
         <div class="wifi-status-icon">
-          <svg :if={@wifi_ssid} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M5 12.55a11 11 0 0 1 14.08 0" /><path d="M1.42 9a16 16 0 0 1 21.16 0" /><path d="M8.53 16.11a6 6 0 0 1 6.95 0" /><circle cx="12" cy="20" r="1" fill="currentColor" />
+          <svg
+            :if={@wifi_ssid}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M5 12.55a11 11 0 0 1 14.08 0" /><path d="M1.42 9a16 16 0 0 1 21.16 0" /><path d="M8.53 16.11a6 6 0 0 1 6.95 0" /><circle
+              cx="12"
+              cy="20"
+              r="1"
+              fill="currentColor"
+            />
           </svg>
-          <svg :if={!@wifi_ssid} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="1" y1="1" x2="23" y2="23" /><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" /><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" /><path d="M10.71 5.05A16 16 0 0 1 22.56 9" /><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" /><path d="M8.53 16.11a6 6 0 0 1 6.95 0" /><circle cx="12" cy="20" r="1" fill="currentColor" />
+          <svg
+            :if={!@wifi_ssid}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="1" y1="1" x2="23" y2="23" /><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" /><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" /><path d="M10.71 5.05A16 16 0 0 1 22.56 9" /><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" /><path d="M8.53 16.11a6 6 0 0 1 6.95 0" /><circle
+              cx="12"
+              cy="20"
+              r="1"
+              fill="currentColor"
+            />
           </svg>
         </div>
         <div class="wifi-status-text">
-          <span class="wifi-status-label">{if @wifi_ssid, do: "Connected to", else: "Not connected"}</span>
+          <span class="wifi-status-label">
+            {if @wifi_ssid, do: "Connected to", else: "Not connected"}
+          </span>
           <span class="wifi-status-ssid">{@wifi_ssid || "No network"}</span>
         </div>
         <div :if={@wifi_ssid} class="wifi-status-badge">
@@ -77,7 +105,11 @@ defmodule ClawrigWeb.WifiComponent do
       <%!-- Error --%>
       <div :if={@wifi_error} class="wifi-error">
         <svg viewBox="0 0 20 20" fill="currentColor" class="wifi-error-icon">
-          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+          <path
+            fill-rule="evenodd"
+            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+            clip-rule="evenodd"
+          />
         </svg>
         {@wifi_error}
       </div>
@@ -145,7 +177,14 @@ defmodule ClawrigWeb.WifiComponent do
       <%!-- Empty state --%>
       <div :if={@networks == [] && !@scanning} class="wifi-empty-state">
         <div class="wifi-empty-icon">
-          <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            viewBox="0 0 48 48"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M10 24.5a18 18 0 0 1 28 0" opacity="0.3" />
             <path d="M6 19.5a24 24 0 0 1 36 0" opacity="0.15" />
             <path d="M15 29a12 12 0 0 1 18 0" opacity="0.5" />
@@ -154,7 +193,9 @@ defmodule ClawrigWeb.WifiComponent do
           </svg>
         </div>
         <p class="wifi-empty-title">No networks found</p>
-        <p class="wifi-empty-hint">Click <strong>Scan</strong> to search for nearby Wi-Fi networks.</p>
+        <p class="wifi-empty-hint">
+          Click <strong>Scan</strong> to search for nearby Wi-Fi networks.
+        </p>
       </div>
     </div>
     """

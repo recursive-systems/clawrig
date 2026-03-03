@@ -50,7 +50,7 @@ defmodule Clawrig.Wizard.Telegram do
     end
   end
 
-  def save_config(token, _chat_id, _bot_name) do
+  def save_config(token, chat_id, _bot_name) do
     alias Clawrig.System.Commands
 
     Commands.impl().run_openclaw([
@@ -61,6 +61,21 @@ defmodule Clawrig.Wizard.Telegram do
       "--token",
       token
     ])
+
+    # `openclaw channels add` does not set allowFrom, so merge the detected
+    # chat ID into the config so the gateway accepts messages from this user.
+    if chat_id do
+      home = System.get_env("HOME") || "/root"
+      config_path = Path.join(home, ".openclaw/openclaw.json")
+
+      with {:ok, contents} <- File.read(config_path),
+           {:ok, config} <- Jason.decode(contents),
+           %{"telegram" => tg} <- Map.get(config, "channels", %{}) do
+        tg = Map.put(tg, "allowFrom", [chat_id])
+        config = put_in(config, ["channels", "telegram"], tg)
+        File.write!(config_path, Jason.encode!(config, pretty: true))
+      end
+    end
 
     {:ok, true}
   end

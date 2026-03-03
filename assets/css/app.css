@@ -202,154 +202,6 @@ h2 {
   line-height: 1.55;
 }
 
-/* ─── Install step ─── */
-.install-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  flex: 1;
-  gap: 0;
-}
-
-.install-center h2 {
-  margin-top: 18px;
-  margin-bottom: 4px;
-  font-size: 1.3rem;
-  transition: color 400ms ease;
-}
-
-.install-center p {
-  margin: 0 auto 12px;
-  font-size: 0.92rem;
-  max-width: 300px;
-}
-
-.install-orb-wrap {
-  position: relative;
-  width: 100px;
-  height: 100px;
-}
-
-/* ─── Orb button (install state) ─── */
-.install-orb {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  border: 2px solid var(--accent);
-  background: linear-gradient(135deg, rgba(240,115,76,0.12), rgba(240,115,76,0.04));
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease, background 200ms ease;
-  position: relative;
-  z-index: 1;
-}
-
-.install-orb:hover:not(:disabled) {
-  transform: scale(1.06);
-  box-shadow: 0 0 30px rgba(240,115,76,0.25), 0 0 60px rgba(240,115,76,0.08);
-  border-color: var(--accent-2);
-  background: linear-gradient(135deg, rgba(240,115,76,0.18), rgba(240,115,76,0.06));
-}
-
-.install-orb:active:not(:disabled) {
-  transform: scale(0.97);
-}
-
-.install-orb:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-.install-orb-icon {
-  font-size: 28px;
-  line-height: 1;
-}
-
-.install-orb-label {
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--accent-2);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-
-/* ─── Spinner ring (checking/installing state) ─── */
-.install-orb-spinner {
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  border-top-color: var(--accent);
-  animation: spin 800ms linear infinite;
-  z-index: 2;
-  pointer-events: none;
-}
-
-/* ─── Check animation (installed state) ─── */
-.install-orb-check {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  z-index: 3;
-}
-
-.install-check-svg {
-  width: 100px;
-  height: 100px;
-}
-
-.install-check-circle {
-  stroke: var(--ok);
-  stroke-width: 2;
-  stroke-dasharray: 151;
-  stroke-dashoffset: 151;
-  stroke-linecap: round;
-  animation: install-circle 600ms cubic-bezier(.4,0,.2,1) 100ms forwards;
-}
-
-.install-check-mark {
-  stroke: var(--ok);
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: 40;
-  stroke-dashoffset: 40;
-  animation: install-mark 400ms cubic-bezier(.4,0,.2,1) 500ms forwards;
-}
-
-@keyframes install-circle {
-  to { stroke-dashoffset: 0; }
-}
-
-@keyframes install-mark {
-  to { stroke-dashoffset: 0; }
-}
-
-.install-center h2.installed { color: var(--ok); }
-
-.install-center .install-version {
-  font-family: var(--font-display);
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--ok);
-  letter-spacing: 0.02em;
-  opacity: 0;
-  transform: translateY(4px);
-  animation: install-version-in 350ms ease 750ms forwards;
-}
-
-@keyframes install-version-in {
-  to { opacity: 1; transform: translateY(0); }
-}
-
 /* ─── Device check step ─── */
 .check-center {
   display: flex;
@@ -468,8 +320,8 @@ h2 {
 .check-label.pass { color: var(--ok); }
 .check-label.fail { color: var(--err); }
 
-/* ─── OAuth step ─── */
-.oauth-center {
+/* ─── OpenAI API key step ─── */
+.openai-center {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -479,28 +331,28 @@ h2 {
   gap: 0;
 }
 
-.oauth-center h2 {
+.openai-center h2 {
   margin-top: 18px;
   margin-bottom: 4px;
   font-size: 1.3rem;
   transition: color 400ms ease;
 }
 
-.oauth-center h2.connected { color: var(--ok); }
+.openai-center h2.pass { color: var(--ok); }
 
-.oauth-center p {
+.openai-center p {
   margin: 0 auto 16px;
   font-size: 0.92rem;
   max-width: 300px;
 }
 
-.oauth-logo-wrap {
+.openai-icon-wrap {
   position: relative;
   width: 80px;
   height: 80px;
 }
 
-.oauth-logo {
+.openai-logo {
   width: 80px;
   height: 80px;
   border-radius: 50%;
@@ -508,19 +360,16 @@ h2 {
   border: 2px solid rgba(255,255,255,0.12);
   display: grid;
   place-items: center;
-  transition: opacity 300ms ease, transform 300ms ease;
 }
 
-.oauth-logo img {
+.openai-logo img {
   width: 36px;
   height: 36px;
   color: var(--ink);
   opacity: 0.85;
 }
 
-.oauth-logo.hidden { opacity: 0; transform: scale(0.8); }
-
-.oauth-check {
+.openai-check {
   position: absolute;
   inset: 0;
   display: grid;
@@ -528,39 +377,171 @@ h2 {
   z-index: 3;
 }
 
-.oauth-check-svg {
+.openai-check-svg {
   width: 80px;
   height: 80px;
 }
 
-.oauth-check-circle {
+.openai-check-circle {
   stroke: var(--ok);
   stroke-width: 2;
   stroke-dasharray: 151;
   stroke-dashoffset: 151;
   stroke-linecap: round;
-  animation: install-circle 600ms cubic-bezier(.4,0,.2,1) 100ms forwards;
+  animation: draw-circle 600ms cubic-bezier(.4,0,.2,1) 100ms forwards;
 }
 
-.oauth-check-mark {
+.openai-check-mark {
   stroke: var(--ok);
   stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-dasharray: 40;
   stroke-dashoffset: 40;
-  animation: install-mark 400ms cubic-bezier(.4,0,.2,1) 500ms forwards;
+  animation: draw-mark 400ms cubic-bezier(.4,0,.2,1) 500ms forwards;
 }
 
-.oauth-spinner {
-  position: absolute;
-  inset: -4px;
+.openai-instructions {
+  width: 100%;
+  max-width: 360px;
+}
+
+.openai-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+  text-align: left;
+}
+
+.openai-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.openai-step-num {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: 2px solid transparent;
-  border-top-color: var(--ink);
-  animation: spin 800ms linear infinite;
-  z-index: 2;
-  pointer-events: none;
+  background: rgba(255,255,255,0.08);
+  display: grid;
+  place-items: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.openai-steps li div {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  padding-top: 1px;
+}
+
+.openai-link {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.openai-input-group {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+}
+
+.openai-input-group label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--muted);
+}
+
+.openai-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.04);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+}
+
+.openai-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.openai-input.error {
+  border-color: var(--err);
+}
+
+.openai-input-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 6px 0 0;
+}
+
+.openai-input-hint.error {
+  color: var(--err);
+}
+
+.openai-input-hint code {
+  font-size: 0.75rem;
+  background: rgba(255,255,255,0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* ─── OpenAI sub-steps ─── */
+.openai-sub {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  animation: tg-sub-in 350ms cubic-bezier(.16,1,.3,1) forwards;
+}
+
+.openai-sub.active { display: flex; }
+
+.openai-center h2.fail { color: var(--err); }
+
+.openai-center p.error {
+  color: var(--err);
+  font-size: 0.88rem;
+  max-width: 380px;
+  line-height: 1.55;
+}
+
+/* ─── Device code display ─── */
+.device-code-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: rgba(255,255,255,0.04);
+  border: 1.5px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.device-code-value {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--ink-bright);
+}
+
+/* ─── OpenAI QR row ─── */
+.openai-qr-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 16px;
 }
 
 /* ─── Buttons ─── */
@@ -642,6 +623,8 @@ h2 {
   vertical-align: middle;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes draw-circle { to { stroke-dashoffset: 0; } }
+@keyframes draw-mark { to { stroke-dashoffset: 0; } }
 
 /* ─── Status pills ─── */
 .pill {
@@ -898,7 +881,7 @@ h2 {
   stroke-dasharray: 151;
   stroke-dashoffset: 151;
   stroke-linecap: round;
-  animation: install-circle 600ms cubic-bezier(.4,0,.2,1) 100ms forwards;
+  animation: draw-circle 600ms cubic-bezier(.4,0,.2,1) 100ms forwards;
 }
 
 .tg-check-mark {
@@ -908,7 +891,7 @@ h2 {
   stroke-linejoin: round;
   stroke-dasharray: 40;
   stroke-dashoffset: 40;
-  animation: install-mark 400ms cubic-bezier(.4,0,.2,1) 500ms forwards;
+  animation: draw-mark 400ms cubic-bezier(.4,0,.2,1) 500ms forwards;
 }
 
 .tg-prereq {
@@ -957,143 +940,6 @@ h2 {
 }
 
 .tg-qr-label strong { color: var(--ink); }
-
-/* ─── Launch step ─── */
-.launch-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  flex: 1;
-  gap: 0;
-}
-
-.launch-center h2 {
-  margin-bottom: 4px;
-  font-size: 1.3rem;
-  transition: color 400ms ease;
-}
-
-.launch-center h2.pass { color: var(--ok); }
-.launch-center h2.fail { color: var(--err); }
-
-.launch-center p {
-  margin: 0 auto 20px;
-  font-size: 0.92rem;
-  max-width: 340px;
-  color: var(--muted);
-}
-
-.launch-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-  max-width: 340px;
-  margin-bottom: 16px;
-}
-
-.launch-item {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.05);
-  transition: background 300ms ease, border-color 300ms ease;
-}
-
-.launch-icon-wrap {
-  position: relative;
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-}
-
-.launch-spinner {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 2px solid var(--line);
-  border-top-color: var(--accent);
-  animation: spin 800ms linear infinite;
-}
-
-.launch-ok, .launch-fail {
-  position: absolute;
-  inset: 0;
-  width: 32px;
-  height: 32px;
-}
-
-.launch-ok-circle {
-  stroke: var(--ok);
-  stroke-width: 2;
-  stroke-dasharray: 100;
-  stroke-dashoffset: 100;
-  stroke-linecap: round;
-}
-
-.launch-ok-mark {
-  stroke: var(--ok);
-  stroke-width: 2.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: 28;
-  stroke-dashoffset: 28;
-}
-
-.launch-ok.animate .launch-ok-circle {
-  animation: check-circle-draw 500ms cubic-bezier(.4,0,.2,1) 80ms forwards;
-}
-
-.launch-ok.animate .launch-ok-mark {
-  animation: check-mark-draw 350ms cubic-bezier(.4,0,.2,1) 400ms forwards;
-}
-
-.launch-fail-circle {
-  stroke: var(--err);
-  stroke-width: 2;
-  stroke-dasharray: 100;
-  stroke-dashoffset: 100;
-  stroke-linecap: round;
-}
-
-.launch-fail-x {
-  stroke: var(--err);
-  stroke-width: 2.5;
-  stroke-linecap: round;
-  stroke-dasharray: 28;
-  stroke-dashoffset: 28;
-}
-
-.launch-fail.animate .launch-fail-circle {
-  animation: check-circle-draw 500ms cubic-bezier(.4,0,.2,1) 80ms forwards;
-}
-
-.launch-fail.animate .launch-fail-x {
-  animation: check-mark-draw 350ms cubic-bezier(.4,0,.2,1) 400ms forwards;
-}
-
-.launch-pending {
-  position: absolute;
-  inset: 8px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.08);
-}
-
-.launch-label {
-  font-family: var(--font-display);
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--muted);
-  transition: color 400ms ease;
-}
-
-.launch-label.pass { color: var(--ok); }
-.launch-label.fail { color: var(--err); }
 
 /* ─── Complete / Receipt step ─── */
 .done-center {
@@ -1183,6 +1029,13 @@ h2 {
 .helper { margin-top: 10px; color: var(--muted); font-size: 0.9rem; }
 .hidden { display: none !important; }
 
+/* ─── Mobile / Desktop toggle ─── */
+.show-mobile { display: none; }
+@media (max-width: 680px) {
+  .hide-mobile { display: none !important; }
+  .show-mobile { display: inline-flex; text-decoration: none; }
+}
+
 
 /* ─── Responsive ─── */
 @media (max-width: 920px) {
@@ -1195,7 +1048,6 @@ h2 {
   .progress { padding: 12px 20px 0; }
   .panel { padding: 28px 20px; }
   .shell-foot { padding: 12px 20px 16px; }
-  .install-hero { flex-direction: column; gap: 12px; }
 }
 
 
@@ -1295,6 +1147,234 @@ h2 {
 
 .status-value.ok { color: var(--ok); }
 .status-value.err { color: var(--err); }
+.status-value.warn { color: var(--warn); }
+
+.status-value.loading {
+  color: var(--muted);
+  animation: pulse-fade 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-fade {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+/* ─── Dash panel (component) ─── */
+.dash-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dash-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.dash-panel-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dash-panel-title-row h2 {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink-bright);
+  margin: 0;
+}
+
+.dash-back {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 200ms ease;
+}
+
+.dash-back:hover {
+  color: var(--ink);
+}
+
+/* ─── Section header (e.g. Logs) ─── */
+.dash-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.dash-section-header h3 {
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ink-bright);
+  margin: 0;
+}
+
+/* ─── System actions ─── */
+.system-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.system-action-group h3 {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+/* ─── Account status ─── */
+.account-status {
+  padding: 20px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.account-connected {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.account-badge {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.account-check-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.account-check-circle {
+  stroke: var(--ok);
+  stroke-width: 2;
+}
+
+.account-check-mark {
+  stroke: var(--ok);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ─── Account section (dashboard re-auth) ─── */
+.account-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.account-section h3 {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink-bright);
+  margin: 0;
+}
+
+.account-section p {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.account-actions { margin-top: 4px; }
+
+.account-lead { margin-bottom: 6px; }
+
+.account-choose {
+  align-items: center;
+  text-align: center;
+  padding: 10px 0;
+}
+
+.account-auth-link { margin: 4px 0; }
+
+.account-saving {
+  align-items: center;
+  padding: 30px 0;
+  gap: 16px;
+}
+
+.account-error {
+  color: var(--err);
+  font-size: 0.88rem;
+}
+
+.account-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.account-input-group label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.account-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1.5px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  box-sizing: border-box;
+}
+
+.account-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.account-input.error { border-color: var(--err); }
+
+.account-input-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.account-input-hint.error { color: var(--err); }
+
+.account-input-hint code {
+  font-size: 0.75rem;
+  background: rgba(255,255,255,0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.coming-soon {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* ─── Log section ─── */
+.log-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 
 /* ─── Network list ─── */
 .network-list {
@@ -1385,6 +1465,363 @@ h2 {
   word-break: break-all;
 }
 
+/* ═══════════════════════════════════════════
+   Wi-Fi Component
+   ═══════════════════════════════════════════ */
+
+.wifi-component {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ─── Connection status banner ─── */
+.wifi-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: rgba(255,255,255,0.03);
+}
+
+.wifi-status-banner.connected {
+  border-color: rgba(61,214,140,0.25);
+  background: rgba(61,214,140,0.06);
+}
+
+.wifi-status-banner.disconnected {
+  border-color: rgba(240,180,41,0.2);
+  background: rgba(240,180,41,0.04);
+}
+
+.wifi-status-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.wifi-status-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.connected .wifi-status-icon { color: var(--ok); }
+.disconnected .wifi-status-icon { color: var(--warn); }
+
+.wifi-status-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.wifi-status-label {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.wifi-status-ssid {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--ink-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wifi-status-badge {
+  flex-shrink: 0;
+}
+
+.wifi-status-dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 6px var(--ok-bg);
+}
+
+/* ─── Error banner ─── */
+.wifi-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--err-bg);
+  border: 1px solid rgba(239,68,68,0.2);
+  color: var(--err);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.wifi-error-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* ─── Scanning indicator ─── */
+.wifi-scanning {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 16px;
+}
+
+.wifi-scanning-bar {
+  width: 100%;
+  max-width: 200px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--card-border);
+  overflow: hidden;
+  position: relative;
+}
+
+.wifi-scanning-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  animation: wifi-scan-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes wifi-scan-slide {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
+
+.wifi-scanning-text {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+/* ─── Network list ─── */
+.wifi-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wifi-net {
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  background: rgba(255,255,255,0.03);
+  overflow: hidden;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+
+.wifi-net:hover {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.1);
+}
+
+.wifi-net-active {
+  border-color: rgba(61,214,140,0.25);
+}
+
+.wifi-net-selected {
+  border-color: var(--accent);
+  background: rgba(255,255,255,0.05);
+}
+
+.wifi-net-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+}
+
+.wifi-net-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* ─── Signal bars ─── */
+.wifi-signal-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  width: 16px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.wifi-bar {
+  display: block;
+  width: 3px;
+  border-radius: 1px;
+  background: rgba(255,255,255,0.15);
+  transition: background 200ms ease;
+}
+
+.wifi-bar.bar-1 { height: 5px; }
+.wifi-bar.bar-2 { height: 9px; }
+.wifi-bar.bar-3 { height: 14px; }
+
+.wifi-signal-bars.level-1 .bar-1 { background: var(--err); }
+.wifi-signal-bars.level-2 .bar-1,
+.wifi-signal-bars.level-2 .bar-2 { background: var(--warn); }
+.wifi-signal-bars.level-3 .bar-1,
+.wifi-signal-bars.level-3 .bar-2,
+.wifi-signal-bars.level-3 .bar-3 { background: var(--ok); }
+
+.wifi-net-ssid {
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wifi-net-connected-tag {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ok);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+.wifi-net-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.wifi-net-lock {
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+}
+
+.wifi-net-lock svg {
+  width: 100%;
+  height: 100%;
+}
+
+.wifi-net-signal-pct {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  min-width: 32px;
+  text-align: right;
+}
+
+/* ─── Password form (expanded) ─── */
+.wifi-net-form {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 12px;
+}
+
+.wifi-net-pass {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 200ms ease;
+}
+
+.wifi-net-pass:focus {
+  border-color: var(--accent);
+}
+
+.wifi-net-pass::placeholder {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.wifi-net-connect {
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 200ms ease;
+  white-space: nowrap;
+}
+
+.wifi-net-connect:hover {
+  background: var(--accent-2);
+}
+
+/* ─── Empty state ─── */
+.wifi-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.wifi-empty-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--muted);
+  opacity: 0.5;
+}
+
+.wifi-empty-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.wifi-empty-title {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.wifi-empty-hint {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.wifi-empty-hint strong {
+  color: var(--ink);
+}
+
 /* ─── Dashboard responsive ─── */
 @media (max-width: 680px) {
   .dashboard .shell-head { padding: 16px 20px; }
@@ -1393,4 +1830,5 @@ h2 {
   .dash-content { padding: 20px; }
   .status-grid { grid-template-columns: 1fr; }
   .action-grid { flex-direction: column; }
+  .wifi-net-form { flex-direction: column; }
 }

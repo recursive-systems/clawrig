@@ -19,7 +19,15 @@ defmodule ClawrigWeb.WifiHTML do
       |> assign(:c3, if(s >= 75, do: active, else: inactive))
 
     ~H"""
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
       <circle cx="12" cy="18" r="1.5" fill={@active} stroke="none" />
       <path d="M9.17 13.17a5.5 5.5 0 0 1 5.66 0" stroke={@c1} />
       <path d="M6.34 10.34a10 10 0 0 1 11.32 0" stroke={@c2} />

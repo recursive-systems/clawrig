@@ -18,19 +18,25 @@
 
   <section class="stage" aria-live="polite">
     <%!-- Preflight --%>
-    <article class={panel_class(@step, :preflight)} phx-hook="AutoRun" id="preflight-panel" data-event="run_preflight" data-run={to_string(!@preflight_done)}>
+    <article
+      class={panel_class(@step, :preflight)}
+      phx-hook="AutoRun"
+      id="preflight-panel"
+      data-event="run_preflight"
+      data-run={to_string(!@preflight_done)}
+    >
       <div class="check-center">
         <div class="check-list">
           <div class="check-item">
             <div class="check-icon-wrap">
               <div :if={@preflight_status == :checking} class="check-spinner"></div>
               <svg :if={@preflight_status == :pass} class="check-ok" viewBox="0 0 36 36">
-                <circle class="check-ok-circle" cx="18" cy="18" r="16" fill="none"/>
-                <path class="check-ok-mark" fill="none" d="M11 19l4 4 10-10"/>
+                <circle class="check-ok-circle" cx="18" cy="18" r="16" fill="none" />
+                <path class="check-ok-mark" fill="none" d="M11 19l4 4 10-10" />
               </svg>
               <svg :if={@preflight_status == :fail} class="check-fail" viewBox="0 0 36 36">
-                <circle class="check-fail-circle" cx="18" cy="18" r="16" fill="none"/>
-                <path class="check-fail-x" fill="none" d="M13 13l10 10M23 13l-10 10"/>
+                <circle class="check-fail-circle" cx="18" cy="18" r="16" fill="none" />
+                <path class="check-fail-x" fill="none" d="M13 13l10 10M23 13l-10 10" />
               </svg>
               <div :if={@preflight_status == nil} class="check-spinner"></div>
             </div>
@@ -49,74 +55,197 @@
       </div>
     </article>
 
-    <%!-- Install --%>
-    <article class={panel_class(@step, :install)} phx-hook="AutoRun" id="install-panel" data-event="check_openclaw" data-run={to_string(!@install_done)}>
-      <div class="install-center">
-        <div class="install-orb-wrap">
-          <button
-            :if={@install_status != :installed}
-            class="install-orb"
-            phx-click="install_openclaw"
-            disabled={@install_status in [:checking, :installing]}
-            aria-label="Install OpenClaw"
-          >
-            <span class="install-orb-icon">&#x1F99E;</span>
-            <span class="install-orb-label">Install</span>
+    <%!-- OpenAI --%>
+    <article class={panel_class(@step, :openai)} id="openai-panel">
+      <div class="openai-center">
+        <%!-- Choose auth method --%>
+        <div :if={@openai_sub == :choose} class="openai-sub active">
+          <div class="openai-icon-wrap">
+            <div class="openai-logo">
+              <img alt="OpenAI" src={~p"/images/openai-mark.svg"} />
+            </div>
+          </div>
+          <h2>{openai_title(@openai_sub)}</h2>
+          <p>{openai_desc(@openai_sub)}</p>
+          <button class="btn openai" phx-click="openai_start_device_code">
+            <img alt="" src={~p"/images/openai-mark.svg"} /> Sign in with OpenAI
           </button>
-          <div :if={@install_status == :installed} class="install-orb-check">
-            <svg class="install-check-svg" viewBox="0 0 52 52">
-              <circle class="install-check-circle" cx="26" cy="26" r="24" fill="none"/>
-              <path class="install-check-mark" fill="none" d="M15 27l7 7 15-15"/>
-            </svg>
-          </div>
-          <div :if={@install_status in [:checking, :installing]} class="install-orb-spinner"></div>
+          <button
+            class="btn subtle"
+            phx-click="openai_use_api_key"
+            style="margin-top:10px"
+          >
+            Use API key instead
+          </button>
         </div>
-        <h2 class={if @install_status == :installed, do: "installed"}>
-          {install_title(@install_status)}
-        </h2>
-        <p>{install_desc(@install_status, @install_version)}</p>
-      </div>
-    </article>
 
-    <%!-- OAuth --%>
-    <article class={panel_class(@step, :oauth)} phx-hook="AutoRun" id="oauth-panel" data-event="check_oauth" data-run={to_string(!@oauth_connected)}>
-      <div class="oauth-center">
-        <div class="oauth-logo-wrap">
-          <div :if={!@oauth_connected} class="oauth-logo">
-            <img alt="OpenAI" src={~p"/images/openai-mark.svg"} />
-          </div>
-          <div :if={@oauth_connected} class="oauth-check">
-            <svg class="oauth-check-svg" viewBox="0 0 52 52">
-              <circle class="oauth-check-circle" cx="26" cy="26" r="24" fill="none"/>
-              <path class="oauth-check-mark" fill="none" d="M15 27l7 7 15-15"/>
-            </svg>
-          </div>
-          <div :if={@oauth_status in [:starting, :waiting]} class="oauth-spinner"></div>
+        <%!-- Device code polling --%>
+        <div :if={@openai_sub == :device_code} class="openai-sub active" id="openai-device-code" phx-hook="PageFocus">
+          <%= if @openai_resuming do %>
+            <div class="openai-icon-wrap">
+              <div class="check-spinner"></div>
+            </div>
+            <h2>Completing sign-in…</h2>
+            <p>Checking your authorization with OpenAI.</p>
+            <button
+              class="btn ghost btn-sm"
+              phx-click="openai_back_to_choose"
+              style="margin-top:16px"
+            >
+              Start over
+            </button>
+          <% else %>
+            <h2>{openai_title(@openai_sub)}</h2>
+            <p>{openai_desc(@openai_sub)}</p>
+
+            <div :if={@openai_user_code} class="device-code-display">
+              <span class="device-code-value" id="device-code-text">{@openai_user_code}</span>
+              <button
+                class="btn subtle btn-sm"
+                id="copy-device-code"
+                phx-hook="CopyToClipboard"
+                data-text={@openai_user_code}
+              >
+                Copy
+              </button>
+            </div>
+
+            <div class="openai-qr-row">
+              <div
+                class="tg-qr hide-mobile"
+                id="openai-qr-device"
+                phx-hook="QRCode"
+                data-url="https://auth.openai.com/codex/device"
+              >
+              </div>
+              <p class="tg-qr-label hide-mobile">
+                Scan to open <strong>auth.openai.com</strong>
+              </p>
+              <a
+                href="https://auth.openai.com/codex/device"
+                target="_blank"
+                class="btn primary show-mobile"
+              >
+                Open auth.openai.com
+              </a>
+            </div>
+
+            <div :if={@openai_polling} class="tg-polling">
+              <div class="tg-polling-dot"></div>
+              <span>Waiting for authorization…</span>
+            </div>
+
+            <button
+              class="btn ghost btn-sm"
+              phx-click="openai_back_to_choose"
+              style="margin-top:12px"
+            >
+              Cancel
+            </button>
+          <% end %>
         </div>
-        <h2 class={if @oauth_connected, do: "connected"}>
-          {if @oauth_connected, do: "Connected", else: "OpenAI"}
-        </h2>
-        <p>
-          {oauth_desc(@oauth_status, @oauth_connected)}
-        </p>
-        <button
-          :if={!@oauth_connected && @oauth_url}
-          class="btn openai"
-          phx-hook="OAuthPopup"
-          id="btn-oauth-popup"
-          data-url={@oauth_url}
-        >
-          <img alt="OpenAI" src={~p"/images/openai-mark.svg"} />
-          <span>Continue with OpenAI</span>
-        </button>
-        <button
-          :if={!@oauth_connected && !@oauth_url && @oauth_status != :starting}
-          class="btn openai"
-          phx-click="start_oauth"
-        >
-          <img alt="OpenAI" src={~p"/images/openai-mark.svg"} />
-          <span>Continue with OpenAI</span>
-        </button>
+
+        <%!-- Done --%>
+        <div :if={@openai_sub == :done} class="openai-sub active">
+          <div class="openai-icon-wrap">
+            <div class="openai-check">
+              <svg class="openai-check-svg" viewBox="0 0 52 52">
+                <circle class="openai-check-circle" cx="26" cy="26" r="24" fill="none" />
+                <path class="openai-check-mark" fill="none" d="M15 27l7 7 15-15" />
+              </svg>
+            </div>
+          </div>
+          <h2 class={openai_title_class(@openai_sub)}>
+            {openai_title(@openai_sub)}
+          </h2>
+          <p>{openai_desc(@openai_sub)}</p>
+        </div>
+
+        <%!-- Error --%>
+        <div :if={@openai_sub == :error} class="openai-sub active">
+          <div class="openai-icon-wrap">
+            <div class="openai-logo">
+              <img alt="OpenAI" src={~p"/images/openai-mark.svg"} />
+            </div>
+          </div>
+          <h2 class={openai_title_class(@openai_sub)}>
+            {openai_title(@openai_sub)}
+          </h2>
+          <p class="error">{@openai_error}</p>
+          <button class="btn primary" phx-click="openai_start_device_code" style="margin-top:4px">
+            Try again
+          </button>
+          <button
+            class="btn subtle"
+            phx-click="openai_use_api_key"
+            style="margin-top:10px"
+          >
+            Use API key instead
+          </button>
+        </div>
+
+        <%!-- API key paste (fallback) --%>
+        <div :if={@openai_sub == :api_key} class="openai-sub active">
+          <h2>{openai_title(@openai_sub)}</h2>
+          <p>{openai_desc(@openai_sub)}</p>
+          <div class="openai-instructions">
+            <ol class="openai-steps">
+              <li>
+                <span class="openai-step-num">1</span>
+                <div>
+                  Go to
+                  <a
+                    href="https://platform.openai.com/api-keys"
+                    target="_blank"
+                    class="openai-link"
+                  >
+                    platform.openai.com/api-keys
+                  </a>
+                </div>
+              </li>
+              <li>
+                <span class="openai-step-num">2</span>
+                <div>Click <strong>Create new secret key</strong></div>
+              </li>
+              <li>
+                <span class="openai-step-num">3</span>
+                <div>Copy the key and paste it below</div>
+              </li>
+            </ol>
+            <form phx-submit="submit_api_key" class="openai-input-group">
+              <label for="api-key-input">API key</label>
+              <input
+                type="password"
+                name="api_key"
+                id="api-key-input"
+                class={["openai-input", @openai_error && "error"]}
+                placeholder="sk-..."
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <p class={["openai-input-hint", @openai_error && "error"]}>
+                {if @openai_error,
+                  do: @openai_error,
+                  else: raw("Starts with <code>sk-</code>")}
+              </p>
+              <button
+                type="submit"
+                class="btn primary"
+                disabled={@openai_status == :saving}
+                style="margin-top:12px"
+              >
+                {if @openai_status == :saving, do: "Saving...", else: "Save API key"}
+              </button>
+            </form>
+          </div>
+          <button
+            class="btn ghost btn-sm"
+            phx-click="openai_back_to_choose"
+            style="margin-top:8px"
+          >
+            Back
+          </button>
+        </div>
       </div>
     </article>
 
@@ -127,12 +256,26 @@
         <div :if={@tg_sub == :intro} class="tg-sub active">
           <div class="tg-icon-wrap">
             <div class="tg-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M22 2L11 13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
             </div>
           </div>
           <h2>Telegram</h2>
-          <p class="tg-lead">This is how you'll talk to your Pi. Send it messages, get status updates, and control OpenClaw — all from your phone.</p>
-          <p class="tg-prereq">You'll need the <strong>Telegram app</strong> installed on your phone (Android or iPhone).</p>
+          <p class="tg-lead">
+            This is how you'll talk to your Pi. Send it messages, get status updates, and control OpenClaw — all from your phone.
+          </p>
+          <p class="tg-prereq">
+            You'll need the <strong>Telegram app</strong>
+            installed on your phone (Android or iPhone).
+          </p>
           <button class="btn primary" phx-click="tg_start">Set up Telegram</button>
           <p class="tg-skip-hint">or press Skip to set up later</p>
         </div>
@@ -140,24 +283,63 @@
         <%!-- Create bot --%>
         <div :if={@tg_sub == :create} class="tg-sub active">
           <h2>Create your bot</h2>
-          <p class="tg-lead">You'll make a personal Telegram bot that connects to your Pi. It takes about 30 seconds.</p>
+          <p class="tg-lead">
+            You'll make a personal Telegram bot that connects to your Pi. It takes about 30 seconds.
+          </p>
           <div class="tg-qr-row">
-            <div class="tg-qr" id="tg-qr-botfather" phx-hook="QRCode" data-url="https://t.me/BotFather"></div>
+            <div
+              class="tg-qr"
+              id="tg-qr-botfather"
+              phx-hook="QRCode"
+              data-url="https://t.me/BotFather"
+            >
+            </div>
             <p class="tg-qr-label">Scan with your phone to open <strong>@BotFather</strong></p>
           </div>
           <ol class="tg-steps">
-            <li><span class="tg-step-num">1</span><div>Scan the QR code above, or search for <strong>@BotFather</strong> in Telegram</div></li>
-            <li><span class="tg-step-num">2</span><div>Send the message <code>/newbot</code></div></li>
-            <li><span class="tg-step-num">3</span><div>Give your bot a name (e.g. <strong>My Pi</strong>) and a username (e.g. <strong>mypi_bot</strong>)</div></li>
-            <li><span class="tg-step-num">4</span><div>BotFather will reply with a token — copy it and paste it here</div></li>
+            <li>
+              <span class="tg-step-num">1</span>
+              <div>
+                Scan the QR code above, or search for <strong>@BotFather</strong> in Telegram
+              </div>
+            </li>
+            <li>
+              <span class="tg-step-num">2</span>
+              <div>Send the message <code>/newbot</code></div>
+            </li>
+            <li>
+              <span class="tg-step-num">3</span>
+              <div>
+                Give your bot a name (e.g. <strong>My Pi</strong>) and a username (e.g. <strong>mypi_bot</strong>)
+              </div>
+            </li>
+            <li>
+              <span class="tg-step-num">4</span>
+              <div>BotFather will reply with a token — copy it and paste it here</div>
+            </li>
           </ol>
           <form phx-submit="tg_validate" class="tg-input-group">
             <label for="tg-token-input">Bot token</label>
-            <input type="text" name="token" id="tg-token-input" class={["tg-input", @tg_error && "error"]} placeholder="123456789:ABCdef..." autocomplete="off" spellcheck="false" />
+            <input
+              type="text"
+              name="token"
+              id="tg-token-input"
+              class={["tg-input", @tg_error && "error"]}
+              placeholder="123456789:ABCdef..."
+              autocomplete="off"
+              spellcheck="false"
+            />
             <p class={["tg-input-hint", @tg_error && "error"]}>
-              {if @tg_error, do: @tg_error, else: raw("Looks like <code>123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11</code>")}
+              {if @tg_error,
+                do: @tg_error,
+                else: raw("Looks like <code>123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11</code>")}
             </p>
-            <button type="submit" class="btn primary" disabled={@tg_status == :validating} style="margin-top:12px">
+            <button
+              type="submit"
+              class="btn primary"
+              disabled={@tg_status == :validating}
+              style="margin-top:12px"
+            >
               {if @tg_status == :validating, do: "Validating...", else: "Connect bot"}
             </button>
           </form>
@@ -167,15 +349,32 @@
         <div :if={@tg_sub == :chat} class="tg-sub active">
           <div class="tg-icon-wrap">
             <div class="tg-icon pulse">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
             </div>
           </div>
           <h2>Say hello to your bot</h2>
           <div :if={@tg_bot_username} class="tg-qr-row">
-            <div class="tg-qr" id="tg-qr-bot" phx-hook="QRCode" data-url={"https://t.me/#{@tg_bot_username}"}></div>
+            <div
+              class="tg-qr"
+              id="tg-qr-bot"
+              phx-hook="QRCode"
+              data-url={"https://t.me/#{@tg_bot_username}"}
+            >
+            </div>
             <p class="tg-qr-label">Scan to open <strong>@{@tg_bot_username}</strong></p>
           </div>
-          <p class="tg-lead">Scan the QR code or search for your bot in Telegram. Send it any message — like "hello".</p>
+          <p class="tg-lead">
+            Scan the QR code or search for your bot in Telegram. Send it any message — like "hello".
+          </p>
           <div class="tg-polling">
             <div class="tg-polling-dot"></div>
             <span>Waiting for your message…</span>
@@ -187,8 +386,8 @@
           <div class="tg-icon-wrap">
             <div class="tg-check">
               <svg class="tg-check-svg" viewBox="0 0 52 52">
-                <circle class="tg-check-circle" cx="26" cy="26" r="24" fill="none"/>
-                <path class="tg-check-mark" fill="none" d="M15 27l7 7 15-15"/>
+                <circle class="tg-check-circle" cx="26" cy="26" r="24" fill="none" />
+                <path class="tg-check-mark" fill="none" d="M15 27l7 7 15-15" />
               </svg>
             </div>
           </div>
@@ -198,45 +397,31 @@
       </div>
     </article>
 
-    <%!-- Launch --%>
-    <article class={panel_class(@step, :launch)} phx-hook="AutoRun" id="launch-panel" data-event="run_launch" data-run={to_string(!@launch_done)}>
-      <div class="launch-center">
-        <h2 class={launch_title_class(@launch_done, @verify_passed)}>
-          {launch_title(@launch_done, @verify_passed)}
-        </h2>
-        <p>{launch_desc(@launch_done, @verify_passed)}</p>
-        <div class="launch-list">
-          <.launch_item :for={{key, _} <- @launch_items}
-            key={key}
-            status={@launch_items[key]}
-            label={@launch_messages[key]}
-          />
-        </div>
-        <button :if={@launch_done && !@verify_passed} class="btn subtle" phx-click="run_launch">
-          Retry
-        </button>
-      </div>
-    </article>
-
     <%!-- Receipt --%>
     <article class={panel_class(@step, :receipt)}>
       <div class="done-center">
         <div class={["done-icon-wrap", @step == :receipt && "visible"]} id="done-icon">
           <svg class="done-check-svg" viewBox="0 0 64 64">
-            <circle class="done-check-circle" cx="32" cy="32" r="30" fill="none"/>
-            <path class="done-check-mark" fill="none" d="M19 34l8 8 18-18"/>
+            <circle class="done-check-circle" cx="32" cy="32" r="30" fill="none" />
+            <path class="done-check-mark" fill="none" d="M19 34l8 8 18-18" />
           </svg>
         </div>
         <h2>You're all set</h2>
-        <p>Your Pi is configured and OpenClaw is running. You can close this window.</p>
+        <p>Your Pi is configured. OpenClaw will start automatically in the background.</p>
         <p :if={@finish_message} class="helper">{@finish_message}</p>
-        <button class="btn primary" phx-click="finish">Finish setup</button>
+        <button class="btn primary" phx-click="finish" disabled={@finishing}>
+          {if @finishing, do: "Finishing...", else: "Finish setup"}
+        </button>
       </div>
     </article>
   </section>
 
   <footer class="shell-foot">
-    <button class={["btn ghost", at_start?(@step) && "nav-hidden"]} phx-click="nav_prev" disabled={at_start?(@step)}>
+    <button
+      class={["btn ghost", at_start?(@step) && "nav-hidden"]}
+      phx-click="nav_prev"
+      disabled={at_start?(@step)}
+    >
       Back
     </button>
     <button

@@ -58,12 +58,4 @@ defmodule ClawrigWeb.Router do
       live "/system", DashboardLive, :system
     end
   end
-
-  # OAuth callback (separate port handled by OAuthCallbackPlug, but also here for dev)
-  scope "/auth", ClawrigWeb do
-    pipe_through :api
-
-    get "/callback", OAuthCallbackController, :callback
-  end
-
 end

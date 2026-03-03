@@ -86,9 +86,7 @@ defmodule Clawrig.System.PiCommands do
            "ipv4.method",
            "shared",
            "ipv4.addresses",
-           "192.168.4.1/24",
-           "wifi-sec.key-mgmt",
-           "none"
+           "192.168.4.1/24"
          ]) do
       {_, 0} ->
         case System.cmd("nmcli", ["connection", "up", "ClawRig-Hotspot"]) do
@@ -114,23 +112,15 @@ defmodule Clawrig.System.PiCommands do
   end
 
   defp start_captive_portal do
-    System.cmd("systemctl", ["start", "dnsmasq"], stderr_to_stdout: true)
-
-    System.cmd(
-      "iptables",
-      ["-t", "nat", "-A", "PREROUTING", "-i", "wlan0", "-p", "tcp", "--dport", "80", "-j", "REDIRECT", "--to-port", "4090"],
-      stderr_to_stdout: true
-    )
+    # iptables redirect is pre-loaded at boot via /etc/iptables/rules.v4.
+    # DNS catch-all is handled by NM's shared dnsmasq via
+    # /etc/NetworkManager/dnsmasq-shared.d/captive-portal.conf.
+    # Nothing to start here.
+    :ok
   end
 
   defp stop_captive_portal do
-    System.cmd("systemctl", ["stop", "dnsmasq"], stderr_to_stdout: true)
-
-    System.cmd(
-      "iptables",
-      ["-t", "nat", "-D", "PREROUTING", "-i", "wlan0", "-p", "tcp", "--dport", "80", "-j", "REDIRECT", "--to-port", "4090"],
-      stderr_to_stdout: true
-    )
+    :ok
   end
 
   @impl true
@@ -144,56 +134,13 @@ defmodule Clawrig.System.PiCommands do
   end
 
   @impl true
-  def check_openclaw do
-    case System.cmd("which", ["openclaw"], stderr_to_stdout: true) do
-      {_, 0} ->
-        case System.cmd("openclaw", ["--version"], stderr_to_stdout: true) do
-          {version, 0} -> {:ok, String.trim(version)}
-          _ -> {:ok, "unknown"}
-        end
-
-      _ ->
-        :not_installed
-    end
-  end
-
-  @impl true
-  def install_openclaw do
-    case System.cmd("npm", ["install", "-g", "openclaw@latest"], stderr_to_stdout: true) do
-      {_, 0} ->
-        System.cmd("openclaw", ["onboard", "--install-daemon"], stderr_to_stdout: true)
-
-        case System.cmd("openclaw", ["--version"], stderr_to_stdout: true) do
-          {version, 0} -> {:ok, String.trim(version)}
-          _ -> {:ok, "installed"}
-        end
-
-      {_, _} ->
-        case System.cmd("bash", ["-c", "curl -fsSL https://openclaw.ai/install.sh | bash"],
-               stderr_to_stdout: true
-             ) do
-          {_, 0} ->
-            System.cmd("openclaw", ["onboard", "--install-daemon"], stderr_to_stdout: true)
-
-            case System.cmd("openclaw", ["--version"], stderr_to_stdout: true) do
-              {version, 0} -> {:ok, String.trim(version)}
-              _ -> {:ok, "installed"}
-            end
-
-          {err, _} ->
-            {:error, "Installation failed: #{err}"}
-        end
-    end
-  end
-
-  @impl true
   def run_openclaw(args) do
-    System.cmd("openclaw", args, stderr_to_stdout: true)
+    System.cmd("openclaw", args, stderr_to_stdout: true, env: user_env())
   end
 
   @impl true
   def gateway_status do
-    case System.cmd("openclaw", ["gateway", "status"], stderr_to_stdout: true) do
+    case System.cmd("openclaw", ["gateway", "status"], stderr_to_stdout: true, env: user_env()) do
       {output, 0} ->
         if String.contains?(output, "RPC probe: ok"), do: :running, else: :stopped
 
@@ -212,15 +159,35 @@ defmodule Clawrig.System.PiCommands do
         match?({_, 0}, System.cmd("which", ["systemctl"], stderr_to_stdout: true))
 
     if has_systemd do
-      System.cmd("openclaw", ["gateway", "install"], stderr_to_stdout: true)
+      # --force ensures the service file is regenerated with the current
+      # gateway.auth.token from openclaw.json (onboard may have changed it).
+      System.cmd("openclaw", ["gateway", "install", "--force"],
+        stderr_to_stdout: true,
+        env: user_env()
+      )
 
-      System.cmd("systemctl", ["--user", "enable", "--now", "openclaw-gateway.service"],
-        stderr_to_stdout: true
+      # daemon-reload so systemd picks up the regenerated service file
+      # (without this, restart uses the stale in-memory unit with an old token).
+      System.cmd("systemctl", ["--user", "daemon-reload"],
+        stderr_to_stdout: true,
+        env: user_env()
+      )
+
+      System.cmd("systemctl", ["--user", "enable", "openclaw-gateway.service"],
+        stderr_to_stdout: true,
+        env: user_env()
+      )
+
+      System.cmd("systemctl", ["--user", "restart", "openclaw-gateway.service"],
+        stderr_to_stdout: true,
+        env: user_env()
       )
 
       case System.cmd("whoami", [], stderr_to_stdout: true) do
         {user, 0} ->
-          System.cmd("loginctl", ["enable-linger", String.trim(user)], stderr_to_stdout: true)
+          System.cmd("sudo", ["loginctl", "enable-linger", String.trim(user)],
+            stderr_to_stdout: true
+          )
 
         _ ->
           :ok
@@ -244,6 +211,17 @@ defmodule Clawrig.System.PiCommands do
       Port.close(port)
       :ok
     end
+  end
+
+  defp get_uid do
+    case System.cmd("id", ["-u"], stderr_to_stdout: true) do
+      {uid, 0} -> String.trim(uid)
+      _ -> "1000"
+    end
+  end
+
+  defp user_env do
+    [{"XDG_RUNTIME_DIR", "/run/user/#{get_uid()}"}]
   end
 
   @impl true

@@ -276,9 +276,7 @@ defmodule Clawrig.Updater do
     if tarball do
       tarball_path = Path.join(@staging_dir, tarball)
 
-      case System.cmd("tar", ["-xzf", tarball_path, "-C", @staging_dir],
-             stderr_to_stdout: true
-           ) do
+      case System.cmd("tar", ["-xzf", tarball_path, "-C", @staging_dir], stderr_to_stdout: true) do
         {_, 0} -> :ok
         {output, _} -> {:error, "tar extraction failed: #{output}"}
       end

@@ -7,17 +7,31 @@
 
   <div class="wifi-transition">
     <div class="wifi-spinner"></div>
-    <p class="wifi-next-step">
+    <p class="wifi-next-step" id="status-msg">
       This takes about 20–30 seconds.<br />
-      Once connected, visit<br />
-      <strong>http://clawrig.local</strong><br />
-      to continue setup.
+      Your phone will reconnect to your home WiFi automatically.
     </p>
     <p class="wifi-fallback">
-      If that doesn't work, check your router<br />
-      for the Pi's IP address and visit it directly.
+      Once connected, visit<br />
+      <strong>http://clawrig.local</strong> to continue setup.
     </p>
   </div>
 
-  <meta http-equiv="refresh" content="30;url=http://clawrig.local/" />
+  <script>
+    // Poll clawrig.local on the home network until reachable, then redirect
+    var attempts = 0;
+    var maxAttempts = 30;
+    function checkPi() {
+      attempts++;
+      if (attempts > maxAttempts) {
+        document.getElementById("status-msg").innerHTML =
+          "Could not reach the Pi automatically.<br/>Please open <strong>http://clawrig.local</strong> in your browser.";
+        return;
+      }
+      fetch("http://clawrig.local:4090/portal/status", {mode: "no-cors"})
+        .then(function() { window.location.href = "http://clawrig.local/"; })
+        .catch(function() { setTimeout(checkPi, 3000); });
+    }
+    setTimeout(checkPi, 5000);
+  </script>
 </div>

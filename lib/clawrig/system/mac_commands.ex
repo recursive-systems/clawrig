@@ -70,10 +70,6 @@ defmodule Clawrig.System.MacCommands do
   @impl true
   defdelegate check_internet, to: Clawrig.System.MockCommands
   @impl true
-  defdelegate check_openclaw, to: Clawrig.System.MockCommands
-  @impl true
-  defdelegate install_openclaw, to: Clawrig.System.MockCommands
-  @impl true
   defdelegate run_openclaw(args), to: Clawrig.System.MockCommands
   @impl true
   defdelegate gateway_status, to: Clawrig.System.MockCommands

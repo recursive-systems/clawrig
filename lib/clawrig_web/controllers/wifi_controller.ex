@@ -20,17 +20,11 @@ defmodule ClawrigWeb.WifiController do
   end
 
   def connect(conn, %{"ssid" => ssid, "password" => password}) do
-    # Respond immediately with transition page
-    conn = render(conn, :connecting, ssid: ssid)
-
-    # Schedule the actual connection after response is sent
-    Task.start(fn ->
-      Process.sleep(3000)
-      Manager.stop_hotspot()
-      Manager.connect(ssid, password)
-    end)
-
-    conn
+    # Respond with transition page, then attempt connection asynchronously.
+    # safe_connect tears down the hotspot, tries WiFi, and restarts the
+    # hotspot if the connection fails — so the user is never locked out.
+    Manager.safe_connect(ssid, password)
+    render(conn, :connecting, ssid: ssid)
   end
 
   def connect(conn, _params) do

@@ -1,31 +1,34 @@
 defmodule ClawrigWeb.WizardLive do
   use ClawrigWeb, :live_view
+  require Logger
 
-  alias Clawrig.Wizard.{State, OAuth, Installer, Launcher, Telegram}
+  alias Clawrig.System.Commands
+  alias Clawrig.Wizard.{State, Installer, Launcher, Telegram}
 
-  @steps [:preflight, :install, :oauth, :telegram, :launch, :receipt]
+  @steps [:preflight, :openai, :telegram, :receipt]
+  @openai_poll_timeout_count 180
 
   @impl true
   def mount(_params, _session, socket) do
-    if connected?(socket) do
-      Phoenix.PubSub.subscribe(Clawrig.PubSub, "oauth")
-    end
-
     state = State.get()
 
     {:ok,
      socket
-     |> assign(:step, state.step || :preflight)
+     |> assign(:step, if(state.step in @steps, do: state.step, else: :preflight))
      |> assign(:steps, @steps)
      |> assign(:mode, state.mode || :new)
      |> assign(:preflight_done, state.preflight_done)
      |> assign(:preflight_status, if(state.preflight_done, do: :pass))
-     |> assign(:install_done, state.install_done)
-     |> assign(:install_version, state.install_version)
-     |> assign(:install_status, if(state.install_done, do: :installed))
-     |> assign(:oauth_connected, OAuth.connected?(state.oauth_tokens))
-     |> assign(:oauth_url, nil)
-     |> assign(:oauth_status, if(OAuth.connected?(state.oauth_tokens), do: :connected))
+     |> assign(:openai_done, state.openai_done || false)
+     |> assign(:openai_status, nil)
+     |> assign(:openai_error, nil)
+     |> assign(:openai_sub, openai_sub_on_mount(state))
+     |> assign(:openai_user_code, state.openai_user_code)
+     |> assign(:openai_device_auth_id, state.openai_device_auth_id)
+     |> assign(:openai_poll_interval, 5)
+     |> assign(:openai_polling, false)
+     |> assign(:openai_poll_count, 0)
+     |> assign(:openai_resuming, false)
      |> assign(:tg_token, state.tg_token)
      |> assign(:tg_chat_id, state.tg_chat_id)
      |> assign(:tg_bot_name, state.tg_bot_name)
@@ -34,21 +37,9 @@ defmodule ClawrigWeb.WizardLive do
      |> assign(:tg_status, nil)
      |> assign(:tg_error, nil)
      |> assign(:tg_polling, false)
-     |> assign(:launch_done, state.launch_done)
-     |> assign(:verify_passed, state.verify_passed)
-     |> assign(:launch_items, state.launch_items || %{
-       configure: :pending,
-       gateway: :pending,
-       pairing: :pending,
-       health: :pending
-     })
-     |> assign(:launch_messages, state.launch_messages || %{
-       configure: "Configure system",
-       gateway: "Start gateway",
-       pairing: "Pair Telegram",
-       health: "Verify connection"
-     })
-     |> assign(:finish_message, nil)}
+     |> assign(:finishing, false)
+     |> assign(:finish_message, nil)
+     |> maybe_resume_device_code_polling()}
   end
 
   @impl true
@@ -100,29 +91,50 @@ defmodule ClawrigWeb.WizardLive do
     {:noreply, socket}
   end
 
-  # Install
-  def handle_event("check_openclaw", _params, socket) do
-    socket = assign(socket, :install_status, :checking)
-    send(self(), :do_check_openclaw)
+  # OpenAI — device code flow
+  def handle_event("openai_start_device_code", _params, socket) do
+    send(self(), :do_request_user_code)
+    {:noreply, assign(socket, openai_sub: :device_code, openai_error: nil)}
+  end
+
+  def handle_event("openai_use_api_key", _params, socket) do
+    {:noreply, assign(socket, openai_sub: :api_key, openai_error: nil)}
+  end
+
+  def handle_event("openai_back_to_choose", _params, socket) do
+    State.merge(%{openai_device_auth_id: nil, openai_user_code: nil})
+
+    {:noreply,
+     assign(socket,
+       openai_sub: :choose,
+       openai_error: nil,
+       openai_polling: false,
+       openai_user_code: nil,
+       openai_device_auth_id: nil,
+       openai_poll_count: 0
+     )}
+  end
+
+  # Trigger immediate poll when user returns to the tab
+  def handle_event("page_visible", _params, socket) do
+    if socket.assigns.openai_polling and socket.assigns.openai_sub == :device_code do
+      send(self(), :openai_poll)
+    end
+
     {:noreply, socket}
   end
 
-  def handle_event("install_openclaw", _params, socket) do
-    socket = assign(socket, :install_status, :installing)
-    send(self(), :do_install_openclaw)
-    {:noreply, socket}
-  end
+  # OpenAI — API key paste (fallback)
+  def handle_event("submit_api_key", %{"api_key" => key}, socket) do
+    key = String.trim(key)
 
-  # OAuth
-  def handle_event("start_oauth", _params, socket) do
-    socket = assign(socket, :oauth_status, :starting)
-    send(self(), :do_start_oauth)
-    {:noreply, socket}
-  end
-
-  def handle_event("check_oauth", _params, socket) do
-    send(self(), :do_check_oauth)
-    {:noreply, socket}
+    if key == "" do
+      {:noreply, assign(socket, :openai_error, "Please paste your API key.")}
+    else
+      socket = assign(socket, openai_status: :saving, openai_error: nil)
+      send(self(), {:do_save_api_key, key})
+      {:noreply, socket}
+    end
   end
 
   # Telegram
@@ -146,16 +158,10 @@ defmodule ClawrigWeb.WizardLive do
     {:noreply, socket}
   end
 
-  # Launch
-  def handle_event("run_launch", _params, socket) do
-    send(self(), :do_launch)
-    {:noreply, socket}
-  end
-
   # Finish
   def handle_event("finish", _params, socket) do
     send(self(), :do_finish)
-    {:noreply, socket}
+    {:noreply, assign(socket, :finishing, true)}
   end
 
   # Async handlers
@@ -171,56 +177,133 @@ defmodule ClawrigWeb.WizardLive do
      )}
   end
 
-  def handle_info(:do_check_openclaw, socket) do
-    case Installer.check_openclaw() do
-      {:ok, version} ->
-        State.merge(%{install_done: true, install_version: version})
+  def handle_info(:do_request_user_code, socket) do
+    case device_code_impl().request_user_code() do
+      {:ok, %{device_auth_id: id, user_code: code, interval: interval}} ->
+        Logger.info("[DeviceCode] Got user_code=#{code} interval=#{interval}")
+        State.merge(%{openai_device_auth_id: id, openai_user_code: code})
+        Process.send_after(self(), :openai_poll, interval * 1000)
 
         {:noreply,
-         assign(socket, install_done: true, install_version: version, install_status: :installed)}
+         assign(socket,
+           openai_sub: :device_code,
+           openai_user_code: code,
+           openai_device_auth_id: id,
+           openai_poll_interval: interval,
+           openai_polling: true,
+           openai_poll_count: 0
+         )}
 
-      :not_installed ->
-        {:noreply, assign(socket, install_status: :not_installed)}
+      {:error, :not_enabled} ->
+        {:noreply,
+         assign(socket,
+           openai_sub: :error,
+           openai_error:
+             "Device code authorization isn't enabled on your OpenAI account. " <>
+               "Enable it in ChatGPT Settings > Security > \"Device code authorization for Codex\", then try again."
+         )}
+
+      {:error, msg} ->
+        {:noreply, assign(socket, openai_sub: :error, openai_error: "#{msg}")}
     end
   end
 
-  def handle_info(:do_install_openclaw, socket) do
-    case Installer.install_openclaw() do
-      {:ok, version} ->
-        State.merge(%{install_done: true, install_version: version})
-
-        {:noreply,
-         assign(socket, install_done: true, install_version: version, install_status: :installed)}
-
-      {:error, _msg} ->
-        {:noreply, assign(socket, install_status: :failed)}
-    end
-  end
-
-  def handle_info(:do_start_oauth, socket) do
-    {verifier, challenge} = OAuth.generate_pkce()
-    state_param = Base.url_encode64(:crypto.strong_rand_bytes(16), padding: false)
-    url = OAuth.build_auth_url(state_param, challenge)
-
-    State.put(:oauth_flow, %{verifier: verifier, state: state_param})
-
-    {:noreply, assign(socket, oauth_url: url, oauth_status: :waiting)}
-  end
-
-  def handle_info(:do_check_oauth, socket) do
-    state = State.get()
-
-    if OAuth.connected?(state.oauth_tokens) do
-      {:noreply, assign(socket, oauth_connected: true, oauth_status: :connected)}
+  def handle_info(:openai_poll, socket) do
+    if !socket.assigns.openai_polling || socket.assigns.openai_sub != :device_code do
+      {:noreply, assign(socket, openai_polling: false)}
     else
-      {:noreply, socket}
+      if socket.assigns.openai_poll_count >= @openai_poll_timeout_count do
+        {:noreply,
+         assign(socket,
+           openai_sub: :error,
+           openai_polling: false,
+           openai_error: "Authorization timed out. Please try again."
+         )}
+      else
+        case device_code_impl().poll_authorization(
+               socket.assigns.openai_device_auth_id,
+               socket.assigns.openai_user_code
+             ) do
+          :pending ->
+            Process.send_after(self(), :openai_poll, socket.assigns.openai_poll_interval * 1000)
+            {:noreply, assign(socket, openai_poll_count: socket.assigns.openai_poll_count + 1)}
+
+          {:ok, auth_data} ->
+            Logger.info("[DeviceCode] Authorization received, exchanging tokens")
+            send(self(), {:do_exchange_tokens, auth_data})
+            {:noreply, assign(socket, openai_polling: false)}
+
+          {:error, msg} ->
+            Logger.error("[DeviceCode] Poll error: #{msg}")
+
+            {:noreply,
+             assign(socket,
+               openai_sub: :error,
+               openai_polling: false,
+               openai_error: "#{msg}"
+             )}
+        end
+      end
     end
   end
 
-  def handle_info({:oauth_complete, tokens}, socket) do
-    State.put(:oauth_tokens, tokens)
+  def handle_info({:do_exchange_tokens, auth_data}, socket) do
+    Logger.info("[DeviceCode] Exchanging tokens...")
 
-    {:noreply, assign(socket, oauth_connected: true, oauth_status: :connected, oauth_url: nil)}
+    case device_code_impl().complete_flow(auth_data) do
+      {:ok, api_key} ->
+        Logger.info("[DeviceCode] Got API key (#{String.slice(api_key, 0..7)}...)")
+        send(self(), {:do_save_api_key, api_key})
+        {:noreply, assign(socket, openai_status: :saving)}
+
+      {:error, msg} ->
+        Logger.error("[DeviceCode] Token exchange failed: #{msg}")
+        {:noreply, assign(socket, openai_sub: :error, openai_error: "#{msg}")}
+    end
+  end
+
+  def handle_info({:do_save_api_key, key}, socket) do
+    {output, exit_code} =
+      Commands.impl().run_openclaw([
+        "onboard",
+        "--non-interactive",
+        "--accept-risk",
+        "--auth-choice",
+        "openai-api-key",
+        "--openai-api-key",
+        key,
+        "--skip-channels",
+        "--skip-health",
+        "--skip-skills",
+        "--skip-daemon",
+        "--skip-ui"
+      ])
+
+    if exit_code == 0 do
+      method = if socket.assigns.openai_sub == :api_key, do: "api-key", else: "device-code"
+
+      State.merge(%{
+        openai_done: true,
+        openai_auth_method: method,
+        openai_device_auth_id: nil,
+        openai_user_code: nil
+      })
+
+      {:noreply,
+       assign(socket,
+         openai_done: true,
+         openai_sub: :done,
+         openai_status: :saved,
+         openai_error: nil
+       )}
+    else
+      {:noreply,
+       assign(socket,
+         openai_status: nil,
+         openai_sub: :error,
+         openai_error: "Could not save API key. #{String.trim(output)}"
+       )}
+    end
   end
 
   def handle_info({:do_tg_validate, token}, socket) do
@@ -271,55 +354,22 @@ defmodule ClawrigWeb.WizardLive do
     end
   end
 
-  def handle_info(:do_launch, socket) do
-    socket =
-      launch_step(socket, :configure, "Configuring...", fn ->
-        Launcher.configure(socket.assigns.mode, socket.assigns.tg_token)
-      end)
-
-    socket =
-      launch_step(socket, :gateway, "Starting gateway...", fn ->
-        Launcher.start_gateway()
-      end)
-
-    has_telegram = socket.assigns.tg_token != nil
-
-    all_ok =
-      socket.assigns.launch_items.configure == :pass &&
-        socket.assigns.launch_items.gateway == :pass
-
-    socket =
-      if has_telegram && all_ok do
-        launch_pairing(socket)
-      else
-        update_launch_item(socket, :pairing, :pass, "Skipped")
-      end
-
-    socket =
-      launch_step(socket, :health, "Verifying...", fn ->
-        Launcher.health_check()
-      end)
-
-    items = socket.assigns.launch_items
-    all_pass = Enum.all?(Map.values(items), &(&1 == :pass))
-    State.merge(%{
-      launch_done: true,
-      verify_passed: all_pass,
-      launch_items: socket.assigns.launch_items,
-      launch_messages: socket.assigns.launch_messages
-    })
-
-    {:noreply, assign(socket, launch_done: true, verify_passed: all_pass)}
-  end
-
   def handle_info(:do_finish, socket) do
     state = State.get()
+
+    # Apply runtime-only config (Telegram channel) and write audit trail
+    Launcher.finalize(state.mode, state.tg_token, state.tg_chat_id)
+    State.put(:wifi_configured, true)
     {:ok, _receipt} = Launcher.write_receipt(state)
 
-    # Mark OOBE as complete
+    # Mark OOBE as complete — this unlocks the gateway watchdog
     path = Application.get_env(:clawrig, :oobe_marker, "/var/lib/clawrig/.oobe-complete")
     File.mkdir_p!(Path.dirname(path))
     File.write!(path, "")
+
+    # Best-effort gateway start (non-blocking).
+    # If this fails, the watchdog will pick it up within ~2 minutes.
+    Task.start(fn -> Commands.impl().start_gateway() end)
 
     {:noreply, socket |> put_flash(:info, "Setup complete!") |> redirect(to: "/")}
   end
@@ -338,10 +388,8 @@ defmodule ClawrigWeb.WizardLive do
   def step_title(step) do
     %{
       preflight: "Connectivity",
-      install: "Install OpenClaw",
-      oauth: "OpenAI",
+      openai: "OpenAI",
       telegram: "Optional Telegram",
-      launch: "Launch",
       receipt: "Complete"
     }[step] || ""
   end
@@ -349,10 +397,8 @@ defmodule ClawrigWeb.WizardLive do
   def can_next?(assigns) do
     case assigns.step do
       :preflight -> assigns.preflight_done
-      :install -> assigns.install_done
-      :oauth -> assigns.oauth_connected
+      :openai -> assigns.openai_done
       :telegram -> true
-      :launch -> assigns.launch_done
       :receipt -> true
     end
   end
@@ -364,56 +410,30 @@ defmodule ClawrigWeb.WizardLive do
     if step == :telegram && !assigns.tg_chat_id, do: "Skip", else: "Continue"
   end
 
-  defp launch_step(socket, key, running_msg, func) do
-    socket = update_launch_item(socket, key, :running, running_msg)
-
-    case func.() do
-      :ok ->
-        update_launch_item(socket, key, :pass, pass_label(key))
-
-      {:error, msg} ->
-        update_launch_item(socket, key, :fail, msg)
-    end
+  defp device_code_impl do
+    Application.get_env(:clawrig, :device_code_module, Clawrig.Wizard.DeviceCode)
   end
 
-  defp launch_pairing(socket) do
-    socket = update_launch_item(socket, :pairing, :running, "Pairing Telegram...")
+  defp maybe_resume_device_code_polling(socket) do
+    if socket.assigns.openai_sub == :device_code and socket.assigns.openai_device_auth_id do
+      Logger.info(
+        "[DeviceCode] Resuming polling on reconnect for #{socket.assigns.openai_user_code}"
+      )
 
-    result =
-      Enum.reduce_while(1..24, false, fn _, _acc ->
-        Process.sleep(2500)
-
-        case Launcher.check_pairing() do
-          {:ok, [first | _]} ->
-            code = first["code"]
-
-            case Launcher.approve_pairing(code) do
-              :ok -> {:halt, true}
-              _ -> {:cont, false}
-            end
-
-          _ ->
-            {:cont, false}
-        end
-      end)
-
-    if result do
-      update_launch_item(socket, :pairing, :pass, "Telegram paired")
+      Process.send_after(self(), :openai_poll, 1000)
+      assign(socket, openai_polling: true, openai_poll_count: 0, openai_resuming: true)
     else
-      update_launch_item(socket, :pairing, :fail, "Pairing timed out")
+      socket
     end
   end
 
-  defp update_launch_item(socket, key, status, message) do
-    items = Map.put(socket.assigns.launch_items, key, status)
-    messages = Map.put(socket.assigns.launch_messages, key, message)
-    assign(socket, launch_items: items, launch_messages: messages)
+  defp openai_sub_on_mount(state) do
+    cond do
+      state.openai_done -> :done
+      state.openai_device_auth_id != nil -> :device_code
+      true -> :choose
+    end
   end
-
-  defp pass_label(:configure), do: "Configured"
-  defp pass_label(:gateway), do: "Gateway running"
-  defp pass_label(:pairing), do: "Telegram paired"
-  defp pass_label(:health), do: "All systems go"
 
   # View helpers
 
@@ -454,64 +474,21 @@ defmodule ClawrigWeb.WizardLive do
   def preflight_desc(:checking), do: "Checking your connection..."
   def preflight_desc(_), do: "Checking your connection..."
 
-  def install_title(:installed), do: "Installed"
-  def install_title(:checking), do: "OpenClaw"
-  def install_title(:installing), do: "OpenClaw"
-  def install_title(:failed), do: "OpenClaw"
-  def install_title(_), do: "OpenClaw"
+  def openai_title(:done), do: "Connected to OpenAI"
+  def openai_title(:error), do: "Something went wrong"
+  def openai_title(:device_code), do: "Sign in with OpenAI"
+  def openai_title(:api_key), do: "API key"
+  def openai_title(_), do: "OpenAI"
 
-  def install_desc(:installed, version) when is_binary(version), do: "v#{version}"
-  def install_desc(:installed, _), do: "Installed"
-  def install_desc(:checking, _), do: "Checking..."
-  def install_desc(:installing, _), do: "Installing..."
-  def install_desc(:failed, _), do: "Installation failed. Tap to retry."
-  def install_desc(_, _), do: "Tap to install the runtime"
+  def openai_title_class(:done), do: "pass"
+  def openai_title_class(:error), do: "fail"
+  def openai_title_class(_), do: ""
 
-  def oauth_desc(_status, true), do: "OpenAI account linked."
-  def oauth_desc(:starting, _), do: "Preparing sign-in..."
-  def oauth_desc(:waiting, _), do: "Complete sign-in in the popup..."
-  def oauth_desc(_, _), do: "Sign in to connect your account."
+  def openai_desc(:done), do: "Your API key is configured."
 
-  def launch_title_class(true, true), do: "pass"
-  def launch_title_class(true, false), do: "fail"
-  def launch_title_class(_, _), do: ""
+  def openai_desc(:device_code),
+    do: "Enter the code below on your phone to authorize this device."
 
-  def launch_title(true, true), do: "OpenClaw is running"
-  def launch_title(true, false), do: "Needs attention"
-  def launch_title(_, _), do: "Launching OpenClaw"
-
-  def launch_desc(true, true), do: "Everything is up and operational."
-  def launch_desc(true, false), do: "Some steps had issues. You can retry or continue."
-  def launch_desc(_, _), do: "Setting everything up..."
-
-  # Launch item component
-  attr :key, :atom, required: true
-  attr :status, :atom, required: true
-  attr :label, :string, required: true
-
-  def launch_item(assigns) do
-    ~H"""
-    <div class="launch-item">
-      <div class="launch-icon-wrap">
-        <div :if={@status == :running} class="launch-spinner"></div>
-        <svg :if={@status == :pass} class="launch-ok animate" viewBox="0 0 36 36">
-          <circle class="launch-ok-circle" cx="18" cy="18" r="16" fill="none" />
-          <path class="launch-ok-mark" fill="none" d="M11 19l4 4 10-10" />
-        </svg>
-        <svg :if={@status == :fail} class="launch-fail animate" viewBox="0 0 36 36">
-          <circle class="launch-fail-circle" cx="18" cy="18" r="16" fill="none" />
-          <path class="launch-fail-x" fill="none" d="M13 13l10 10M23 13l-10 10" />
-        </svg>
-        <div :if={@status == :pending} class="launch-pending"></div>
-      </div>
-      <span class={["launch-label", launch_label_class(@status)]}>
-        {@label}
-      </span>
-    </div>
-    """
-  end
-
-  defp launch_label_class(:pass), do: "pass"
-  defp launch_label_class(:fail), do: "fail"
-  defp launch_label_class(_), do: ""
+  def openai_desc(:api_key), do: "Paste your OpenAI API key to connect."
+  def openai_desc(_), do: "Connect your OpenAI account to get started."
 end

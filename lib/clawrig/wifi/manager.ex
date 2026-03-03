@@ -12,6 +12,10 @@ defmodule Clawrig.Wifi.Manager do
   def scan, do: GenServer.call(__MODULE__, :scan, 15_000)
   def networks, do: GenServer.call(__MODULE__, :networks)
   def connect(ssid, password), do: GenServer.call(__MODULE__, {:connect, ssid, password}, 30_000)
+
+  def safe_connect(ssid, password),
+    do: GenServer.cast(__MODULE__, {:safe_connect, ssid, password})
+
   def start_hotspot, do: GenServer.call(__MODULE__, :start_hotspot)
   def stop_hotspot, do: GenServer.call(__MODULE__, :stop_hotspot)
   def status, do: GenServer.call(__MODULE__, :status)
@@ -22,6 +26,11 @@ defmodule Clawrig.Wifi.Manager do
   end
 
   @impl true
+  def handle_call(:scan, _from, %{mode: :ap} = state) do
+    # Can't scan while wlan0 is in AP mode — return cached or empty list
+    {:reply, {:ok, state.networks}, state}
+  end
+
   def handle_call(:scan, _from, state) do
     networks = Commands.impl().scan_networks()
     {:reply, {:ok, networks}, %{state | networks: networks}}
@@ -56,5 +65,26 @@ defmodule Clawrig.Wifi.Manager do
 
   def handle_call(:status, _from, state) do
     {:reply, %{mode: state.mode, connected_ssid: state.connected_ssid}, state}
+  end
+
+  @impl true
+  def handle_cast({:safe_connect, ssid, password}, state) do
+    require Logger
+
+    # Must tear down AP before wlan0 can join a network
+    Commands.impl().stop_hotspot()
+
+    case Commands.impl().connect_wifi(ssid, password) do
+      {:ok, ip} ->
+        Logger.info("Connected to #{ssid} (#{ip})")
+        if ip, do: Clawrig.Wizard.State.put(:local_ip, ip)
+        Clawrig.Wizard.State.put(:wifi_configured, true)
+        {:noreply, %{state | mode: :station, connecting: false, connected_ssid: ssid}}
+
+      {:error, reason} ->
+        Logger.warning("WiFi connect to #{ssid} failed: #{inspect(reason)}, restarting hotspot")
+        Commands.impl().start_hotspot()
+        {:noreply, %{state | mode: :ap, connecting: false}}
+    end
   end
 end

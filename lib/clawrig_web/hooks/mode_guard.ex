@@ -19,8 +19,13 @@ defmodule ClawrigWeb.Hooks.ModeGuard do
 
   defp oobe_complete? do
     case Application.get_env(:clawrig, :oobe_complete) do
-      nil -> File.exists?(Application.get_env(:clawrig, :oobe_marker, "/var/lib/clawrig/.oobe-complete"))
-      val -> val
+      nil ->
+        File.exists?(
+          Application.get_env(:clawrig, :oobe_marker, "/var/lib/clawrig/.oobe-complete")
+        )
+
+      val ->
+        val
     end
   end
 end

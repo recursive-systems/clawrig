@@ -7,18 +7,15 @@ defmodule Clawrig.Wizard.State do
     mode: :new,
     wifi_configured: false,
     preflight_done: false,
-    install_done: false,
-    install_version: nil,
-    oauth_tokens: nil,
+    openai_done: false,
     tg_token: nil,
     tg_chat_id: nil,
     tg_bot_name: nil,
     tg_bot_username: nil,
     local_ip: nil,
-    launch_done: false,
-    verify_passed: false,
-    launch_items: nil,
-    launch_messages: nil
+    openai_auth_method: nil,
+    openai_device_auth_id: nil,
+    openai_user_code: nil
   }
 
   def start_link(_opts) do
@@ -111,16 +108,6 @@ defmodule Clawrig.Wizard.State do
 
           v when k in [:phase, :step, :mode] and is_binary(v) ->
             String.to_existing_atom(v)
-
-          v when k in [:launch_items] and is_map(v) ->
-            Map.new(v, fn {mk, mv} ->
-              {String.to_existing_atom(mk), String.to_existing_atom(mv)}
-            end)
-
-          v when k in [:launch_messages] and is_map(v) ->
-            Map.new(v, fn {mk, mv} ->
-              {String.to_existing_atom(mk), mv}
-            end)
 
           v ->
             v
