@@ -17,7 +17,7 @@ RUN mix deps.compile
 # Copy config (needed before compile)
 COPY config config
 
-# Copy static assets (CSS is pre-copied by build-release.sh)
+# Copy static assets (images, favicon, etc.)
 COPY priv priv
 
 # Copy application source

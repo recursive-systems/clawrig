@@ -66,9 +66,10 @@ defmodule Clawrig.MixProject do
     [
       setup: ["deps.get", "assets.setup", "assets.build"],
       "assets.setup": ["esbuild.install --if-missing"],
-      "assets.build": ["compile", "esbuild clawrig"],
+      "assets.build": ["compile", "esbuild clawrig", "esbuild clawrig_css"],
       "assets.deploy": [
         "esbuild clawrig --minify",
+        "esbuild clawrig_css --minify",
         "phx.digest"
       ],
       precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]

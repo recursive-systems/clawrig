@@ -9,7 +9,8 @@ config :clawrig, ClawrigWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "WOEVJoVEGvtXQvId85SZikg6l6j98Eo/gzqM/ZUS1ZP/EWVPGorZEjOc2D+RxmsO",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:clawrig, ~w(--sourcemap=inline --watch)]}
+    esbuild: {Esbuild, :install_and_run, [:clawrig, ~w(--sourcemap=inline --watch)]},
+    esbuild_css: {Esbuild, :install_and_run, [:clawrig_css, ~w(--watch)]}
   ]
 
 config :clawrig, ClawrigWeb.Endpoint,
