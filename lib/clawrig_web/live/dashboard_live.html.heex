@@ -1,10 +1,10 @@
-<section class="dashboard-shell">
-  <header class="dashboard-head">
+<section class="dashboard">
+  <header class="shell-head">
     <h1>ClawRig</h1>
     <span class="version">v{@version}</span>
   </header>
 
-  <nav class="dashboard-tabs" role="tablist">
+  <nav class="dash-nav" role="tablist">
     <.link patch={~p"/"} class={tab_class(@live_action, :index)}>
       Dashboard
     </.link>
@@ -22,45 +22,44 @@
     </.link>
   </nav>
 
-  <section class="dashboard-content" aria-live="polite">
+  <section class="dash-content" aria-live="polite">
     <%!-- Dashboard / Status Overview --%>
     <.dash_panel :if={@live_action == :index}>
       <div class="status-grid">
-        <div class="status-card">
-          <span class={["status-dot", status_color(@gateway_status)]}></span>
-          <div class="status-info">
-            <span class="status-label">OpenClaw Gateway</span>
-            <span class={["status-value", status_color(@gateway_status)]}>
-              {status_label(@gateway_status)}
-            </span>
-          </div>
+        <div class="status-item">
+          <span class="status-label">OpenClaw Gateway</span>
+          <span class={["status-value", status_color(@gateway_status)]}>
+            {status_label(@gateway_status)}
+          </span>
         </div>
-        <div class="status-card">
-          <span class={["status-dot", status_color(@internet)]}></span>
-          <div class="status-info">
-            <span class="status-label">Internet</span>
-            <span class={["status-value", status_color(@internet)]}>
-              {status_label(@internet)}
-            </span>
-          </div>
+        <div class="status-item">
+          <span class="status-label">Internet</span>
+          <span class={["status-value", status_color(@internet)]}>
+            {status_label(@internet)}
+          </span>
         </div>
-        <div class="status-card">
-          <span class={["status-dot", if(@wifi_ssid, do: "status-ok", else: "status-warn")]}></span>
-          <div class="status-info">
-            <span class="status-label">Wi-Fi Network</span>
-            <span class={["status-value", if(@wifi_ssid, do: "status-ok", else: "status-warn")]}>
-              {@wifi_ssid || "Not connected"}
-            </span>
-          </div>
+        <div class="status-item">
+          <span class="status-label">Wi-Fi Network</span>
+          <span class={[
+            "status-value",
+            cond do
+              @wifi_ssid == :loading -> "loading"
+              @wifi_ssid -> "ok"
+              true -> "warn"
+            end
+          ]}>
+            {cond do
+              @wifi_ssid == :loading -> "Checking..."
+              @wifi_ssid -> @wifi_ssid
+              true -> "Not connected"
+            end}
+          </span>
         </div>
-        <div class="status-card">
-          <span class={["status-dot", status_color(@oauth_status)]}></span>
-          <div class="status-info">
-            <span class="status-label">OpenAI Account</span>
-            <span class={["status-value", status_color(@oauth_status)]}>
-              {status_label(@oauth_status)}
-            </span>
-          </div>
+        <div class="status-item">
+          <span class="status-label">OpenAI Account</span>
+          <span class={["status-value", status_color(@openai_status)]}>
+            {status_label(@openai_status)}
+          </span>
         </div>
       </div>
     </.dash_panel>
@@ -68,34 +67,137 @@
     <%!-- Wi-Fi --%>
     <.dash_panel :if={@live_action == :wifi} title="Wi-Fi Networks" back>
       <:actions>
-        <button class="btn subtle btn-sm" phx-click="scan_wifi" phx-target="#wifi-scanner">Scan</button>
+        <button class="btn subtle btn-sm" phx-click="scan_wifi" phx-target="#wifi-scanner">
+          Scan
+        </button>
       </:actions>
       <.live_component module={ClawrigWeb.WifiComponent} id="wifi-scanner" wifi_ssid={@wifi_ssid} />
     </.dash_panel>
 
     <%!-- Account --%>
     <.dash_panel :if={@live_action == :account} title="OpenAI Account" back>
-      <div :if={@oauth_status == :connected} class="account-status account-connected">
-        <div class="account-badge">
-          <svg class="account-check-svg" viewBox="0 0 52 52">
-            <circle class="account-check-circle" cx="26" cy="26" r="24" fill="none"/>
-            <path class="account-check-mark" fill="none" d="M15 27l7 7 15-15"/>
-          </svg>
+      <%!-- Connected --%>
+      <div :if={@account_sub == :idle and @openai_status == :connected} class="account-section">
+        <div class="account-status account-connected">
+          <div class="account-badge">
+            <svg class="account-check-svg" viewBox="0 0 52 52">
+              <circle class="account-check-circle" cx="26" cy="26" r="24" fill="none" />
+              <path class="account-check-mark" fill="none" d="M15 27l7 7 15-15" />
+            </svg>
+          </div>
+          <span>Your OpenAI API key is configured.</span>
         </div>
-        <span>Your OpenAI account is connected.</span>
+        <div class="account-actions">
+          <button
+            class="btn subtle btn-sm"
+            phx-click="disconnect_openai"
+            data-confirm="Disconnect your OpenAI account? You can re-authenticate at any time."
+          >
+            Disconnect
+          </button>
+        </div>
       </div>
 
-      <div :if={@oauth_status == :waiting} class="account-status">
-        <p>Complete sign-in in the browser window...</p>
-        <a :if={@oauth_url} href={@oauth_url} target="_blank" class="btn openai">
-          Open sign-in page
-        </a>
+      <%!-- Choose auth method --%>
+      <div :if={@account_sub == :choose} class="account-section account-choose">
+        <p class="account-lead">Connect your OpenAI account to use the gateway.</p>
+        <button class="btn openai" phx-click="account_start_device_code">
+          <img alt="" src={~p"/images/openai-mark.svg"} /> Sign in with OpenAI
+        </button>
+        <button class="btn subtle" phx-click="account_use_api_key">
+          Use API key instead
+        </button>
       </div>
 
-      <div :if={@oauth_status not in [:connected, :waiting]} class="account-status">
-        <p>Sign in to connect your OpenAI account.</p>
-        <button class="btn openai" phx-click="start_oauth">
-          Sign in with OpenAI
+      <%!-- Device code polling --%>
+      <div
+        :if={@account_sub == :device_code}
+        class="account-section"
+        id="account-device-code"
+        phx-hook="PageFocus"
+      >
+        <h3>Sign in with OpenAI</h3>
+        <p>Scan the QR code with your phone, then enter the code to authorize this device.</p>
+
+        <div class="openai-qr-row">
+          <div
+            class="tg-qr"
+            id="account-qr-device"
+            phx-hook="QRCode"
+            data-url="https://auth.openai.com/codex/device"
+          >
+          </div>
+          <p class="tg-qr-label">
+            Scan to open <strong>auth.openai.com</strong>
+          </p>
+        </div>
+
+        <div :if={@openai_user_code} class="device-code-display">
+          <span class="device-code-value" id="account-device-code-text">{@openai_user_code}</span>
+          <button
+            class="btn subtle btn-sm"
+            id="account-copy-device-code"
+            phx-hook="CopyToClipboard"
+            data-text={@openai_user_code}
+          >
+            Copy
+          </button>
+        </div>
+
+        <div :if={@openai_polling} class="tg-polling">
+          <div class="tg-polling-dot"></div>
+          <span>Waiting for authorization...</span>
+        </div>
+
+        <button class="btn ghost btn-sm" phx-click="account_back_to_choose">
+          Cancel
+        </button>
+      </div>
+
+      <%!-- API key paste --%>
+      <div :if={@account_sub == :api_key} class="account-section">
+        <h3>API key</h3>
+        <p>Paste your OpenAI API key to connect.</p>
+        <form phx-submit="account_submit_api_key" class="account-input-group">
+          <label for="account-api-key-input">API key</label>
+          <input
+            type="password"
+            name="api_key"
+            id="account-api-key-input"
+            class={["account-input", @account_error && "error"]}
+            placeholder="sk-..."
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <p :if={@account_error} class="account-input-hint error">{@account_error}</p>
+          <p :if={!@account_error} class="account-input-hint">
+            Starts with <code>sk-</code>
+          </p>
+          <button type="submit" class="btn primary">
+            Save API key
+          </button>
+        </form>
+        <button class="btn ghost btn-sm" phx-click="account_back_to_choose">
+          Back
+        </button>
+      </div>
+
+      <%!-- Saving --%>
+      <div :if={@account_sub == :saving} class="account-section account-saving">
+        <div class="check-icon-wrap">
+          <div class="check-spinner"></div>
+        </div>
+        <p>Saving API key...</p>
+      </div>
+
+      <%!-- Error --%>
+      <div :if={@account_sub == :error} class="account-section">
+        <p class="account-error">{@account_error}</p>
+        <button class="btn primary btn-sm" phx-click="account_start_device_code">
+          Try again
+        </button>
+        <button class="btn subtle btn-sm" phx-click="account_use_api_key">
+          Use API key instead
         </button>
       </div>
     </.dash_panel>
@@ -110,7 +212,7 @@
       <div class="system-actions">
         <div class="system-action-group">
           <h3>Maintenance</h3>
-          <div class="system-btns">
+          <div class="action-grid">
             <button class="btn subtle" phx-click="restart_gateway">Restart Gateway</button>
             <button class="btn subtle" phx-click="run_repair">Run Repair</button>
             <button class="btn subtle" phx-click="check_update">Check for Updates</button>
@@ -118,9 +220,12 @@
         </div>
         <div class="system-action-group system-danger-zone">
           <h3>Danger Zone</h3>
-          <div class="system-btns">
-            <button class="btn danger" phx-click="reboot"
-                    data-confirm="Are you sure you want to reboot the device?">
+          <div class="action-grid">
+            <button
+              class="btn danger"
+              phx-click="reboot"
+              data-confirm="Are you sure you want to reboot the device?"
+            >
               Reboot Device
             </button>
           </div>
@@ -141,7 +246,7 @@
           <h3>Logs</h3>
           <button class="btn subtle btn-sm" phx-click="view_logs">Refresh</button>
         </div>
-        <div :if={@logs} class="log-viewer">
+        <div :if={@logs} class="log-output">
           <pre>{@logs}</pre>
         </div>
       </div>
