@@ -19,8 +19,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y qemu-user-static
-          # Verify the binary exists (pi-gen checks for this)
-          ls -la /usr/bin/qemu-aarch64-static
+          # pi-gen's build-docker.sh runs `which qemu-aarch64` (not the -static suffix).
+          # The qemu-user-static package only provides qemu-aarch64-static, so add a symlink.
+          sudo ln -sf /usr/bin/qemu-aarch64-static /usr/bin/qemu-aarch64
+          # Verify both names resolve
+          ls -la /usr/bin/qemu-aarch64-static /usr/bin/qemu-aarch64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
