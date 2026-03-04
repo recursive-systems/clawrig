@@ -9,9 +9,10 @@ defmodule Clawrig.Provider.Config do
   Write an OpenAI-compatible provider to ~/.openclaw/openclaw.json.
 
   Sets up:
-  - `env.<ENV_VAR>` with the API key
-  - `models.providers.<slug>` with baseUrl, apiKey ref, api type, and model list
+  - `models.providers.<slug>` with baseUrl, apiKey, api type, and model list
   - `agents.defaults.model.primary` to `<slug>/<model_id>`
+
+  TODO: Migrate to OpenClaw SecretRefs workflow instead of plaintext apiKey.
   """
   @spec write_compatible(String.t(), String.t(), String.t(), String.t()) ::
           :ok | {:error, String.t()}
@@ -19,7 +20,6 @@ defmodule Clawrig.Provider.Config do
     home = System.get_env("HOME") || "/root"
     config_path = Path.join(home, ".openclaw/openclaw.json")
     provider_slug = slug(display_name)
-    env_var = "#{String.upcase(provider_slug)}_API_KEY"
 
     config =
       case File.read(config_path) do
@@ -27,13 +27,10 @@ defmodule Clawrig.Provider.Config do
         _ -> %{}
       end
 
-    # Store API key in env block (OpenClaw resolves ${VAR} from env first)
-    config = deep_put(config, ["env", env_var], api_key)
-
     # Provider config matching OpenClaw's models.providers format
     provider_config = %{
       "baseUrl" => base_url,
-      "apiKey" => "${#{env_var}}",
+      "apiKey" => api_key,
       "api" => "openai-completions",
       "models" => [
         %{
