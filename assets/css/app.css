@@ -1896,9 +1896,16 @@ h2 {
 .toggle-switch {
   width: 44px;
   height: 24px;
+  min-width: 44px;
+  min-height: 24px;
   border-radius: 12px;
-  background: var(--ink-dim);
+  background: var(--ink-dim, #475569);
   border: none;
+  padding: 0;
+  margin: 0;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
   cursor: pointer;
   position: relative;
   transition: background 0.2s;
