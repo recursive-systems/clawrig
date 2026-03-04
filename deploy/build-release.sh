@@ -61,6 +61,26 @@ if [ -f "$INSTALL_DIR/update-pubkey.pem" ]; then
   cp "$INSTALL_DIR/update-pubkey.pem" "$BUNDLE_DIR/"
 fi
 
+# ClawRig OpenClaw plugin — check multiple locations:
+#   1. CLAWRIG_PLUGIN_DIR env var (set by CI after cloning the plugin repo)
+#   2. Monorepo sibling path (local dev from openclaw_monorepo)
+PLUGIN_SRC="${CLAWRIG_PLUGIN_DIR:-}"
+if [ -z "$PLUGIN_SRC" ]; then
+  # Local dev: plugin lives at plugins/clawrig/ relative to monorepo root
+  MONOREPO_PLUGIN="$PROJECT_DIR/../../../plugins/clawrig"
+  if [ -d "$MONOREPO_PLUGIN" ]; then
+    PLUGIN_SRC="$MONOREPO_PLUGIN"
+  fi
+fi
+if [ -n "$PLUGIN_SRC" ] && [ -d "$PLUGIN_SRC" ]; then
+  mkdir -p "$BUNDLE_DIR/clawrig-plugin/scripts"
+  cp "$PLUGIN_SRC"/SKILL_*.md "$BUNDLE_DIR/clawrig-plugin/"
+  cp "$PLUGIN_SRC/scripts/clawrig-info" "$BUNDLE_DIR/clawrig-plugin/scripts/"
+  echo "  Bundled ClawRig plugin from $PLUGIN_SRC"
+else
+  echo "  Warning: ClawRig plugin not found, skipping"
+fi
+
 # Watchdog and self-healing files
 WATCHDOG_DIR="$SCRIPT_DIR/pi-gen/stage-clawrig/04-configure-watchdog/files"
 cp "$WATCHDOG_DIR/clawrig-gateway-watchdog.sh" "$BUNDLE_DIR/"

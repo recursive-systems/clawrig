@@ -77,6 +77,17 @@ if [ -f "$SCRIPT_DIR/clawrig-updater-sudoers" ]; then
   sudo install -m 440 "$SCRIPT_DIR/clawrig-updater-sudoers" /etc/sudoers.d/clawrig-updater
 fi
 
+# Install ClawRig OpenClaw plugin
+if [ -d "$SCRIPT_DIR/clawrig-plugin" ]; then
+  echo "==> Installing ClawRig OpenClaw plugin..."
+  PLUGIN_DIR="/home/pi/.openclaw/plugins/clawrig"
+  mkdir -p "$PLUGIN_DIR"
+  cp "$SCRIPT_DIR"/clawrig-plugin/SKILL_*.md "$PLUGIN_DIR/"
+  mkdir -p /home/pi/.local/bin
+  install -m 755 "$SCRIPT_DIR/clawrig-plugin/scripts/clawrig-info" /home/pi/.local/bin/clawrig-info
+  chown -R pi:pi /home/pi/.openclaw/plugins /home/pi/.local/bin/clawrig-info
+fi
+
 # 7. Install systemd service
 echo ""
 echo "==> Installing systemd service..."
