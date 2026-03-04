@@ -5,6 +5,10 @@ defmodule Clawrig.Updater do
   Checks GitHub Releases on a 30-minute timer for the latest release,
   verifies checksums and signatures, and performs atomic swap upgrades
   with rollback on health-check failure.
+
+  Auto-updates are enabled by default and can be toggled via the
+  dashboard. Manual checks via `check_now/0` always work regardless
+  of the auto-update setting.
   """
 
   use GenServer
@@ -17,6 +21,7 @@ defmodule Clawrig.Updater do
   @version_file "/opt/clawrig/VERSION"
   @pubkey_path "/etc/clawrig/update-pubkey"
   @token_path "/etc/clawrig/github-token"
+  @pending_marker "/var/lib/clawrig/.update-pending"
   @repo "recursive-systems/clawrig"
   @api_base "https://api.github.com"
 
@@ -28,13 +33,23 @@ defmodule Clawrig.Updater do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
-  @doc "Trigger an update check now (GenServer.call)."
+  @doc "Trigger an update check now (GenServer.call). Always works regardless of auto-update setting."
   def check_now do
     GenServer.call(__MODULE__, :check_now, 60_000)
   end
 
   @doc "Alias for `check_now/0` (backward compat with dashboard_live)."
   def check, do: check_now()
+
+  @doc "Enable or disable automatic update checks."
+  def set_auto_update(enabled) when is_boolean(enabled) do
+    GenServer.call(__MODULE__, {:set_auto_update, enabled})
+  end
+
+  @doc "Returns true if automatic updates are enabled (default: true)."
+  def auto_update_enabled? do
+    Clawrig.Wizard.State.get(:auto_update_enabled) != false
+  end
 
   @doc """
   Parses and validates a manifest map from a GitHub release asset.
@@ -79,31 +94,53 @@ defmodule Clawrig.Updater do
 
   @impl true
   def init(_opts) do
-    if oobe_complete?() do
+    state = %{last_check: nil, last_result: nil}
+
+    # Boot-time reconciliation: check if an update was in progress when we restarted
+    reconcile_pending_update()
+
+    if oobe_complete?() and auto_update_enabled?() do
       schedule_check()
       Logger.info("[Updater] Scheduled update checks every #{div(@check_interval, 60_000)}m")
     else
-      Logger.info("[Updater] OOBE not complete — update checks disabled")
+      reason = if !oobe_complete?(), do: "OOBE not complete", else: "auto-updates disabled"
+      Logger.info("[Updater] #{reason} — update checks disabled")
     end
 
-    {:ok, %{last_check: nil, last_result: nil}}
+    {:ok, state}
   end
 
   @impl true
   def handle_call(:check_now, _from, state) do
     result = do_check_and_update()
-
     new_state = %{state | last_check: DateTime.utc_now(), last_result: result}
     {:reply, result, new_state}
   end
 
+  def handle_call({:set_auto_update, enabled}, _from, state) do
+    Clawrig.Wizard.State.put(:auto_update_enabled, enabled)
+
+    if enabled do
+      schedule_check()
+      Logger.info("[Updater] Auto-updates enabled, scheduling checks")
+    else
+      Logger.info("[Updater] Auto-updates disabled")
+    end
+
+    {:reply, :ok, state}
+  end
+
   @impl true
   def handle_info(:scheduled_check, state) do
-    result = do_check_and_update()
-    schedule_check()
-
-    new_state = %{state | last_check: DateTime.utc_now(), last_result: result}
-    {:noreply, new_state}
+    if auto_update_enabled?() do
+      result = do_check_and_update()
+      schedule_check()
+      new_state = %{state | last_check: DateTime.utc_now(), last_result: result}
+      {:noreply, new_state}
+    else
+      Logger.info("[Updater] Auto-updates disabled, skipping scheduled check")
+      {:noreply, state}
+    end
   end
 
   # ── Private ─────────────────────────────────────────────────────────
@@ -116,7 +153,48 @@ defmodule Clawrig.Updater do
     File.exists?(Application.get_env(:clawrig, :oobe_marker, "/var/lib/clawrig/.oobe-complete"))
   end
 
+  defp broadcast(status) do
+    Phoenix.PubSub.broadcast(Clawrig.PubSub, "clawrig:updates", {:update_status, status})
+  end
+
+  # ── Boot-time reconciliation ────────────────────────────────────────
+
+  defp reconcile_pending_update do
+    case File.read(@pending_marker) do
+      {:ok, version} ->
+        version = String.trim(version)
+        Logger.info("[Updater] Found pending update marker for v#{version}, running health check")
+
+        # Give the service a moment to stabilize after restart
+        Process.sleep(5_000)
+
+        case System.cmd("sudo", ["systemctl", "is-active", "clawrig"], stderr_to_stdout: true) do
+          {"active\n", 0} ->
+            Logger.info("[Updater] Post-update health check passed for v#{version}")
+            File.rm(@pending_marker)
+            sudo_rm_rf(@prev_dir)
+            broadcast({:ok, :updated, version})
+
+          {output, _} ->
+            Logger.error("[Updater] Post-update health check failed: #{output} — rolling back")
+            rollback()
+            File.rm(@pending_marker)
+            broadcast({:error, "health check failed after update to v#{version}, rolled back"})
+        end
+
+      {:error, :enoent} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning("[Updater] Could not read pending marker: #{inspect(reason)}")
+    end
+  end
+
+  # ── Check & Update ─────────────────────────────────────────────────
+
   defp do_check_and_update do
+    broadcast(:checking)
+
     with {:ok, manifest} <- fetch_manifest(),
          {:ok, parsed} <- parse_manifest(manifest),
          local_version <- read_local_version(),
@@ -126,10 +204,12 @@ defmodule Clawrig.Updater do
     else
       false ->
         Logger.debug("[Updater] Already up to date")
+        broadcast({:ok, :up_to_date})
         {:ok, :up_to_date}
 
       {:error, reason} = err ->
         Logger.warning("[Updater] Check failed: #{inspect(reason)}")
+        broadcast(err)
         err
     end
   end
@@ -178,16 +258,28 @@ defmodule Clawrig.Updater do
   defp find_manifest_in_assets(_), do: {:error, "release has no assets"}
 
   defp apply_update(parsed) do
+    broadcast({:ok, :downloading, parsed.version})
+
     with :ok <- download_tarball(parsed),
          :ok <- verify_checksum(parsed),
          :ok <- verify_signature(parsed),
-         :ok <- extract_staging(),
-         :ok <- swap_and_restart() do
-      Logger.info("[Updater] Update to #{parsed.version} completed successfully")
-      {:ok, :updated}
+         :ok <- extract_staging() do
+      broadcast({:ok, :installing, parsed.version})
+
+      case swap_and_restart(parsed.version) do
+        :ok ->
+          # The process will be killed by systemctl restart.
+          # Boot-time reconciliation in init/1 handles the health check.
+          Logger.info("[Updater] Update to #{parsed.version} applied, restarting service")
+          {:ok, :updated}
+
+        {:error, _} = err ->
+          err
+      end
     else
       {:error, reason} = err ->
         Logger.error("[Updater] Update failed: #{inspect(reason)}")
+        broadcast(err)
         cleanup_staging()
         err
     end
@@ -207,7 +299,8 @@ defmodule Clawrig.Updater do
           {:error, "tarball asset #{parsed.tarball} not found"}
 
         %{"browser_download_url" => dl_url} ->
-          File.mkdir_p!(@staging_dir)
+          sudo_mkdir_p(@staging_dir)
+          sudo_chown(@staging_dir)
           dest = Path.join(@staging_dir, parsed.tarball)
 
           case Req.get(dl_url, headers: auth_headers(), into: File.stream!(dest)) do
@@ -285,40 +378,27 @@ defmodule Clawrig.Updater do
     end
   end
 
-  defp swap_and_restart do
+  defp swap_and_restart(version) do
     try do
       # Remove previous backup
-      if File.exists?(@prev_dir), do: File.rm_rf!(@prev_dir)
+      if File.exists?(@prev_dir), do: sudo_rm_rf(@prev_dir)
 
       # Move current install to backup
       if File.exists?(@install_dir) do
-        File.rename!(@install_dir, @prev_dir)
+        sudo_mv(@install_dir, @prev_dir)
       end
 
       # Move staging to install
-      File.rename!(@staging_dir, @install_dir)
+      sudo_mv(@staging_dir, @install_dir)
+      sudo_chown(@install_dir)
 
-      # Restart the service
-      case System.cmd("systemctl", ["restart", "clawrig"], stderr_to_stdout: true) do
-        {_, 0} ->
-          # Brief health check
-          Process.sleep(5_000)
+      # Write pending marker so boot-time reconciliation can run the health check
+      File.write!(@pending_marker, version)
 
-          case System.cmd("systemctl", ["is-active", "clawrig"], stderr_to_stdout: true) do
-            {"active\n", 0} ->
-              :ok
-
-            _ ->
-              Logger.error("[Updater] Health check failed — rolling back")
-              rollback()
-              {:error, "health check failed after update, rolled back"}
-          end
-
-        {output, _} ->
-          Logger.error("[Updater] Service restart failed — rolling back")
-          rollback()
-          {:error, "service restart failed: #{output}"}
-      end
+      # Restart the service — this will kill our process.
+      # The new instance's init/1 handles health check via reconcile_pending_update/0.
+      System.cmd("sudo", ["systemctl", "restart", "clawrig"], stderr_to_stdout: true)
+      :ok
     rescue
       e ->
         Logger.error("[Updater] Swap failed: #{Exception.message(e)} — rolling back")
@@ -330,9 +410,9 @@ defmodule Clawrig.Updater do
   defp rollback do
     try do
       if File.exists?(@prev_dir) do
-        if File.exists?(@install_dir), do: File.rm_rf!(@install_dir)
-        File.rename!(@prev_dir, @install_dir)
-        System.cmd("systemctl", ["restart", "clawrig"], stderr_to_stdout: true)
+        if File.exists?(@install_dir), do: sudo_rm_rf(@install_dir)
+        sudo_mv(@prev_dir, @install_dir)
+        System.cmd("sudo", ["systemctl", "restart", "clawrig"], stderr_to_stdout: true)
       end
     rescue
       e -> Logger.error("[Updater] Rollback failed: #{Exception.message(e)}")
@@ -340,10 +420,28 @@ defmodule Clawrig.Updater do
   end
 
   defp cleanup_staging do
-    if File.exists?(@staging_dir) do
-      File.rm_rf(@staging_dir)
-    end
+    if File.exists?(@staging_dir), do: sudo_rm_rf(@staging_dir)
   end
+
+  # ── Sudo helpers ───────────────────────────────────────────────────
+
+  defp sudo_mkdir_p(path) do
+    System.cmd("sudo", ["mkdir", "-p", path], stderr_to_stdout: true)
+  end
+
+  defp sudo_mv(src, dest) do
+    {_, 0} = System.cmd("sudo", ["mv", src, dest], stderr_to_stdout: true)
+  end
+
+  defp sudo_rm_rf(path) do
+    System.cmd("sudo", ["rm", "-rf", path], stderr_to_stdout: true)
+  end
+
+  defp sudo_chown(path) do
+    System.cmd("sudo", ["chown", "-R", "pi:pi", path], stderr_to_stdout: true)
+  end
+
+  # ── Version & Auth ─────────────────────────────────────────────────
 
   defp read_local_version do
     case File.read(@version_file) do

@@ -10,7 +10,7 @@ defmodule ClawrigWeb.DashboardLive do
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      # Kick off an async status check instead of blocking mount.
+      Phoenix.PubSub.subscribe(Clawrig.PubSub, "clawrig:updates")
       send(self(), :refresh_status)
     end
 
@@ -23,6 +23,8 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:openai_status, :loading)
       |> assign(:logs, nil)
       |> assign(:update_status, nil)
+      |> assign(:update_version, nil)
+      |> assign(:auto_update_enabled, Clawrig.Updater.auto_update_enabled?())
       |> assign(:account_sub, :idle)
       |> assign(:account_error, nil)
       |> assign(:openai_user_code, nil)
@@ -75,6 +77,12 @@ defmodule ClawrigWeb.DashboardLive do
   def handle_event("check_update", _params, socket) do
     send(self(), :check_update)
     {:noreply, assign(socket, :update_status, :checking)}
+  end
+
+  def handle_event("toggle_auto_update", _params, socket) do
+    new_value = !socket.assigns.auto_update_enabled
+    Clawrig.Updater.set_auto_update(new_value)
+    {:noreply, assign(socket, :auto_update_enabled, new_value)}
   end
 
   def handle_event("view_logs", _params, socket) do
@@ -208,6 +216,15 @@ defmodule ClawrigWeb.DashboardLive do
       end
 
     {:noreply, assign(socket, :update_status, status)}
+  end
+
+  def handle_info({:update_status, status}, socket) do
+    {update_status, update_version} = normalize_update_status(status)
+
+    {:noreply,
+     socket
+     |> assign(:update_status, update_status)
+     |> assign(:update_version, update_version)}
   end
 
   def handle_info({ClawrigWeb.WifiComponent, {:wifi_connected, ssid}}, socket) do
@@ -417,6 +434,15 @@ defmodule ClawrigWeb.DashboardLive do
         {:error, "Failed to write auth-profiles.json: #{inspect(reason)}"}
     end
   end
+
+  defp normalize_update_status(:checking), do: {:checking, nil}
+  defp normalize_update_status({:ok, :up_to_date}), do: {:up_to_date, nil}
+  defp normalize_update_status({:ok, :update_available, v}), do: {:available, v}
+  defp normalize_update_status({:ok, :downloading, v}), do: {:downloading, v}
+  defp normalize_update_status({:ok, :installing, v}), do: {:installing, v}
+  defp normalize_update_status({:ok, :updated, v}), do: {:updated, v}
+  defp normalize_update_status({:error, reason}), do: {{:error, reason}, nil}
+  defp normalize_update_status(_), do: {nil, nil}
 
   defp device_code_impl do
     Application.get_env(:clawrig, :device_code_module, Clawrig.Wizard.DeviceCode)

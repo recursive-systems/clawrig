@@ -36,4 +36,10 @@ defmodule Clawrig.UpdaterTest do
       refute Updater.version_newer?("0.1.0", "0.2.0")
     end
   end
+
+  describe "auto_update_enabled?/0" do
+    test "returns true by default" do
+      assert Updater.auto_update_enabled?()
+    end
+  end
 end

@@ -12,6 +12,9 @@ SECRET=$(openssl rand -hex 64)
 echo "SECRET_KEY_BASE=$SECRET" > /etc/clawrig.env
 chmod 600 /etc/clawrig.env
 
+# Create config directory (pubkey + token stored here)
+mkdir -p /etc/clawrig
+
 # Create state directory
 mkdir -p /var/lib/clawrig
 chown 1000:1000 /var/lib/clawrig

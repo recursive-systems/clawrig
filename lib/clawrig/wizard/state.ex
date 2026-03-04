@@ -15,7 +15,8 @@ defmodule Clawrig.Wizard.State do
     local_ip: nil,
     openai_auth_method: nil,
     openai_device_auth_id: nil,
-    openai_user_code: nil
+    openai_user_code: nil,
+    auto_update_enabled: true
   }
 
   def start_link(_opts) do

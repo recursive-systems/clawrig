@@ -58,11 +58,24 @@ sudo mkdir -p /etc/avahi/services
 sudo cp "$SCRIPT_DIR/clawrig-avahi.service" /etc/avahi/services/clawrig.service
 sudo systemctl enable avahi-daemon
 
-# 6. Create state directory
+# 6. Create state + config directories
 echo ""
-echo "==> Creating state directory..."
+echo "==> Creating state and config directories..."
 sudo mkdir -p /var/lib/clawrig
 sudo chown pi:pi /var/lib/clawrig
+sudo mkdir -p /etc/clawrig
+
+# Install OTA update pubkey if present in bundle
+if [ -f "$SCRIPT_DIR/update-pubkey.pem" ]; then
+  echo "==> Installing OTA update pubkey..."
+  sudo install -m 644 "$SCRIPT_DIR/update-pubkey.pem" /etc/clawrig/update-pubkey
+fi
+
+# Install sudoers dropin for OTA updater
+if [ -f "$SCRIPT_DIR/clawrig-updater-sudoers" ]; then
+  echo "==> Installing OTA updater sudoers..."
+  sudo install -m 440 "$SCRIPT_DIR/clawrig-updater-sudoers" /etc/sudoers.d/clawrig-updater
+fi
 
 # 7. Install systemd service
 echo ""

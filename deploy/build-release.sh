@@ -14,6 +14,11 @@ else
   exit 1
 fi
 
+VERSION_ARG=""
+if [ -n "${CLAWRIG_VERSION:-}" ]; then
+  VERSION_ARG="--build-arg CLAWRIG_VERSION=$CLAWRIG_VERSION"
+fi
+
 echo "==> Building ARM64 release via $DOCKER..."
 # Use buildx if available (for cross-compilation on x86), otherwise plain build.
 # On Apple Silicon, plain build already produces arm64 images.
@@ -23,11 +28,13 @@ if [ "$DOCKER" = "docker" ] && docker buildx version &>/dev/null; then
     -f "$SCRIPT_DIR/Dockerfile.build" \
     -t clawrig-build \
     --load \
+    $VERSION_ARG \
     "$PROJECT_DIR"
 else
   $DOCKER build \
     -f "$SCRIPT_DIR/Dockerfile.build" \
     -t clawrig-build \
+    $VERSION_ARG \
     "$PROJECT_DIR"
 fi
 
@@ -46,6 +53,13 @@ cp "$SCRIPT_DIR/pi-setup.sh" "$BUNDLE_DIR/"
 cp "$SCRIPT_DIR/dnsmasq-captive.conf" "$BUNDLE_DIR/"
 cp "$SCRIPT_DIR/clawrig-avahi.service" "$BUNDLE_DIR/"
 cp "$SCRIPT_DIR/systemd/clawrig.service" "$BUNDLE_DIR/"
+
+# OTA update infrastructure
+INSTALL_DIR="$SCRIPT_DIR/pi-gen/stage-clawrig/01-install-clawrig/files"
+cp "$INSTALL_DIR/clawrig-updater-sudoers" "$BUNDLE_DIR/"
+if [ -f "$INSTALL_DIR/update-pubkey.pem" ]; then
+  cp "$INSTALL_DIR/update-pubkey.pem" "$BUNDLE_DIR/"
+fi
 
 # Watchdog and self-healing files
 WATCHDOG_DIR="$SCRIPT_DIR/pi-gen/stage-clawrig/04-configure-watchdog/files"

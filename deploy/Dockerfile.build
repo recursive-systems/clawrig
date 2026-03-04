@@ -7,7 +7,9 @@ WORKDIR /app
 
 RUN mix local.hex --force && mix local.rebar --force
 
+ARG CLAWRIG_VERSION=0.1.0-dev
 ENV MIX_ENV=prod
+ENV CLAWRIG_VERSION=${CLAWRIG_VERSION}
 
 # Copy dependency manifests first for layer caching
 COPY mix.exs mix.lock ./

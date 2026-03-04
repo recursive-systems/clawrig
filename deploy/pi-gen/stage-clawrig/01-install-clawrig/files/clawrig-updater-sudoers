@@ -1,0 +1,12 @@
+# ClawRig OTA updater permissions — allow pi user to perform update operations
+pi ALL=(root) NOPASSWD: /usr/bin/systemctl restart clawrig
+pi ALL=(root) NOPASSWD: /usr/bin/systemctl stop clawrig
+pi ALL=(root) NOPASSWD: /usr/bin/systemctl start clawrig
+pi ALL=(root) NOPASSWD: /usr/bin/systemctl is-active clawrig
+pi ALL=(root) NOPASSWD: /usr/bin/mkdir -p /opt/clawrig-staging
+pi ALL=(root) NOPASSWD: /usr/bin/mv /opt/clawrig /opt/clawrig-prev
+pi ALL=(root) NOPASSWD: /usr/bin/mv /opt/clawrig-staging /opt/clawrig
+pi ALL=(root) NOPASSWD: /bin/rm -rf /opt/clawrig-prev
+pi ALL=(root) NOPASSWD: /bin/rm -rf /opt/clawrig-staging
+pi ALL=(root) NOPASSWD: /bin/chown -R pi\:pi /opt/clawrig
+pi ALL=(root) NOPASSWD: /bin/chown -R pi\:pi /opt/clawrig-staging

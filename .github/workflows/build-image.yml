@@ -28,6 +28,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Set version from tag
+        run: echo "CLAWRIG_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
       - name: Build ARM64 Elixir release
         run: bash deploy/build-release.sh
 
@@ -69,6 +72,13 @@ jobs:
           cd deploy/pi-gen/pi-gen-repo
           PRESERVE_CONTAINER=1 ./build-docker.sh
 
+      - name: Sign release and generate OTA manifest
+        run: |
+          echo "${{ secrets.OTA_SIGNING_KEY }}" | base64 -d > /tmp/signing-key.pem
+          chmod 600 /tmp/signing-key.pem
+          bash deploy/sign-release.sh deploy/bundle/clawrig.tar.gz "$CLAWRIG_VERSION" /tmp/signing-key.pem
+          rm -f /tmp/signing-key.pem
+
       - name: Prepare release assets
         env:
           TAG: ${{ github.ref_name }}
@@ -84,4 +94,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: ${{ steps.assets.outputs.asset_path }}
+          files: |
+            ${{ steps.assets.outputs.asset_path }}
+            deploy/bundle/clawrig.tar.gz
+            deploy/bundle/manifest.json

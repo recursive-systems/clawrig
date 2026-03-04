@@ -4,7 +4,7 @@ defmodule Clawrig.MixProject do
   def project do
     [
       app: :clawrig,
-      version: "0.1.0",
+      version: System.get_env("CLAWRIG_VERSION", "0.1.0-dev"),
       elixir: "~> 1.19",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,

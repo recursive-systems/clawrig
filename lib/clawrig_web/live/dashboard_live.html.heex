@@ -7,6 +7,19 @@
     <span class="version">v{@version}</span>
   </header>
 
+  <%!-- Update notification banner (visible on all tabs) --%>
+  <div :if={@update_status == :downloading} class="update-banner update-progress">
+    <span class="update-spinner"></span>
+    <span>Downloading update v{@update_version}...</span>
+  </div>
+  <div :if={@update_status == :installing} class="update-banner update-progress">
+    <span class="update-spinner"></span>
+    <span>Installing update v{@update_version}...</span>
+  </div>
+  <div :if={@update_status == :updated} class="update-banner update-success">
+    Updated to v{@update_version}. Restarting...
+  </div>
+
   <nav class="dash-nav" role="tablist">
     <.link patch={~p"/"} class={tab_class(@live_action, :index)}>
       Dashboard
@@ -214,13 +227,67 @@
     <.dash_panel :if={@live_action == :system} title="System" back>
       <div class="system-actions">
         <div class="system-action-group">
+          <h3>Updates</h3>
+          <div class="update-settings">
+            <label class="toggle-row">
+              <span>Auto-updates</span>
+              <button
+                class={["toggle-switch", @auto_update_enabled && "active"]}
+                phx-click="toggle_auto_update"
+                role="switch"
+                aria-checked={to_string(@auto_update_enabled)}
+              >
+                <span class="toggle-knob"></span>
+              </button>
+            </label>
+            <p class="setting-hint">
+              {if @auto_update_enabled,
+                do: "Checking for updates every 30 minutes.",
+                else: "Automatic updates are paused."}
+            </p>
+          </div>
+          <div class="action-grid">
+            <button
+              class="btn subtle"
+              phx-click="check_update"
+              disabled={@update_status == :checking}
+            >
+              {if @update_status == :checking, do: "Checking...", else: "Check for Updates"}
+            </button>
+          </div>
+          <div :if={@update_status} class="update-status">
+            <p :if={@update_status == :checking} class="update-checking">
+              Checking for updates...
+            </p>
+            <p :if={@update_status == :up_to_date} class="update-ok">
+              System is up to date.
+            </p>
+            <p :if={@update_status == :downloading} class="update-info">
+              Downloading v{@update_version}...
+            </p>
+            <p :if={@update_status == :installing} class="update-info">
+              Installing v{@update_version}...
+            </p>
+            <p :if={@update_status == :updated} class="update-ok">
+              Updated to v{@update_version}. Restarting...
+            </p>
+            <p
+              :if={is_tuple(@update_status) and elem(@update_status, 0) == :error}
+              class="update-err"
+            >
+              {elem(@update_status, 1)}
+            </p>
+          </div>
+        </div>
+
+        <div class="system-action-group">
           <h3>Maintenance</h3>
           <div class="action-grid">
             <button class="btn subtle" phx-click="restart_gateway">Restart Gateway</button>
             <button class="btn subtle" phx-click="run_repair">Run Repair</button>
-            <button class="btn subtle" phx-click="check_update">Check for Updates</button>
           </div>
         </div>
+
         <div class="system-action-group system-danger-zone">
           <h3>Danger Zone</h3>
           <div class="action-grid">
@@ -233,15 +300,6 @@
             </button>
           </div>
         </div>
-      </div>
-
-      <div :if={@update_status} class="update-status">
-        <p :if={@update_status == :checking} class="update-checking">Checking for updates...</p>
-        <p :if={@update_status == :up_to_date} class="update-ok">System is up to date.</p>
-        <p :if={is_tuple(@update_status) and elem(@update_status, 0) == :error} class="update-err">
-          {elem(@update_status, 1)}
-        </p>
-        <p :if={@update_status == :available} class="update-warn">An update is available.</p>
       </div>
 
       <div class="log-section">
