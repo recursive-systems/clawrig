@@ -80,12 +80,15 @@ fi
 # Install ClawRig OpenClaw plugin
 if [ -d "$SCRIPT_DIR/clawrig-plugin" ]; then
   echo "==> Installing ClawRig OpenClaw plugin..."
-  PLUGIN_DIR="/home/pi/.openclaw/plugins/clawrig"
-  mkdir -p "$PLUGIN_DIR"
-  cp "$SCRIPT_DIR"/clawrig-plugin/SKILL_*.md "$PLUGIN_DIR/"
-  mkdir -p /home/pi/.local/bin
-  install -m 755 "$SCRIPT_DIR/clawrig-plugin/scripts/clawrig-info" /home/pi/.local/bin/clawrig-info
-  chown -R pi:pi /home/pi/.openclaw/plugins /home/pi/.local/bin/clawrig-info
+  # Install skills to OpenClaw's managed skills directory
+  for skill_dir in "$SCRIPT_DIR"/clawrig-plugin/skills/*/; do
+    skill_name=$(basename "$skill_dir")
+    mkdir -p "/home/pi/.openclaw/skills/$skill_name"
+    cp "$skill_dir/SKILL.md" "/home/pi/.openclaw/skills/$skill_name/SKILL.md"
+  done
+  chown -R pi:pi /home/pi/.openclaw/skills
+  # Install CLI tool to /usr/local/bin (always on PATH)
+  sudo install -m 755 "$SCRIPT_DIR/clawrig-plugin/scripts/clawrig-info" /usr/local/bin/clawrig-info
 fi
 
 # 7. Install systemd service

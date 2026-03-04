@@ -74,7 +74,7 @@ if [ -z "$PLUGIN_SRC" ]; then
 fi
 if [ -n "$PLUGIN_SRC" ] && [ -d "$PLUGIN_SRC" ]; then
   mkdir -p "$BUNDLE_DIR/clawrig-plugin/scripts"
-  cp "$PLUGIN_SRC"/SKILL_*.md "$BUNDLE_DIR/clawrig-plugin/"
+  cp -a "$PLUGIN_SRC/skills" "$BUNDLE_DIR/clawrig-plugin/skills"
   cp "$PLUGIN_SRC/scripts/clawrig-info" "$BUNDLE_DIR/clawrig-plugin/scripts/"
   echo "  Bundled ClawRig plugin from $PLUGIN_SRC"
 else
