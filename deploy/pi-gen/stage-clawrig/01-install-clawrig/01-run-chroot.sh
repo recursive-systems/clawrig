@@ -26,10 +26,28 @@ su - pi -c "openclaw --version"
 cat > /home/pi/.openclaw/openclaw.json << 'OCJSON'
 {
   "agents": {"defaults": {"model": {"primary": "openai-codex/gpt-5.3-codex"}}},
-  "gateway": {"mode": "local"}
+  "gateway": {"mode": "local"},
+  "tools": {
+    "profile": "messaging",
+    "allow": ["read", "exec"],
+    "exec": {"host": "gateway", "security": "allowlist", "ask": "off"}
+  }
 }
 OCJSON
 chown 1000:1000 /home/pi/.openclaw/openclaw.json
+
+# Pre-bake exec approvals so clawrig-info can run without manual approval
+cat > /home/pi/.openclaw/exec-approvals.json << 'APPROVALS'
+{
+  "version": 1,
+  "allowlist": [
+    {"agent": "*", "pattern": "/usr/local/bin/clawrig-info*"},
+    {"agent": "*", "pattern": "clawrig-info*"}
+  ]
+}
+APPROVALS
+chown 1000:1000 /home/pi/.openclaw/exec-approvals.json
+
 mkdir -p /home/pi/.openclaw/agents/main/agent
 chown -R 1000:1000 /home/pi/.openclaw
 

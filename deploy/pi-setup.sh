@@ -89,6 +89,33 @@ if [ -d "$SCRIPT_DIR/clawrig-plugin" ]; then
   chown -R pi:pi /home/pi/.openclaw/skills
   # Install CLI tool to /usr/local/bin (always on PATH)
   sudo install -m 755 "$SCRIPT_DIR/clawrig-plugin/scripts/clawrig-info" /usr/local/bin/clawrig-info
+
+  # Configure exec tool for skill commands (gateway host, allowlist, no prompts)
+  python3 -c "
+import json, os
+cfg_path = '/home/pi/.openclaw/openclaw.json'
+with open(cfg_path) as f:
+    cfg = json.load(f)
+tools = cfg.setdefault('tools', {})
+tools.setdefault('profile', 'messaging')
+tools.setdefault('allow', ['read', 'exec'])
+tools.setdefault('exec', {'host': 'gateway', 'security': 'allowlist', 'ask': 'off'})
+with open(cfg_path, 'w') as f:
+    json.dump(cfg, f, indent=2)
+"
+  chown pi:pi /home/pi/.openclaw/openclaw.json
+
+  # Pre-bake exec approvals for clawrig-info
+  cat > /home/pi/.openclaw/exec-approvals.json << 'APPROVALS'
+{
+  "version": 1,
+  "allowlist": [
+    {"agent": "*", "pattern": "/usr/local/bin/clawrig-info*"},
+    {"agent": "*", "pattern": "clawrig-info*"}
+  ]
+}
+APPROVALS
+  chown pi:pi /home/pi/.openclaw/exec-approvals.json
 fi
 
 # 7. Install systemd service
