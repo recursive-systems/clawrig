@@ -28,22 +28,27 @@ cat > /home/pi/.openclaw/openclaw.json << 'OCJSON'
   "agents": {"defaults": {"model": {"primary": "openai-codex/gpt-5.3-codex"}}},
   "gateway": {"mode": "local"},
   "tools": {
-    "profile": "messaging",
-    "allow": ["read", "exec"],
+    "allow": ["group:messaging", "read", "exec"],
     "exec": {"host": "gateway", "security": "allowlist", "ask": "off"}
   }
 }
 OCJSON
 chown 1000:1000 /home/pi/.openclaw/openclaw.json
 
-# Pre-bake exec approvals so clawrig-info can run without manual approval
+# Pre-bake exec approvals with wildcard allowlist.
+# Specific path patterns (e.g. "/usr/local/bin/clawrig-info*") don't reliably
+# match through OpenClaw's gateway exec pipeline due to symlink resolution and
+# policy layers. A dedicated appliance like ClawRig can safely use a wildcard.
 cat > /home/pi/.openclaw/exec-approvals.json << 'APPROVALS'
 {
   "version": 1,
-  "allowlist": [
-    {"agent": "*", "pattern": "/usr/local/bin/clawrig-info*"},
-    {"agent": "*", "pattern": "clawrig-info*"}
-  ]
+  "agents": {
+    "*": {
+      "allowlist": [
+        {"pattern": "*"}
+      ]
+    }
+  }
 }
 APPROVALS
 chown 1000:1000 /home/pi/.openclaw/exec-approvals.json

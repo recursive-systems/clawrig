@@ -97,22 +97,25 @@ cfg_path = '/home/pi/.openclaw/openclaw.json'
 with open(cfg_path) as f:
     cfg = json.load(f)
 tools = cfg.setdefault('tools', {})
-tools.setdefault('profile', 'messaging')
-tools.setdefault('allow', ['read', 'exec'])
-tools.setdefault('exec', {'host': 'gateway', 'security': 'allowlist', 'ask': 'off'})
+tools.pop('profile', None)
+tools['allow'] = ['group:messaging', 'read', 'exec']
+tools['exec'] = {'host': 'gateway', 'security': 'allowlist', 'ask': 'off'}
 with open(cfg_path, 'w') as f:
     json.dump(cfg, f, indent=2)
 "
   chown pi:pi /home/pi/.openclaw/openclaw.json
 
-  # Pre-bake exec approvals for clawrig-info
+  # Pre-bake exec approvals with wildcard allowlist (dedicated appliance)
   cat > /home/pi/.openclaw/exec-approvals.json << 'APPROVALS'
 {
   "version": 1,
-  "allowlist": [
-    {"agent": "*", "pattern": "/usr/local/bin/clawrig-info*"},
-    {"agent": "*", "pattern": "clawrig-info*"}
-  ]
+  "agents": {
+    "*": {
+      "allowlist": [
+        {"pattern": "*"}
+      ]
+    }
+  }
 }
 APPROVALS
   chown pi:pi /home/pi/.openclaw/exec-approvals.json
