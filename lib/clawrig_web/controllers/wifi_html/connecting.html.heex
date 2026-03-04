@@ -1,37 +1,37 @@
 <div class="wifi-card">
   <div class="wifi-header">
     <div class="wifi-logo">ClawRig</div>
-    <h1>Finding your Pi...</h1>
-    <p>Connecting to <strong>{@ssid}</strong> and switching networks.</p>
+    <h1 id="connect-title">Connecting...</h1>
+    <p id="connect-subtitle">Connecting to <strong>{@ssid}</strong> and switching networks.</p>
   </div>
 
   <div class="wifi-transition">
-    <div class="wifi-spinner"></div>
+    <div class="wifi-spinner" id="connect-spinner"></div>
     <p class="wifi-next-step" id="status-msg">
-      This takes about 20–30 seconds.<br />
-      Your phone will reconnect to your home WiFi automatically.
+      This takes about 15–20 seconds.
     </p>
-    <p class="wifi-fallback">
-      Once connected, visit<br />
-      <strong>http://clawrig.local</strong> to continue setup.
-    </p>
+    <div id="connect-instructions" style="display:none">
+      <p class="wifi-next-step">
+        Open this link <strong>on your computer</strong> to continue:
+      </p>
+      <p class="wifi-fallback">
+        <strong><a href="http://clawrig.local">http://clawrig.local</a></strong>
+      </p>
+    </div>
   </div>
 
   <script>
-    // Poll clawrig.local on the home network until reachable, then redirect
-    var attempts = 0;
-    var maxAttempts = 30;
-    function checkPi() {
-      attempts++;
-      if (attempts > maxAttempts) {
-        document.getElementById("status-msg").innerHTML =
-          "Could not reach the Pi automatically.<br/>Please open <strong>http://clawrig.local</strong> in your browser.";
-        return;
-      }
-      fetch("http://clawrig.local:4090/portal/status", {mode: "no-cors"})
-        .then(function() { window.location.href = "http://clawrig.local/"; })
-        .catch(function() { setTimeout(checkPi, 3000); });
-    }
-    setTimeout(checkPi, 5000);
+    // After a delay, show "go to your computer" instructions.
+    // We can't reliably poll the Pi from this page because the hotspot
+    // is torn down during the WiFi connection attempt, disconnecting
+    // this device (phone) from the Pi's network.
+    setTimeout(function() {
+      document.getElementById("connect-title").textContent = "Wi-Fi credentials submitted";
+      document.getElementById("connect-subtitle").innerHTML =
+        "Your Pi should now be connecting to <strong>{@ssid}</strong>.";
+      document.getElementById("connect-spinner").style.display = "none";
+      document.getElementById("status-msg").style.display = "none";
+      document.getElementById("connect-instructions").style.display = "block";
+    }, 15000);
   </script>
 </div>

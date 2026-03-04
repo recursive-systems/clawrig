@@ -50,8 +50,40 @@ defmodule Clawrig.System.PiCommands do
     end
   end
 
-  defp detect_local_ip do
-    case System.cmd("ip", ["-4", "-o", "addr", "show", "wlan0"], stderr_to_stdout: true) do
+  @impl true
+  def detect_local_ip do
+    # Use the default route to find the primary interface, then get its IP
+    case System.cmd("ip", ["-4", "-o", "route", "show", "default"], stderr_to_stdout: true) do
+      {output, 0} ->
+        case Regex.run(~r/dev\s+(\S+)/, output) do
+          [_, iface] -> ip_for_interface(iface)
+          _ -> ip_for_interface("eth0") || ip_for_interface("end0") || ip_for_interface("wlan0")
+        end
+
+      _ ->
+        ip_for_interface("eth0") || ip_for_interface("end0") || ip_for_interface("wlan0")
+    end
+  end
+
+  @impl true
+  def has_ethernet_ip do
+    case System.cmd("ip", ["-4", "-o", "addr", "show"], stderr_to_stdout: true) do
+      {output, 0} ->
+        output
+        |> String.split("\n", trim: true)
+        |> Enum.any?(fn line ->
+          not String.contains?(line, "wlan") and
+            not String.contains?(line, " lo ") and
+            Regex.match?(~r/inet \d+\.\d+\.\d+\.\d+/, line)
+        end)
+
+      _ ->
+        false
+    end
+  end
+
+  defp ip_for_interface(iface) do
+    case System.cmd("ip", ["-4", "-o", "addr", "show", iface], stderr_to_stdout: true) do
       {output, 0} ->
         case Regex.run(~r/inet (\d+\.\d+\.\d+\.\d+)/, output) do
           [_, ip] -> ip

@@ -1034,6 +1034,61 @@ h2 {
 @keyframes done-circle { to { stroke-dashoffset: 0; } }
 @keyframes done-mark { to { stroke-dashoffset: 0; } }
 
+/* ─── IP confirmation gate ─── */
+.ip-gate-card {
+  margin: 16px auto 12px;
+  padding: 18px 20px;
+  max-width: 340px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  text-align: center;
+}
+
+.ip-gate-title {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.ip-gate-addresses {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.ip-gate-addr {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--accent);
+  word-break: break-all;
+}
+
+.ip-gate-hint {
+  margin: 0 0 14px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.ip-gate-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--fg);
+  user-select: none;
+}
+
+.ip-gate-confirm input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
 
 /* ─── Footer nav ─── */
 .shell-foot {

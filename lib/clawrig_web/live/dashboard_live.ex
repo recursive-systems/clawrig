@@ -32,6 +32,8 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:openai_poll_interval, 5)
       |> assign(:openai_polling, false)
       |> assign(:openai_poll_count, 0)
+      |> assign(:ethernet_connected, false)
+      |> assign(:local_ip, State.get(:local_ip))
 
     {:ok, socket}
   end
@@ -179,13 +181,15 @@ defmodule ClawrigWeb.DashboardLive do
           _ -> nil
         end
 
-      send(pid, {:status_result, gateway, internet, wifi_ssid})
+      ethernet_connected = Commands.impl().has_ethernet_ip()
+
+      send(pid, {:status_result, gateway, internet, wifi_ssid, ethernet_connected})
     end)
 
     {:noreply, socket}
   end
 
-  def handle_info({:status_result, gateway, internet, wifi_ssid}, socket) do
+  def handle_info({:status_result, gateway, internet, wifi_ssid, ethernet_connected}, socket) do
     openai_status =
       if State.get(:openai_done), do: :connected, else: :disconnected
 
@@ -201,6 +205,7 @@ defmodule ClawrigWeb.DashboardLive do
      |> assign(:gateway_status, gateway)
      |> assign(:internet, internet)
      |> assign(:wifi_ssid, wifi_ssid)
+     |> assign(:ethernet_connected, ethernet_connected)
      |> assign(:openai_status, openai_status)
      |> assign(:account_sub, account_sub)}
   end
@@ -315,7 +320,7 @@ defmodule ClawrigWeb.DashboardLive do
     pid = self()
 
     Task.start(fn ->
-      result = write_oauth_credentials(oauth_creds)
+      result = Clawrig.OpenAI.Credentials.write(oauth_creds)
       send(pid, {:account_save_result, result, :device_code})
     end)
 
@@ -383,57 +388,6 @@ defmodule ClawrigWeb.DashboardLive do
   end
 
   # ---------- Private ----------
-
-  @auth_profiles_path "/home/pi/.openclaw/agents/main/agent/auth-profiles.json"
-
-  defp write_oauth_credentials(oauth_creds) do
-    profile_id =
-      if is_binary(oauth_creds.email) and oauth_creds.email != "",
-        do: "openai-codex:#{oauth_creds.email}",
-        else: "openai-codex:default"
-
-    credential = %{
-      "type" => "oauth",
-      "provider" => "openai-codex",
-      "access" => oauth_creds.access,
-      "refresh" => oauth_creds.refresh,
-      "expires" => oauth_creds.expires,
-      "email" => oauth_creds.email
-    }
-
-    # Read existing auth-profiles.json, upsert the profile, write back
-    store =
-      case File.read(@auth_profiles_path) do
-        {:ok, content} -> Jason.decode!(content)
-        _ -> %{"version" => 1, "profiles" => %{}}
-      end
-
-    store = put_in(store, ["profiles", profile_id], credential)
-
-    case File.write(@auth_profiles_path, Jason.encode!(store, pretty: true)) do
-      :ok ->
-        # Set openclaw.json config: auth profile + model for openai-codex
-        Commands.impl().run_openclaw([
-          "config",
-          "set",
-          "auth.profiles.#{profile_id}",
-          Jason.encode!(%{provider: "openai-codex", mode: "oauth"}),
-          "--strict-json"
-        ])
-
-        Commands.impl().run_openclaw([
-          "config",
-          "set",
-          "agents.defaults.model.primary",
-          "openai-codex/gpt-5.3-codex"
-        ])
-
-        :ok
-
-      {:error, reason} ->
-        {:error, "Failed to write auth-profiles.json: #{inspect(reason)}"}
-    end
-  end
 
   defp normalize_update_status(:checking), do: {:checking, nil}
   defp normalize_update_status({:ok, :up_to_date}), do: {:up_to_date, nil}

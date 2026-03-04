@@ -5,6 +5,17 @@
     <p>Connect your Pi to your home network.</p>
   </div>
 
+  <div :if={assigns[:eth_online]} class="wifi-ethernet">
+    <p class="wifi-ethernet-text">
+      Ethernet connection detected with internet access.
+    </p>
+    <form method="post" action="/portal/skip-wifi">
+      <input type="hidden" name="_csrf_token" value={Phoenix.Controller.get_csrf_token()} />
+      <button type="submit" class="wifi-btn">Skip Wi-Fi setup</button>
+    </form>
+    <p class="wifi-divider">or configure Wi-Fi below</p>
+  </div>
+
   <form method="post" action="/portal/connect" class="wifi-form">
     <input type="hidden" name="_csrf_token" value={Phoenix.Controller.get_csrf_token()} />
 

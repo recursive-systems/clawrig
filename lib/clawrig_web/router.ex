@@ -24,6 +24,18 @@ defmodule ClawrigWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # CORS-enabled JSON API (local network tools, browser extensions)
+  pipeline :api_public do
+    plug :accepts, ["json"]
+    plug ClawrigWeb.Plugs.CorsPlug
+  end
+
+  # CORS-enabled status endpoint (must be before captive scope to match first)
+  scope "/portal", ClawrigWeb do
+    pipe_through :api_public
+    get "/status.json", WifiController, :status_json
+  end
+
   # Phase 1: CNA detection endpoints (captive portal)
   scope "/", ClawrigWeb do
     pipe_through :captive
@@ -38,6 +50,7 @@ defmodule ClawrigWeb.Router do
     post "/portal/scan", WifiController, :scan
     post "/portal/connect", WifiController, :connect
     get "/portal/status", WifiController, :status
+    post "/portal/skip-wifi", WifiController, :skip_wifi
   end
 
   # Phase 2: LiveView wizard (home network)

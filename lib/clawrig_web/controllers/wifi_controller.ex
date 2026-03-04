@@ -2,6 +2,7 @@ defmodule ClawrigWeb.WifiController do
   use ClawrigWeb, :controller
 
   alias Clawrig.Wifi.Manager
+  alias Clawrig.System.Commands
 
   def redirect_wifi(conn, _params) do
     conn
@@ -11,7 +12,19 @@ defmodule ClawrigWeb.WifiController do
 
   def index(conn, _params) do
     {:ok, networks} = Manager.scan()
-    render(conn, :index, networks: networks)
+    eth_online = Commands.impl().has_ethernet_ip() and Commands.impl().check_internet()
+    render(conn, :index, networks: networks, eth_online: eth_online)
+  end
+
+  def skip_wifi(conn, _params) do
+    ip = Commands.impl().detect_local_ip()
+
+    Clawrig.Wizard.State.merge(%{
+      network_method: :ethernet,
+      local_ip: ip
+    })
+
+    render(conn, :continue_on_computer, ip: ip)
   end
 
   def scan(conn, _params) do
@@ -35,5 +48,14 @@ defmodule ClawrigWeb.WifiController do
   def status(conn, _params) do
     status = Manager.status()
     render(conn, :status, status: status)
+  end
+
+  def status_json(conn, _params) do
+    status = Manager.status()
+    ip = Clawrig.Wizard.State.get(:local_ip)
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(%{mode: status.mode, ip: ip}))
   end
 end

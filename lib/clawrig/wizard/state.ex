@@ -6,6 +6,7 @@ defmodule Clawrig.Wizard.State do
     step: :preflight,
     mode: :new,
     wifi_configured: false,
+    network_method: nil,
     preflight_done: false,
     openai_done: false,
     tg_token: nil,
@@ -107,7 +108,7 @@ defmodule Clawrig.Wizard.State do
           nil ->
             default
 
-          v when k in [:phase, :step, :mode] and is_binary(v) ->
+          v when k in [:phase, :step, :mode, :network_method] and is_binary(v) ->
             String.to_existing_atom(v)
 
           v ->

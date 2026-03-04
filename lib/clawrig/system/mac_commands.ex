@@ -77,4 +77,8 @@ defmodule Clawrig.System.MacCommands do
   defdelegate start_gateway, to: Clawrig.System.MockCommands
   @impl true
   defdelegate install_gateway, to: Clawrig.System.MockCommands
+  @impl true
+  defdelegate detect_local_ip, to: Clawrig.System.MockCommands
+  @impl true
+  defdelegate has_ethernet_ip, to: Clawrig.System.MockCommands
 end

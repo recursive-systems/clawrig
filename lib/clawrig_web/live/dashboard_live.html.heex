@@ -72,6 +72,12 @@
           </span>
         </div>
         <div class="status-item">
+          <span class="status-label">Ethernet</span>
+          <span class={["status-value", if(@ethernet_connected, do: "ok", else: "warn")]}>
+            {if @ethernet_connected, do: "Connected", else: "Not connected"}
+          </span>
+        </div>
+        <div class="status-item">
           <span class="status-label">OpenAI Account</span>
           <span class={["status-value", status_color(@openai_status)]}>
             {status_label(@openai_status)}
@@ -226,6 +232,16 @@
     <%!-- System --%>
     <.dash_panel :if={@live_action == :system} title="System" back>
       <div class="system-actions">
+        <div :if={@local_ip} class="system-action-group">
+          <h3>Device Info</h3>
+          <div class="status-grid">
+            <div class="status-item">
+              <span class="status-label">Device IP</span>
+              <span class="status-value">{@local_ip}</span>
+            </div>
+          </div>
+        </div>
+
         <div class="system-action-group">
           <h3>Updates</h3>
           <div class="update-settings">

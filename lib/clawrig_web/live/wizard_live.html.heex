@@ -411,8 +411,25 @@
         </div>
         <h2>You're all set</h2>
         <p>Your Pi is configured. OpenClaw will start automatically in the background.</p>
+
+        <div class="ip-gate-card">
+          <h3 class="ip-gate-title">Your dashboard address</h3>
+          <div class="ip-gate-addresses">
+            <code :if={@local_ip} class="ip-gate-addr">http://{@local_ip}</code>
+            <code class="ip-gate-addr">http://clawrig.local</code>
+          </div>
+          <p class="ip-gate-hint">
+            Bookmark this or write it down — you'll need it to reach your dashboard.
+            <span :if={@tg_chat_id}>You can also ask your Telegram bot "Where's my dashboard?" anytime.</span>
+          </p>
+          <label class="ip-gate-confirm" phx-click="confirm_ip">
+            <input type="checkbox" checked={@ip_confirmed} />
+            <span>I've saved my dashboard address</span>
+          </label>
+        </div>
+
         <p :if={@finish_message} class="helper">{@finish_message}</p>
-        <button class="btn primary" phx-click="finish" disabled={@finishing}>
+        <button class="btn primary" phx-click="finish" disabled={!@ip_confirmed || @finishing}>
           {if @finishing, do: "Finishing...", else: "Finish setup"}
         </button>
       </div>

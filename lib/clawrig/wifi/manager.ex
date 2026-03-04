@@ -79,6 +79,11 @@ defmodule Clawrig.Wifi.Manager do
         Logger.info("Connected to #{ssid} (#{ip})")
         if ip, do: Clawrig.Wizard.State.put(:local_ip, ip)
         Clawrig.Wizard.State.put(:wifi_configured, true)
+
+        current_method = Clawrig.Wizard.State.get(:network_method)
+        method = if current_method == :ethernet, do: :both, else: :wifi
+        Clawrig.Wizard.State.put(:network_method, method)
+
         {:noreply, %{state | mode: :station, connecting: false, connected_ssid: ssid}}
 
       {:error, reason} ->

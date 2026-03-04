@@ -9,6 +9,8 @@ defmodule Clawrig.System.Commands do
   @callback gateway_status() :: :running | :stopped
   @callback start_gateway() :: :ok | {:error, String.t()}
   @callback install_gateway() :: :ok | {:error, String.t()}
+  @callback detect_local_ip() :: String.t() | nil
+  @callback has_ethernet_ip() :: boolean()
 
   def impl do
     Application.get_env(:clawrig, :system_commands, Clawrig.System.MockCommands)

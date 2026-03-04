@@ -63,4 +63,14 @@ defmodule Clawrig.System.MockCommands do
   def install_gateway do
     :ok
   end
+
+  @impl true
+  def detect_local_ip do
+    "192.168.1.42"
+  end
+
+  @impl true
+  def has_ethernet_ip do
+    false
+  end
 end

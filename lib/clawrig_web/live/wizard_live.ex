@@ -39,7 +39,10 @@ defmodule ClawrigWeb.WizardLive do
      |> assign(:tg_polling, false)
      |> assign(:finishing, false)
      |> assign(:finish_message, nil)
-     |> maybe_resume_device_code_polling()}
+     |> assign(:local_ip, state.local_ip)
+     |> assign(:ip_confirmed, false)
+     |> maybe_resume_device_code_polling()
+     |> then(fn s -> if s.assigns.step == :receipt, do: detect_and_assign_ip(s), else: s end)}
   end
 
   @impl true
@@ -55,7 +58,9 @@ defmodule ClawrigWeb.WizardLive do
     if current_idx < length(@steps) - 1 do
       next = Enum.at(@steps, current_idx + 1)
       State.put(:step, next)
-      {:noreply, assign(socket, :step, next)}
+      socket = assign(socket, :step, next)
+      socket = if next == :receipt, do: detect_and_assign_ip(socket), else: socket
+      {:noreply, socket}
     else
       {:noreply, socket}
     end
@@ -158,6 +163,11 @@ defmodule ClawrigWeb.WizardLive do
     {:noreply, socket}
   end
 
+  # IP confirmation gate
+  def handle_event("confirm_ip", _params, socket) do
+    {:noreply, assign(socket, :ip_confirmed, !socket.assigns.ip_confirmed)}
+  end
+
   # Finish
   def handle_event("finish", _params, socket) do
     send(self(), :do_finish)
@@ -251,7 +261,12 @@ defmodule ClawrigWeb.WizardLive do
     Logger.info("[DeviceCode] Exchanging tokens...")
 
     case device_code_impl().complete_flow(auth_data) do
-      {:ok, api_key} ->
+      {:ok, oauth_creds} when is_map(oauth_creds) ->
+        Logger.info("[DeviceCode] Got OAuth credentials for #{oauth_creds[:email] || "unknown"}")
+        send(self(), {:do_save_oauth_creds, oauth_creds})
+        {:noreply, assign(socket, openai_status: :saving)}
+
+      {:ok, api_key} when is_binary(api_key) ->
         Logger.info("[DeviceCode] Got API key (#{String.slice(api_key, 0..7)}...)")
         send(self(), {:do_save_api_key, api_key})
         {:noreply, assign(socket, openai_status: :saving)}
@@ -259,6 +274,34 @@ defmodule ClawrigWeb.WizardLive do
       {:error, msg} ->
         Logger.error("[DeviceCode] Token exchange failed: #{msg}")
         {:noreply, assign(socket, openai_sub: :error, openai_error: "#{msg}")}
+    end
+  end
+
+  def handle_info({:do_save_oauth_creds, oauth_creds}, socket) do
+    case Clawrig.OpenAI.Credentials.write(oauth_creds) do
+      :ok ->
+        State.merge(%{
+          openai_done: true,
+          openai_auth_method: "device-code",
+          openai_device_auth_id: nil,
+          openai_user_code: nil
+        })
+
+        {:noreply,
+         assign(socket,
+           openai_done: true,
+           openai_sub: :done,
+           openai_status: :saved,
+           openai_error: nil
+         )}
+
+      {:error, msg} ->
+        {:noreply,
+         assign(socket,
+           openai_status: nil,
+           openai_sub: :error,
+           openai_error: "Could not save credentials. #{msg}"
+         )}
     end
   end
 
@@ -280,11 +323,9 @@ defmodule ClawrigWeb.WizardLive do
       ])
 
     if exit_code == 0 do
-      method = if socket.assigns.openai_sub == :api_key, do: "api-key", else: "device-code"
-
       State.merge(%{
         openai_done: true,
-        openai_auth_method: method,
+        openai_auth_method: "api-key",
         openai_device_auth_id: nil,
         openai_user_code: nil
       })
@@ -359,13 +400,29 @@ defmodule ClawrigWeb.WizardLive do
 
     # Apply runtime-only config (Telegram channel) and write audit trail
     Launcher.finalize(state.mode, state.tg_token, state.tg_chat_id)
-    State.put(:wifi_configured, true)
-    {:ok, _receipt} = Launcher.write_receipt(state)
+
+    # Detect and store the best IP for dashboard use
+    ip = Commands.impl().detect_local_ip()
+    if ip, do: State.put(:local_ip, ip)
+
+    # Auto-detect network method if user went directly to /setup via LAN
+    if state.network_method == nil do
+      if Commands.impl().has_ethernet_ip() do
+        State.put(:network_method, :ethernet)
+      end
+    end
+
+    {:ok, _receipt} = Launcher.write_receipt(State.get())
 
     # Mark OOBE as complete — this unlocks the gateway watchdog
     path = Application.get_env(:clawrig, :oobe_marker, "/var/lib/clawrig/.oobe-complete")
     File.mkdir_p!(Path.dirname(path))
     File.write!(path, "")
+
+    # Tear down hotspot if still running.
+    # WiFi flow: already torn down by safe_connect, this is a no-op.
+    # Ethernet flow: hotspot is still up and must be stopped.
+    Clawrig.Wifi.Manager.stop_hotspot()
 
     # Best-effort gateway start (non-blocking).
     # If this fails, the watchdog will pick it up within ~2 minutes.
@@ -408,6 +465,12 @@ defmodule ClawrigWeb.WizardLive do
 
   def next_label(step, assigns) do
     if step == :telegram && !assigns.tg_chat_id, do: "Skip", else: "Continue"
+  end
+
+  defp detect_and_assign_ip(socket) do
+    ip = State.get(:local_ip) || Commands.impl().detect_local_ip()
+    if ip, do: State.put(:local_ip, ip)
+    assign(socket, :local_ip, ip)
   end
 
   defp device_code_impl do

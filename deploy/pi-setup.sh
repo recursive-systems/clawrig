@@ -46,8 +46,11 @@ sudo cp "$SCRIPT_DIR/dnsmasq-captive.conf" /etc/dnsmasq.d/clawrig-captive.conf
 sudo systemctl disable dnsmasq
 sudo systemctl stop dnsmasq || true
 
-sudo iptables -t nat -C PREROUTING -i wlan0 -p tcp --dport 80 -j REDIRECT --to-port 4090 2>/dev/null \
-  || sudo iptables -t nat -A PREROUTING -i wlan0 -p tcp --dport 80 -j REDIRECT --to-port 4090
+# Remove old wlan0-only rule if present
+sudo iptables -t nat -D PREROUTING -i wlan0 -p tcp --dport 80 -j REDIRECT --to-port 4090 2>/dev/null || true
+# Add all-interface rule (matches golden image config)
+sudo iptables -t nat -C PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 4090 2>/dev/null \
+  || sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 4090
 sudo netfilter-persistent save
 
 # 5. Configure mDNS (avahi)
