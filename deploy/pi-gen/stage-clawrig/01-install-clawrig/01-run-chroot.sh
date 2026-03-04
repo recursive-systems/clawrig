@@ -11,6 +11,16 @@ apt-get install -y build-essential python3 make g++ cmake
 # Install OpenClaw CLI globally
 npm install -g openclaw@latest
 
+# Install Codex CLI (static musl binary for aarch64 — used for self-healing diagnostics)
+CODEX_ARCH="aarch64-unknown-linux-musl"
+curl -fsSL "https://github.com/openai/codex/releases/latest/download/codex-${CODEX_ARCH}.tar.gz" \
+  -o /tmp/codex.tar.gz
+tar xzf /tmp/codex.tar.gz -C /usr/local/bin/
+mv /usr/local/bin/codex-${CODEX_ARCH} /usr/local/bin/codex
+chmod 755 /usr/local/bin/codex
+rm -f /tmp/codex.tar.gz
+codex --version || echo "Warning: codex --version failed (may need runtime auth)"
+
 # Run onboard as the pi user (uid 1000) to set up config + daemon service
 # --non-interactive: no prompts
 # --accept-risk: required for non-interactive

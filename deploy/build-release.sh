@@ -89,6 +89,7 @@ cp "$WATCHDOG_DIR/clawrig-gateway-watchdog.timer" "$BUNDLE_DIR/"
 cp "$WATCHDOG_DIR/clawrig-daily-repair.sh" "$BUNDLE_DIR/"
 cp "$WATCHDOG_DIR/clawrig-daily-repair.service" "$BUNDLE_DIR/"
 cp "$WATCHDOG_DIR/clawrig-daily-repair.timer" "$BUNDLE_DIR/"
+cp "$WATCHDOG_DIR/diagnostic-schema.json" "$BUNDLE_DIR/"
 
 echo ""
 echo "Done! Deploy bundle: $BUNDLE_DIR/"

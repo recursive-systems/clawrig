@@ -81,4 +81,6 @@ defmodule Clawrig.System.MacCommands do
   defdelegate detect_local_ip, to: Clawrig.System.MockCommands
   @impl true
   defdelegate has_ethernet_ip, to: Clawrig.System.MockCommands
+  @impl true
+  defdelegate run_codex_exec(prompt, schema_path), to: Clawrig.System.MockCommands
 end

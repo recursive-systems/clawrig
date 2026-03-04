@@ -13,6 +13,7 @@ defmodule Clawrig.Application do
         Clawrig.Wifi.Manager,
         Clawrig.Wizard.State,
         Clawrig.Updater,
+        Clawrig.Diagnostics.Agent,
         ClawrigWeb.Endpoint
       ] ++ hotspot_task()
 

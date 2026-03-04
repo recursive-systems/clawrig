@@ -263,4 +263,17 @@ defmodule Clawrig.System.PiCommands do
       {err, _} -> {:error, err}
     end
   end
+
+  @impl true
+  def run_codex_exec(prompt, schema_path) do
+    home = "/home/pi"
+    uid = get_uid()
+
+    System.cmd(
+      "codex",
+      ["exec", "--skip-git-repo-check", "--output-schema", schema_path, prompt],
+      stderr_to_stdout: true,
+      env: [{"HOME", home}, {"XDG_RUNTIME_DIR", "/run/user/#{uid}"}]
+    )
+  end
 end

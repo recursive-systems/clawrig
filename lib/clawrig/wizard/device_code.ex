@@ -123,6 +123,7 @@ defmodule Clawrig.Wizard.DeviceCode do
        %{
          access: tokens.access_token,
          refresh: tokens.refresh_token,
+         id_token: tokens.id_token,
          expires: expires_ms,
          email: email
        }}

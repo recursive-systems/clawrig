@@ -73,4 +73,9 @@ defmodule Clawrig.System.MockCommands do
   def has_ethernet_ip do
     false
   end
+
+  @impl true
+  def run_codex_exec(_prompt, _schema_path) do
+    {Jason.encode!(%{action: "none", reason: "mock: system healthy", confidence: 1.0}), 0}
+  end
 end

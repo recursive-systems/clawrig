@@ -44,10 +44,14 @@ defmodule Clawrig.Wizard.MockDeviceCode do
     {:ok, "sk-proj-mock-device-code-key-for-dev"}
   end
 
-  def complete_flow(%{authorization_code: code, code_verifier: verifier}) do
-    with {:ok, %{id_token: id_token}} <- exchange_tokens(code, verifier),
-         {:ok, api_key} <- exchange_api_key(id_token) do
-      {:ok, api_key}
-    end
+  def complete_flow(%{authorization_code: _code, code_verifier: _verifier}) do
+    {:ok,
+     %{
+       access: "mock-access-token",
+       refresh: "mock-refresh-token",
+       id_token: "mock-id-token",
+       expires: System.system_time(:millisecond) + 3_600_000,
+       email: "test@example.com"
+     }}
   end
 end

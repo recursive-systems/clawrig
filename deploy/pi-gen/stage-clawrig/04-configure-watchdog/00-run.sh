@@ -30,3 +30,12 @@ install -m 644 files/clawrig-gateway-watchdog.timer "${ROOTFS_DIR}/etc/systemd/s
 install -m 755 files/clawrig-daily-repair.sh "${ROOTFS_DIR}/opt/clawrig/bin/clawrig-daily-repair.sh"
 install -m 644 files/clawrig-daily-repair.service "${ROOTFS_DIR}/etc/systemd/system/clawrig-daily-repair.service"
 install -m 644 files/clawrig-daily-repair.timer "${ROOTFS_DIR}/etc/systemd/system/clawrig-daily-repair.timer"
+
+# -----------------------------------------------
+# Layer 2.5: AI Diagnostic Agent (Codex CLI)
+# -----------------------------------------------
+# Schema file for structured diagnostic output.
+# The diagnostic agent runs inside the ClawRig Elixir app (GenServer),
+# not as a separate systemd unit.
+mkdir -p "${ROOTFS_DIR}/opt/clawrig/share"
+install -m 644 files/diagnostic-schema.json "${ROOTFS_DIR}/opt/clawrig/share/diagnostic-schema.json"

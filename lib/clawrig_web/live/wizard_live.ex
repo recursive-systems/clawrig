@@ -280,6 +280,9 @@ defmodule ClawrigWeb.WizardLive do
   def handle_info({:do_save_oauth_creds, oauth_creds}, socket) do
     case Clawrig.OpenAI.Credentials.write(oauth_creds) do
       :ok ->
+        # Also write Codex CLI auth so self-healing diagnostics can use the same tokens
+        Clawrig.Auth.CodexAuth.write_auth(oauth_creds)
+
         State.merge(%{
           openai_done: true,
           openai_auth_method: "device-code",

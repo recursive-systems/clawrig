@@ -321,6 +321,10 @@ defmodule ClawrigWeb.DashboardLive do
 
     Task.start(fn ->
       result = Clawrig.OpenAI.Credentials.write(oauth_creds)
+
+      # Also write Codex CLI auth so self-healing diagnostics can use the same tokens
+      if result == :ok, do: Clawrig.Auth.CodexAuth.write_auth(oauth_creds)
+
       send(pid, {:account_save_result, result, :device_code})
     end)
 
