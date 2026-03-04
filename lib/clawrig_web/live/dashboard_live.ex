@@ -27,6 +27,7 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:auto_update_enabled, Clawrig.Updater.auto_update_enabled?())
       |> assign(:account_sub, :idle)
       |> assign(:account_error, nil)
+      |> assign(:account_provider_type, State.get(:provider_type))
       |> assign(:openai_user_code, nil)
       |> assign(:openai_device_auth_id, nil)
       |> assign(:openai_poll_interval, 5)
@@ -93,10 +94,14 @@ defmodule ClawrigWeb.DashboardLive do
 
   # ---------- Account events ----------
 
-  def handle_event("disconnect_openai", _params, socket) do
+  def handle_event("disconnect_provider", _params, socket) do
     State.merge(%{
-      openai_done: false,
-      openai_auth_method: nil,
+      provider_done: false,
+      provider_type: nil,
+      provider_auth_method: nil,
+      provider_name: nil,
+      provider_base_url: nil,
+      provider_model_id: nil,
       openai_device_auth_id: nil,
       openai_user_code: nil
     })
@@ -104,9 +109,34 @@ defmodule ClawrigWeb.DashboardLive do
     {:noreply,
      socket
      |> assign(:openai_status, :disconnected)
-     |> assign(:account_sub, :choose)
+     |> assign(:account_sub, :choose_type)
+     |> assign(:account_provider_type, nil)
      |> assign(:account_error, nil)
-     |> put_flash(:info, "OpenAI account disconnected.")}
+     |> put_flash(:info, "Provider disconnected.")}
+  end
+
+  def handle_event("account_choose_openai", _params, socket) do
+    {:noreply, assign(socket, account_sub: :choose, account_provider_type: "openai")}
+  end
+
+  def handle_event("account_choose_compatible", _params, socket) do
+    {:noreply,
+     assign(socket, account_sub: :compat_form, account_provider_type: "openai-compatible")}
+  end
+
+  def handle_event("account_back_to_type", _params, socket) do
+    State.merge(%{openai_device_auth_id: nil, openai_user_code: nil})
+
+    {:noreply,
+     assign(socket,
+       account_sub: :choose_type,
+       account_provider_type: nil,
+       account_error: nil,
+       openai_polling: false,
+       openai_user_code: nil,
+       openai_device_auth_id: nil,
+       openai_poll_count: 0
+     )}
   end
 
   def handle_event("account_start_device_code", _params, socket) do
@@ -140,6 +170,29 @@ defmodule ClawrigWeb.DashboardLive do
     else
       send(self(), {:account_save_api_key, key, :api_key})
       {:noreply, assign(socket, account_sub: :saving, account_error: nil)}
+    end
+  end
+
+  def handle_event("account_submit_compatible", params, socket) do
+    base_url = String.trim(params["base_url"] || "")
+    api_key = String.trim(params["api_key"] || "")
+    model_id = String.trim(params["model_id"] || "")
+    display_name = String.trim(params["display_name"] || "")
+    display_name = if display_name == "", do: "custom", else: display_name
+
+    cond do
+      base_url == "" ->
+        {:noreply, assign(socket, account_error: "Base URL is required.")}
+
+      api_key == "" ->
+        {:noreply, assign(socket, account_error: "API key is required.")}
+
+      model_id == "" ->
+        {:noreply, assign(socket, account_error: "Model ID is required.")}
+
+      true ->
+        send(self(), {:account_save_compatible, base_url, api_key, model_id, display_name})
+        {:noreply, assign(socket, account_sub: :saving, account_error: nil)}
     end
   end
 
@@ -191,13 +244,13 @@ defmodule ClawrigWeb.DashboardLive do
 
   def handle_info({:status_result, gateway, internet, wifi_ssid, ethernet_connected}, socket) do
     openai_status =
-      if State.get(:openai_done), do: :connected, else: :disconnected
+      if State.get(:provider_done), do: :connected, else: :disconnected
 
     account_sub =
       cond do
         socket.assigns.account_sub != :idle -> socket.assigns.account_sub
         openai_status == :connected -> :idle
-        true -> :choose
+        true -> :choose_type
       end
 
     {:noreply,
@@ -359,12 +412,58 @@ defmodule ClawrigWeb.DashboardLive do
     {:noreply, assign(socket, account_sub: :saving, account_error: nil)}
   end
 
+  def handle_info({:account_save_compatible, base_url, api_key, model_id, display_name}, socket) do
+    pid = self()
+
+    Task.start(fn ->
+      result = Clawrig.Provider.Config.write_compatible(base_url, api_key, model_id, display_name)
+      send(pid, {:account_save_compatible_result, result, display_name, base_url, model_id})
+    end)
+
+    {:noreply, assign(socket, account_sub: :saving, account_error: nil)}
+  end
+
+  def handle_info(
+        {:account_save_compatible_result, :ok, display_name, base_url, model_id},
+        socket
+      ) do
+    State.merge(%{
+      provider_done: true,
+      provider_type: "openai-compatible",
+      provider_auth_method: "api-key",
+      provider_name: display_name,
+      provider_base_url: base_url,
+      provider_model_id: model_id
+    })
+
+    Task.start(fn -> Commands.impl().start_gateway() end)
+
+    {:noreply,
+     socket
+     |> assign(
+       openai_status: :connected,
+       account_sub: :idle,
+       account_provider_type: "openai-compatible",
+       account_error: nil
+     )
+     |> put_flash(:info, "Provider connected. Gateway restarting...")}
+  end
+
+  def handle_info({:account_save_compatible_result, {:error, msg}, _, _, _}, socket) do
+    {:noreply,
+     assign(socket,
+       account_sub: :error,
+       account_error: "Could not save provider config. #{msg}"
+     )}
+  end
+
   def handle_info({:account_save_result, :ok, method}, socket) do
     method_str = if method == :api_key, do: "api-key", else: "device-code"
 
     State.merge(%{
-      openai_done: true,
-      openai_auth_method: method_str,
+      provider_done: true,
+      provider_type: "openai",
+      provider_auth_method: method_str,
       openai_device_auth_id: nil,
       openai_user_code: nil
     })
@@ -376,6 +475,7 @@ defmodule ClawrigWeb.DashboardLive do
      |> assign(
        openai_status: :connected,
        account_sub: :idle,
+       account_provider_type: "openai",
        account_error: nil,
        openai_user_code: nil,
        openai_device_auth_id: nil

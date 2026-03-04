@@ -58,18 +58,48 @@
       </div>
     </article>
 
-    <%!-- OpenAI --%>
-    <article class={panel_class(@step, :openai)} id="openai-panel">
+    <%!-- AI Provider --%>
+    <article class={panel_class(@step, :provider)} id="provider-panel">
       <div class="openai-center">
-        <%!-- Choose auth method --%>
-        <div :if={@openai_sub == :choose} class="openai-sub active">
+        <%!-- Choose provider type --%>
+        <div :if={@provider_sub == :choose_type} class="openai-sub active">
+          <h2>{provider_title(@provider_sub)}</h2>
+          <p>{provider_desc(@provider_sub)}</p>
+          <div class="provider-type-cards">
+            <button class="provider-type-card" phx-click="choose_openai">
+              <div class="provider-type-icon">
+                <img alt="OpenAI" src={~p"/images/openai-mark.svg"} />
+              </div>
+              <div class="provider-type-info">
+                <strong>OpenAI</strong>
+                <span>Sign in or use an API key</span>
+              </div>
+            </button>
+            <button class="provider-type-card" phx-click="choose_compatible">
+              <div class="provider-type-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                  <path d="M2 17l10 5 10-5" />
+                  <path d="M2 12l10 5 10-5" />
+                </svg>
+              </div>
+              <div class="provider-type-info">
+                <strong>Other Provider</strong>
+                <span>LiteLLM, Fireworks, Groq, or any OpenAI-compatible API</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <%!-- OpenAI: choose auth method --%>
+        <div :if={@provider_sub == :openai_choose} class="openai-sub active">
           <div class="openai-icon-wrap">
             <div class="openai-logo">
               <img alt="OpenAI" src={~p"/images/openai-mark.svg"} />
             </div>
           </div>
-          <h2>{openai_title(@openai_sub)}</h2>
-          <p>{openai_desc(@openai_sub)}</p>
+          <h2>{provider_title(@provider_sub)}</h2>
+          <p>{provider_desc(@provider_sub)}</p>
           <button class="btn openai" phx-click="openai_start_device_code">
             <img alt="" src={~p"/images/openai-mark.svg"} /> Sign in with OpenAI
           </button>
@@ -80,10 +110,17 @@
           >
             Use API key instead
           </button>
+          <button
+            class="btn ghost btn-sm"
+            phx-click="provider_back_to_type"
+            style="margin-top:16px"
+          >
+            Back
+          </button>
         </div>
 
-        <%!-- Device code polling --%>
-        <div :if={@openai_sub == :device_code} class="openai-sub active" id="openai-device-code" phx-hook="PageFocus">
+        <%!-- OpenAI: device code polling --%>
+        <div :if={@provider_sub == :openai_device_code} class="openai-sub active" id="openai-device-code" phx-hook="PageFocus">
           <%= if @openai_resuming do %>
             <div class="openai-icon-wrap">
               <div class="check-spinner"></div>
@@ -98,8 +135,8 @@
               Start over
             </button>
           <% else %>
-            <h2>{openai_title(@openai_sub)}</h2>
-            <p>{openai_desc(@openai_sub)}</p>
+            <h2>{provider_title(@provider_sub)}</h2>
+            <p>{provider_desc(@provider_sub)}</p>
 
             <div :if={@openai_user_code} class="device-code-display">
               <span class="device-code-value" id="device-code-text">{@openai_user_code}</span>
@@ -148,49 +185,10 @@
           <% end %>
         </div>
 
-        <%!-- Done --%>
-        <div :if={@openai_sub == :done} class="openai-sub active">
-          <div class="openai-icon-wrap">
-            <div class="openai-check">
-              <svg class="openai-check-svg" viewBox="0 0 52 52">
-                <circle class="openai-check-circle" cx="26" cy="26" r="24" fill="none" />
-                <path class="openai-check-mark" fill="none" d="M15 27l7 7 15-15" />
-              </svg>
-            </div>
-          </div>
-          <h2 class={openai_title_class(@openai_sub)}>
-            {openai_title(@openai_sub)}
-          </h2>
-          <p>{openai_desc(@openai_sub)}</p>
-        </div>
-
-        <%!-- Error --%>
-        <div :if={@openai_sub == :error} class="openai-sub active">
-          <div class="openai-icon-wrap">
-            <div class="openai-logo">
-              <img alt="OpenAI" src={~p"/images/openai-mark.svg"} />
-            </div>
-          </div>
-          <h2 class={openai_title_class(@openai_sub)}>
-            {openai_title(@openai_sub)}
-          </h2>
-          <p class="error">{@openai_error}</p>
-          <button class="btn primary" phx-click="openai_start_device_code" style="margin-top:4px">
-            Try again
-          </button>
-          <button
-            class="btn subtle"
-            phx-click="openai_use_api_key"
-            style="margin-top:10px"
-          >
-            Use API key instead
-          </button>
-        </div>
-
-        <%!-- API key paste (fallback) --%>
-        <div :if={@openai_sub == :api_key} class="openai-sub active">
-          <h2>{openai_title(@openai_sub)}</h2>
-          <p>{openai_desc(@openai_sub)}</p>
+        <%!-- OpenAI: API key paste --%>
+        <div :if={@provider_sub == :openai_api_key} class="openai-sub active">
+          <h2>{provider_title(@provider_sub)}</h2>
+          <p>{provider_desc(@provider_sub)}</p>
           <div class="openai-instructions">
             <ol class="openai-steps">
               <li>
@@ -221,23 +219,23 @@
                 type="password"
                 name="api_key"
                 id="api-key-input"
-                class={["openai-input", @openai_error && "error"]}
+                class={["openai-input", @provider_error && "error"]}
                 placeholder="sk-..."
                 autocomplete="off"
                 spellcheck="false"
               />
-              <p class={["openai-input-hint", @openai_error && "error"]}>
-                {if @openai_error,
-                  do: @openai_error,
+              <p class={["openai-input-hint", @provider_error && "error"]}>
+                {if @provider_error,
+                  do: @provider_error,
                   else: raw("Starts with <code>sk-</code>")}
               </p>
               <button
                 type="submit"
                 class="btn primary"
-                disabled={@openai_status == :saving}
+                disabled={@provider_status == :saving}
                 style="margin-top:12px"
               >
-                {if @openai_status == :saving, do: "Saving...", else: "Save API key"}
+                {if @provider_status == :saving, do: "Saving...", else: "Save API key"}
               </button>
             </form>
           </div>
@@ -247,6 +245,142 @@
             style="margin-top:8px"
           >
             Back
+          </button>
+        </div>
+
+        <%!-- OpenAI-Compatible: endpoint form --%>
+        <div :if={@provider_sub == :compat_form} class="openai-sub active">
+          <h2>{provider_title(@provider_sub)}</h2>
+          <p>{provider_desc(@provider_sub)}</p>
+          <form phx-submit="submit_compatible" class="openai-input-group">
+            <label for="base-url-input">Base URL</label>
+            <input
+              type="url"
+              name="base_url"
+              id="base-url-input"
+              class="openai-input"
+              placeholder="https://litellm.example.com/v1"
+              autocomplete="off"
+            />
+            <p class="openai-input-hint">
+              The /v1 endpoint of your provider
+            </p>
+
+            <label for="compat-api-key-input" style="margin-top:12px">API Key</label>
+            <input
+              type="password"
+              name="api_key"
+              id="compat-api-key-input"
+              class="openai-input"
+              placeholder="sk-..."
+              autocomplete="off"
+            />
+
+            <label for="model-id-input" style="margin-top:12px">Model ID</label>
+            <input
+              type="text"
+              name="model_id"
+              id="model-id-input"
+              class="openai-input"
+              placeholder="gpt-4o"
+              autocomplete="off"
+            />
+            <p class="openai-input-hint">
+              The model identifier your provider expects
+            </p>
+
+            <label for="display-name-input" style="margin-top:12px">Display Name <span class="openai-input-optional">(optional)</span></label>
+            <input
+              type="text"
+              name="display_name"
+              id="display-name-input"
+              class="openai-input"
+              placeholder="My LiteLLM Proxy"
+              autocomplete="off"
+            />
+
+            <p :if={@provider_error} class="openai-input-hint error" style="margin-top:8px">
+              {@provider_error}
+            </p>
+
+            <button
+              type="submit"
+              class="btn primary"
+              disabled={@provider_status == :saving}
+              style="margin-top:16px"
+            >
+              {if @provider_status == :saving, do: "Saving...", else: "Connect"}
+            </button>
+          </form>
+          <button
+            class="btn ghost btn-sm"
+            phx-click="provider_back_to_type"
+            style="margin-top:8px"
+          >
+            Back
+          </button>
+        </div>
+
+        <%!-- Done --%>
+        <div :if={@provider_sub == :done} class="openai-sub active">
+          <div class="openai-icon-wrap">
+            <div class="openai-check">
+              <svg class="openai-check-svg" viewBox="0 0 52 52">
+                <circle class="openai-check-circle" cx="26" cy="26" r="24" fill="none" />
+                <path class="openai-check-mark" fill="none" d="M15 27l7 7 15-15" />
+              </svg>
+            </div>
+          </div>
+          <h2 class={provider_title_class(@provider_sub)}>
+            {provider_title(@provider_sub)}
+          </h2>
+          <p :if={@provider_type == "openai"}>{provider_desc(@provider_sub)}</p>
+          <p :if={@provider_type == "openai-compatible"}>
+            Connected to {@provider_name || "your provider"}.
+          </p>
+        </div>
+
+        <%!-- Error --%>
+        <div :if={@provider_sub == :error} class="openai-sub active">
+          <div class="openai-icon-wrap">
+            <div class="openai-logo">
+              <%= if @provider_type == "openai" do %>
+                <img alt="OpenAI" src={~p"/images/openai-mark.svg"} />
+              <% else %>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              <% end %>
+            </div>
+          </div>
+          <h2 class={provider_title_class(@provider_sub)}>
+            {provider_title(@provider_sub)}
+          </h2>
+          <p class="error">{@provider_error}</p>
+          <%= if @provider_type == "openai" do %>
+            <button class="btn primary" phx-click="openai_start_device_code" style="margin-top:4px">
+              Try again
+            </button>
+            <button
+              class="btn subtle"
+              phx-click="openai_use_api_key"
+              style="margin-top:10px"
+            >
+              Use API key instead
+            </button>
+          <% else %>
+            <button class="btn primary" phx-click="choose_compatible" style="margin-top:4px">
+              Try again
+            </button>
+          <% end %>
+          <button
+            class="btn ghost btn-sm"
+            phx-click="provider_back_to_type"
+            style="margin-top:12px"
+          >
+            Change provider
           </button>
         </div>
       </div>

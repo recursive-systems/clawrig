@@ -132,8 +132,16 @@ defmodule Clawrig.Wizard.Launcher do
       "phase" => "phoenix-oobe-wizard-v1",
       "mode" => to_string(mode),
       "auth" => %{
-        "provider" => "openai-codex",
-        "method" => if(state.openai_done, do: "api-key", else: "none")
+        "provider" => state.provider_type || "openai-codex",
+        "method" =>
+          cond do
+            state.provider_done and state.provider_auth_method -> state.provider_auth_method
+            state.provider_done -> "api-key"
+            true -> "none"
+          end,
+        "providerName" => state[:provider_name],
+        "baseUrl" => state[:provider_base_url],
+        "modelId" => state[:provider_model_id]
       },
       "core_path" => core_path,
       "restore" =>

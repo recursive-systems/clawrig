@@ -28,7 +28,7 @@
       Wi-Fi
     </.link>
     <.link patch={~p"/account"} class={tab_class(@live_action, :account)}>
-      Account
+      Provider
     </.link>
     <.link patch={~p"/telegram"} class={tab_class(@live_action, :telegram)}>
       Telegram
@@ -78,7 +78,7 @@
           </span>
         </div>
         <div class="status-item">
-          <span class="status-label">OpenAI Account</span>
+          <span class="status-label">AI Provider</span>
           <span class={["status-value", status_color(@openai_status)]}>
             {status_label(@openai_status)}
           </span>
@@ -97,7 +97,7 @@
     </.dash_panel>
 
     <%!-- Account --%>
-    <.dash_panel :if={@live_action == :account} title="OpenAI Account" back>
+    <.dash_panel :if={@live_action == :account} title="AI Provider" back>
       <%!-- Connected --%>
       <div :if={@account_sub == :idle and @openai_status == :connected} class="account-section">
         <div class="account-status account-connected">
@@ -107,20 +107,55 @@
               <path class="account-check-mark" fill="none" d="M15 27l7 7 15-15" />
             </svg>
           </div>
-          <span>Your OpenAI API key is configured.</span>
+          <span>
+            <%= if @account_provider_type == "openai-compatible" do %>
+              Connected to custom provider.
+            <% else %>
+              Your OpenAI account is configured.
+            <% end %>
+          </span>
         </div>
         <div class="account-actions">
           <button
             class="btn subtle btn-sm"
-            phx-click="disconnect_openai"
-            data-confirm="Disconnect your OpenAI account? You can re-authenticate at any time."
+            phx-click="disconnect_provider"
+            data-confirm="Disconnect your AI provider? You can re-authenticate at any time."
           >
             Disconnect
           </button>
         </div>
       </div>
 
-      <%!-- Choose auth method --%>
+      <%!-- Choose provider type --%>
+      <div :if={@account_sub == :choose_type} class="account-section account-choose">
+        <p class="account-lead">Connect an AI provider to use the gateway.</p>
+        <div class="provider-type-cards">
+          <button class="provider-type-card" phx-click="account_choose_openai">
+            <div class="provider-type-icon">
+              <img alt="OpenAI" src={~p"/images/openai-mark.svg"} />
+            </div>
+            <div class="provider-type-info">
+              <strong>OpenAI</strong>
+              <span>Sign in or use an API key</span>
+            </div>
+          </button>
+          <button class="provider-type-card" phx-click="account_choose_compatible">
+            <div class="provider-type-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
+              </svg>
+            </div>
+            <div class="provider-type-info">
+              <strong>Other Provider</strong>
+              <span>LiteLLM, Fireworks, Groq, or any OpenAI-compatible API</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <%!-- OpenAI: choose auth method --%>
       <div :if={@account_sub == :choose} class="account-section account-choose">
         <p class="account-lead">Connect your OpenAI account to use the gateway.</p>
         <button class="btn openai" phx-click="account_start_device_code">
@@ -129,9 +164,12 @@
         <button class="btn subtle" phx-click="account_use_api_key">
           Use API key instead
         </button>
+        <button class="btn ghost btn-sm" phx-click="account_back_to_type" style="margin-top:12px">
+          Back
+        </button>
       </div>
 
-      <%!-- Device code polling --%>
+      <%!-- OpenAI: device code polling --%>
       <div
         :if={@account_sub == :device_code}
         class="account-section"
@@ -176,7 +214,7 @@
         </button>
       </div>
 
-      <%!-- API key paste --%>
+      <%!-- OpenAI: API key paste --%>
       <div :if={@account_sub == :api_key} class="account-section">
         <h3>API key</h3>
         <p>Paste your OpenAI API key to connect.</p>
@@ -204,22 +242,79 @@
         </button>
       </div>
 
+      <%!-- Compatible: endpoint form --%>
+      <div :if={@account_sub == :compat_form} class="account-section">
+        <h3>Connect Provider</h3>
+        <p>Enter your provider's OpenAI-compatible endpoint details.</p>
+        <form phx-submit="account_submit_compatible" class="account-input-group">
+          <label for="account-base-url-input">Base URL</label>
+          <input
+            type="url"
+            name="base_url"
+            id="account-base-url-input"
+            class="account-input"
+            placeholder="https://litellm.example.com/v1"
+            autocomplete="off"
+          />
+          <p class="account-input-hint">The /v1 endpoint of your provider</p>
+
+          <label for="account-compat-api-key-input" style="margin-top:12px">API Key</label>
+          <input
+            type="password"
+            name="api_key"
+            id="account-compat-api-key-input"
+            class="account-input"
+            placeholder="sk-..."
+            autocomplete="off"
+          />
+
+          <label for="account-model-id-input" style="margin-top:12px">Model ID</label>
+          <input
+            type="text"
+            name="model_id"
+            id="account-model-id-input"
+            class="account-input"
+            placeholder="gpt-4o"
+            autocomplete="off"
+          />
+          <p class="account-input-hint">The model identifier your provider expects</p>
+
+          <label for="account-display-name-input" style="margin-top:12px">Display Name <span style="font-weight:400;color:var(--muted);font-size:0.78rem">(optional)</span></label>
+          <input
+            type="text"
+            name="display_name"
+            id="account-display-name-input"
+            class="account-input"
+            placeholder="My LiteLLM Proxy"
+            autocomplete="off"
+          />
+
+          <p :if={@account_error} class="account-input-hint error" style="margin-top:8px">
+            {@account_error}
+          </p>
+
+          <button type="submit" class="btn primary" style="margin-top:16px">
+            Connect
+          </button>
+        </form>
+        <button class="btn ghost btn-sm" phx-click="account_back_to_type" style="margin-top:8px">
+          Back
+        </button>
+      </div>
+
       <%!-- Saving --%>
       <div :if={@account_sub == :saving} class="account-section account-saving">
         <div class="check-icon-wrap">
           <div class="check-spinner"></div>
         </div>
-        <p>Saving API key...</p>
+        <p>Saving...</p>
       </div>
 
       <%!-- Error --%>
       <div :if={@account_sub == :error} class="account-section">
         <p class="account-error">{@account_error}</p>
-        <button class="btn primary btn-sm" phx-click="account_start_device_code">
+        <button class="btn primary btn-sm" phx-click="account_back_to_type">
           Try again
-        </button>
-        <button class="btn subtle btn-sm" phx-click="account_use_api_key">
-          Use API key instead
         </button>
       </div>
     </.dash_panel>

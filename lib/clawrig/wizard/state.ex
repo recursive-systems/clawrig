@@ -8,13 +8,17 @@ defmodule Clawrig.Wizard.State do
     wifi_configured: false,
     network_method: nil,
     preflight_done: false,
-    openai_done: false,
+    provider_done: false,
     tg_token: nil,
     tg_chat_id: nil,
     tg_bot_name: nil,
     tg_bot_username: nil,
     local_ip: nil,
-    openai_auth_method: nil,
+    provider_type: nil,
+    provider_name: nil,
+    provider_base_url: nil,
+    provider_model_id: nil,
+    provider_auth_method: nil,
     openai_device_auth_id: nil,
     openai_user_code: nil,
     auto_update_enabled: true
@@ -100,6 +104,9 @@ defmodule Clawrig.Wizard.State do
   defp stringify_keys(v), do: v
 
   defp atomize_state(data) when is_map(data) do
+    # Migrate old field names from pre-multi-provider state files
+    data = migrate_legacy_fields(data)
+
     Map.new(@default_state, fn {k, default} ->
       str_key = to_string(k)
 
@@ -109,7 +116,7 @@ defmodule Clawrig.Wizard.State do
             default
 
           v when k in [:phase, :step, :mode, :network_method] and is_binary(v) ->
-            String.to_existing_atom(v)
+            v |> migrate_step_value() |> String.to_existing_atom()
 
           v ->
             v
@@ -119,5 +126,22 @@ defmodule Clawrig.Wizard.State do
     end)
   rescue
     ArgumentError -> nil
+  end
+
+  defp migrate_step_value("openai"), do: "provider"
+  defp migrate_step_value(v), do: v
+
+  defp migrate_legacy_fields(data) do
+    data
+    |> migrate_field("openai_done", "provider_done")
+    |> migrate_field("openai_auth_method", "provider_auth_method")
+  end
+
+  defp migrate_field(data, old_key, new_key) do
+    if Map.has_key?(data, old_key) and not Map.has_key?(data, new_key) do
+      data |> Map.put(new_key, Map.get(data, old_key)) |> Map.delete(old_key)
+    else
+      data
+    end
   end
 end

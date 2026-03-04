@@ -5,7 +5,7 @@ defmodule ClawrigWeb.WizardLive do
   alias Clawrig.System.Commands
   alias Clawrig.Wizard.{State, Installer, Launcher, Telegram}
 
-  @steps [:preflight, :openai, :telegram, :receipt]
+  @steps [:preflight, :provider, :telegram, :receipt]
   @openai_poll_timeout_count 180
 
   @impl true
@@ -19,16 +19,23 @@ defmodule ClawrigWeb.WizardLive do
      |> assign(:mode, state.mode || :new)
      |> assign(:preflight_done, state.preflight_done)
      |> assign(:preflight_status, if(state.preflight_done, do: :pass))
-     |> assign(:openai_done, state.openai_done || false)
-     |> assign(:openai_status, nil)
-     |> assign(:openai_error, nil)
-     |> assign(:openai_sub, openai_sub_on_mount(state))
+     # Provider state (replaces openai_*)
+     |> assign(:provider_done, state.provider_done || false)
+     |> assign(:provider_status, nil)
+     |> assign(:provider_error, nil)
+     |> assign(:provider_sub, provider_sub_on_mount(state))
+     |> assign(:provider_type, state.provider_type)
+     |> assign(:provider_name, state.provider_name)
+     |> assign(:provider_base_url, state.provider_base_url)
+     |> assign(:provider_model_id, state.provider_model_id)
+     # OpenAI device code polling (only used when provider_type == "openai")
      |> assign(:openai_user_code, state.openai_user_code)
      |> assign(:openai_device_auth_id, state.openai_device_auth_id)
      |> assign(:openai_poll_interval, 5)
      |> assign(:openai_polling, false)
      |> assign(:openai_poll_count, 0)
      |> assign(:openai_resuming, false)
+     # Telegram
      |> assign(:tg_token, state.tg_token)
      |> assign(:tg_chat_id, state.tg_chat_id)
      |> assign(:tg_bot_name, state.tg_bot_name)
@@ -96,14 +103,40 @@ defmodule ClawrigWeb.WizardLive do
     {:noreply, socket}
   end
 
+  # Provider type selection
+  def handle_event("choose_openai", _params, socket) do
+    State.put(:provider_type, "openai")
+    {:noreply, assign(socket, provider_type: "openai", provider_sub: :openai_choose)}
+  end
+
+  def handle_event("choose_compatible", _params, socket) do
+    State.put(:provider_type, "openai-compatible")
+    {:noreply, assign(socket, provider_type: "openai-compatible", provider_sub: :compat_form)}
+  end
+
+  def handle_event("provider_back_to_type", _params, socket) do
+    State.merge(%{provider_type: nil, openai_device_auth_id: nil, openai_user_code: nil})
+
+    {:noreply,
+     assign(socket,
+       provider_sub: :choose_type,
+       provider_type: nil,
+       provider_error: nil,
+       openai_polling: false,
+       openai_user_code: nil,
+       openai_device_auth_id: nil,
+       openai_poll_count: 0
+     )}
+  end
+
   # OpenAI — device code flow
   def handle_event("openai_start_device_code", _params, socket) do
     send(self(), :do_request_user_code)
-    {:noreply, assign(socket, openai_sub: :device_code, openai_error: nil)}
+    {:noreply, assign(socket, provider_sub: :openai_device_code, provider_error: nil)}
   end
 
   def handle_event("openai_use_api_key", _params, socket) do
-    {:noreply, assign(socket, openai_sub: :api_key, openai_error: nil)}
+    {:noreply, assign(socket, provider_sub: :openai_api_key, provider_error: nil)}
   end
 
   def handle_event("openai_back_to_choose", _params, socket) do
@@ -111,8 +144,8 @@ defmodule ClawrigWeb.WizardLive do
 
     {:noreply,
      assign(socket,
-       openai_sub: :choose,
-       openai_error: nil,
+       provider_sub: :openai_choose,
+       provider_error: nil,
        openai_polling: false,
        openai_user_code: nil,
        openai_device_auth_id: nil,
@@ -122,7 +155,7 @@ defmodule ClawrigWeb.WizardLive do
 
   # Trigger immediate poll when user returns to the tab
   def handle_event("page_visible", _params, socket) do
-    if socket.assigns.openai_polling and socket.assigns.openai_sub == :device_code do
+    if socket.assigns.openai_polling and socket.assigns.provider_sub == :openai_device_code do
       send(self(), :openai_poll)
     end
 
@@ -134,11 +167,36 @@ defmodule ClawrigWeb.WizardLive do
     key = String.trim(key)
 
     if key == "" do
-      {:noreply, assign(socket, :openai_error, "Please paste your API key.")}
+      {:noreply, assign(socket, :provider_error, "Please paste your API key.")}
     else
-      socket = assign(socket, openai_status: :saving, openai_error: nil)
+      socket = assign(socket, provider_status: :saving, provider_error: nil)
       send(self(), {:do_save_api_key, key})
       {:noreply, socket}
+    end
+  end
+
+  # OpenAI-Compatible — form submission
+  def handle_event("submit_compatible", params, socket) do
+    base_url = String.trim(params["base_url"] || "")
+    api_key = String.trim(params["api_key"] || "")
+    model_id = String.trim(params["model_id"] || "")
+    display_name = String.trim(params["display_name"] || "")
+    display_name = if display_name == "", do: "custom", else: display_name
+
+    cond do
+      base_url == "" ->
+        {:noreply, assign(socket, provider_error: "Base URL is required.")}
+
+      api_key == "" ->
+        {:noreply, assign(socket, provider_error: "API key is required.")}
+
+      model_id == "" ->
+        {:noreply, assign(socket, provider_error: "Model ID is required.")}
+
+      true ->
+        socket = assign(socket, provider_status: :saving, provider_error: nil)
+        send(self(), {:do_save_compatible, base_url, api_key, model_id, display_name})
+        {:noreply, socket}
     end
   end
 
@@ -196,7 +254,7 @@ defmodule ClawrigWeb.WizardLive do
 
         {:noreply,
          assign(socket,
-           openai_sub: :device_code,
+           provider_sub: :openai_device_code,
            openai_user_code: code,
            openai_device_auth_id: id,
            openai_poll_interval: interval,
@@ -207,27 +265,27 @@ defmodule ClawrigWeb.WizardLive do
       {:error, :not_enabled} ->
         {:noreply,
          assign(socket,
-           openai_sub: :error,
-           openai_error:
+           provider_sub: :error,
+           provider_error:
              "Device code authorization isn't enabled on your OpenAI account. " <>
                "Enable it in ChatGPT Settings > Security > \"Device code authorization for Codex\", then try again."
          )}
 
       {:error, msg} ->
-        {:noreply, assign(socket, openai_sub: :error, openai_error: "#{msg}")}
+        {:noreply, assign(socket, provider_sub: :error, provider_error: "#{msg}")}
     end
   end
 
   def handle_info(:openai_poll, socket) do
-    if !socket.assigns.openai_polling || socket.assigns.openai_sub != :device_code do
+    if !socket.assigns.openai_polling || socket.assigns.provider_sub != :openai_device_code do
       {:noreply, assign(socket, openai_polling: false)}
     else
       if socket.assigns.openai_poll_count >= @openai_poll_timeout_count do
         {:noreply,
          assign(socket,
-           openai_sub: :error,
+           provider_sub: :error,
            openai_polling: false,
-           openai_error: "Authorization timed out. Please try again."
+           provider_error: "Authorization timed out. Please try again."
          )}
       else
         case device_code_impl().poll_authorization(
@@ -248,9 +306,9 @@ defmodule ClawrigWeb.WizardLive do
 
             {:noreply,
              assign(socket,
-               openai_sub: :error,
+               provider_sub: :error,
                openai_polling: false,
-               openai_error: "#{msg}"
+               provider_error: "#{msg}"
              )}
         end
       end
@@ -264,16 +322,16 @@ defmodule ClawrigWeb.WizardLive do
       {:ok, oauth_creds} when is_map(oauth_creds) ->
         Logger.info("[DeviceCode] Got OAuth credentials for #{oauth_creds[:email] || "unknown"}")
         send(self(), {:do_save_oauth_creds, oauth_creds})
-        {:noreply, assign(socket, openai_status: :saving)}
+        {:noreply, assign(socket, provider_status: :saving)}
 
       {:ok, api_key} when is_binary(api_key) ->
         Logger.info("[DeviceCode] Got API key (#{String.slice(api_key, 0..7)}...)")
         send(self(), {:do_save_api_key, api_key})
-        {:noreply, assign(socket, openai_status: :saving)}
+        {:noreply, assign(socket, provider_status: :saving)}
 
       {:error, msg} ->
         Logger.error("[DeviceCode] Token exchange failed: #{msg}")
-        {:noreply, assign(socket, openai_sub: :error, openai_error: "#{msg}")}
+        {:noreply, assign(socket, provider_sub: :error, provider_error: "#{msg}")}
     end
   end
 
@@ -284,26 +342,27 @@ defmodule ClawrigWeb.WizardLive do
         Clawrig.Auth.CodexAuth.write_auth(oauth_creds)
 
         State.merge(%{
-          openai_done: true,
-          openai_auth_method: "device-code",
+          provider_done: true,
+          provider_type: "openai",
+          provider_auth_method: "device-code",
           openai_device_auth_id: nil,
           openai_user_code: nil
         })
 
         {:noreply,
          assign(socket,
-           openai_done: true,
-           openai_sub: :done,
-           openai_status: :saved,
-           openai_error: nil
+           provider_done: true,
+           provider_sub: :done,
+           provider_status: :saved,
+           provider_error: nil
          )}
 
       {:error, msg} ->
         {:noreply,
          assign(socket,
-           openai_status: nil,
-           openai_sub: :error,
-           openai_error: "Could not save credentials. #{msg}"
+           provider_status: nil,
+           provider_sub: :error,
+           provider_error: "Could not save credentials. #{msg}"
          )}
     end
   end
@@ -327,26 +386,60 @@ defmodule ClawrigWeb.WizardLive do
 
     if exit_code == 0 do
       State.merge(%{
-        openai_done: true,
-        openai_auth_method: "api-key",
+        provider_done: true,
+        provider_type: "openai",
+        provider_auth_method: "api-key",
         openai_device_auth_id: nil,
         openai_user_code: nil
       })
 
       {:noreply,
        assign(socket,
-         openai_done: true,
-         openai_sub: :done,
-         openai_status: :saved,
-         openai_error: nil
+         provider_done: true,
+         provider_sub: :done,
+         provider_status: :saved,
+         provider_error: nil
        )}
     else
       {:noreply,
        assign(socket,
-         openai_status: nil,
-         openai_sub: :error,
-         openai_error: "Could not save API key. #{String.trim(output)}"
+         provider_status: nil,
+         provider_sub: :error,
+         provider_error: "Could not save API key. #{String.trim(output)}"
        )}
+    end
+  end
+
+  def handle_info({:do_save_compatible, base_url, api_key, model_id, display_name}, socket) do
+    case Clawrig.Provider.Config.write_compatible(base_url, api_key, model_id, display_name) do
+      :ok ->
+        State.merge(%{
+          provider_done: true,
+          provider_type: "openai-compatible",
+          provider_auth_method: "api-key",
+          provider_name: display_name,
+          provider_base_url: base_url,
+          provider_model_id: model_id
+        })
+
+        {:noreply,
+         assign(socket,
+           provider_done: true,
+           provider_sub: :done,
+           provider_status: :saved,
+           provider_error: nil,
+           provider_name: display_name,
+           provider_base_url: base_url,
+           provider_model_id: model_id
+         )}
+
+      {:error, msg} ->
+        {:noreply,
+         assign(socket,
+           provider_status: nil,
+           provider_sub: :error,
+           provider_error: "Could not save provider config. #{msg}"
+         )}
     end
   end
 
@@ -448,7 +541,7 @@ defmodule ClawrigWeb.WizardLive do
   def step_title(step) do
     %{
       preflight: "Connectivity",
-      openai: "OpenAI",
+      provider: "AI Provider",
       telegram: "Optional Telegram",
       receipt: "Complete"
     }[step] || ""
@@ -457,7 +550,7 @@ defmodule ClawrigWeb.WizardLive do
   def can_next?(assigns) do
     case assigns.step do
       :preflight -> assigns.preflight_done
-      :openai -> assigns.openai_done
+      :provider -> assigns.provider_done
       :telegram -> true
       :receipt -> true
     end
@@ -481,7 +574,8 @@ defmodule ClawrigWeb.WizardLive do
   end
 
   defp maybe_resume_device_code_polling(socket) do
-    if socket.assigns.openai_sub == :device_code and socket.assigns.openai_device_auth_id do
+    if socket.assigns.provider_sub == :openai_device_code and
+         socket.assigns.openai_device_auth_id do
       Logger.info(
         "[DeviceCode] Resuming polling on reconnect for #{socket.assigns.openai_user_code}"
       )
@@ -493,11 +587,22 @@ defmodule ClawrigWeb.WizardLive do
     end
   end
 
-  defp openai_sub_on_mount(state) do
+  defp provider_sub_on_mount(state) do
     cond do
-      state.openai_done -> :done
-      state.openai_device_auth_id != nil -> :device_code
-      true -> :choose
+      state.provider_done ->
+        :done
+
+      state.provider_type == "openai" and state.openai_device_auth_id != nil ->
+        :openai_device_code
+
+      state.provider_type == "openai" ->
+        :openai_choose
+
+      state.provider_type == "openai-compatible" ->
+        :compat_form
+
+      true ->
+        :choose_type
     end
   end
 
@@ -540,21 +645,27 @@ defmodule ClawrigWeb.WizardLive do
   def preflight_desc(:checking), do: "Checking your connection..."
   def preflight_desc(_), do: "Checking your connection..."
 
-  def openai_title(:done), do: "Connected to OpenAI"
-  def openai_title(:error), do: "Something went wrong"
-  def openai_title(:device_code), do: "Sign in with OpenAI"
-  def openai_title(:api_key), do: "API key"
-  def openai_title(_), do: "OpenAI"
+  def provider_title(:choose_type), do: "AI Provider"
+  def provider_title(:openai_choose), do: "OpenAI"
+  def provider_title(:openai_device_code), do: "Sign in with OpenAI"
+  def provider_title(:openai_api_key), do: "OpenAI API key"
+  def provider_title(:compat_form), do: "Connect Provider"
+  def provider_title(:done), do: "Provider Connected"
+  def provider_title(:error), do: "Something went wrong"
+  def provider_title(_), do: "AI Provider"
 
-  def openai_title_class(:done), do: "pass"
-  def openai_title_class(:error), do: "fail"
-  def openai_title_class(_), do: ""
+  def provider_title_class(:done), do: "pass"
+  def provider_title_class(:error), do: "fail"
+  def provider_title_class(_), do: ""
 
-  def openai_desc(:done), do: "Your API key is configured."
+  def provider_desc(:choose_type), do: "Choose how to connect your AI provider."
+  def provider_desc(:openai_choose), do: "Connect your OpenAI account to get started."
 
-  def openai_desc(:device_code),
+  def provider_desc(:openai_device_code),
     do: "Enter the code below on your phone to authorize this device."
 
-  def openai_desc(:api_key), do: "Paste your OpenAI API key to connect."
-  def openai_desc(_), do: "Connect your OpenAI account to get started."
+  def provider_desc(:openai_api_key), do: "Paste your OpenAI API key to connect."
+  def provider_desc(:compat_form), do: "Enter your provider's OpenAI-compatible endpoint details."
+  def provider_desc(:done), do: "Your AI provider is configured."
+  def provider_desc(_), do: "Choose how to connect your AI provider."
 end
