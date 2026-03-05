@@ -6,7 +6,13 @@ defmodule Clawrig.OpenAI.Credentials do
 
   alias Clawrig.System.Commands
 
-  @auth_profiles_path "/home/pi/.openclaw/agents/main/agent/auth-profiles.json"
+  defp auth_profiles_path do
+    Application.get_env(
+      :clawrig,
+      :auth_profiles_path,
+      Path.expand("~/.openclaw/agents/main/agent/auth-profiles.json")
+    )
+  end
 
   @doc """
   Persists OAuth credentials to auth-profiles.json and configures the
@@ -29,14 +35,14 @@ defmodule Clawrig.OpenAI.Credentials do
     }
 
     store =
-      case File.read(@auth_profiles_path) do
+      case File.read(auth_profiles_path()) do
         {:ok, content} -> Jason.decode!(content)
         _ -> %{"version" => 1, "profiles" => %{}}
       end
 
     store = put_in(store, ["profiles", profile_id], credential)
 
-    case File.write(@auth_profiles_path, Jason.encode!(store, pretty: true)) do
+    case File.write(auth_profiles_path(), Jason.encode!(store, pretty: true)) do
       :ok ->
         Commands.impl().run_openclaw([
           "config",

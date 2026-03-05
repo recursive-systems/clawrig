@@ -3,8 +3,6 @@ defmodule Clawrig.Integrations.Config do
   Reads and writes integration config in ~/.openclaw/openclaw.json.
   """
 
-  @proxy_url Clawrig.Integrations.SearchProxy.proxy_url()
-
   @doc """
   Returns the current web search mode:
   - :managed — using the ClawRig search proxy (Perplexity via proxy)
@@ -58,7 +56,10 @@ defmodule Clawrig.Integrations.Config do
     config =
       read_config()
       |> deep_put(["tools", "web", "search", "provider"], "perplexity")
-      |> deep_put(["tools", "web", "search", "perplexity", "baseUrl"], @proxy_url)
+      |> deep_put(
+        ["tools", "web", "search", "perplexity", "baseUrl"],
+        Clawrig.Integrations.SearchProxy.proxy_url()
+      )
       |> deep_put(["tools", "web", "search", "perplexity", "apiKey"], device_token)
       |> deep_put(["tools", "web", "search", "perplexity", "model"], "sonar")
 

@@ -3,9 +3,9 @@ defmodule Clawrig.Integrations.SearchProxy do
   HTTP client for the ClawRig search proxy service.
   """
 
-  @proxy_url "https://rs-search-proxy.fly.dev"
-
-  def proxy_url, do: @proxy_url
+  def proxy_url do
+    Application.get_env(:clawrig, :search_proxy_url, "https://rs-search-proxy.fly.dev")
+  end
 
   @doc """
   Register this device with the search proxy.
@@ -15,7 +15,7 @@ defmodule Clawrig.Integrations.SearchProxy do
     hostname = Clawrig.DeviceIdentity.hostname()
     secret = registration_secret()
 
-    case Req.post("#{@proxy_url}/v1/device/register",
+    case Req.post("#{proxy_url()}/v1/device/register",
            json: %{hostname: hostname, secret: secret},
            receive_timeout: 15_000
          ) do
@@ -41,7 +41,7 @@ defmodule Clawrig.Integrations.SearchProxy do
   Returns {:ok, %{used, limit, period, resets_at}} or {:error, reason}.
   """
   def get_usage(token) do
-    case Req.get("#{@proxy_url}/v1/device/usage",
+    case Req.get("#{proxy_url()}/v1/device/usage",
            headers: [{"authorization", "Bearer #{token}"}],
            receive_timeout: 10_000
          ) do

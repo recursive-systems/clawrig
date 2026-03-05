@@ -1,8 +1,11 @@
 defmodule Clawrig.Wizard.DeviceCode do
   @moduledoc false
 
-  @client_id "app_EMoamEEZ73f0CkXaXp7hrann"
   @auth_base "https://auth.openai.com"
+
+  defp client_id do
+    Application.get_env(:clawrig, :openai_client_id, "app_EMoamEEZ73f0CkXaXp7hrann")
+  end
 
   @doc """
   Step 1: Request a user code for device authorization.
@@ -12,7 +15,7 @@ defmodule Clawrig.Wizard.DeviceCode do
   def request_user_code do
     case Req.post("#{@auth_base}/api/accounts/deviceauth/usercode",
            json: %{
-             client_id: @client_id,
+             client_id: client_id(),
              audience: "https://api.openai.com/v1",
              scope:
                "openid profile email offline_access " <>
@@ -86,7 +89,7 @@ defmodule Clawrig.Wizard.DeviceCode do
   def exchange_tokens(authorization_code, code_verifier) do
     case Req.post("#{@auth_base}/oauth/token",
            form: [
-             client_id: @client_id,
+             client_id: client_id(),
              grant_type: "authorization_code",
              code: authorization_code,
              code_verifier: code_verifier,
