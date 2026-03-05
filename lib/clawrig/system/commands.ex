@@ -13,6 +13,9 @@ defmodule Clawrig.System.Commands do
   @callback has_ethernet_ip() :: boolean()
   @callback run_codex_exec(prompt :: String.t(), schema_path :: String.t()) ::
               {String.t(), integer()}
+  @callback cpu_temperature() :: float() | nil
+  @callback cpu_voltage() :: float() | nil
+  @callback throttle_status() :: map()
 
   def impl do
     Application.get_env(:clawrig, :system_commands, Clawrig.System.MockCommands)

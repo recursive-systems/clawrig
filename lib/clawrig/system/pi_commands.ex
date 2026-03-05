@@ -315,6 +315,48 @@ defmodule Clawrig.System.PiCommands do
   end
 
   @impl true
+  def cpu_temperature do
+    case System.cmd("vcgencmd", ["measure_temp"], stderr_to_stdout: true) do
+      {"temp=" <> rest, 0} ->
+        rest |> String.trim_trailing("'C\n") |> String.to_float()
+
+      _ ->
+        nil
+    end
+  end
+
+  @impl true
+  def cpu_voltage do
+    case System.cmd("vcgencmd", ["measure_volts"], stderr_to_stdout: true) do
+      {"volt=" <> rest, 0} ->
+        rest |> String.trim_trailing("V\n") |> String.to_float()
+
+      _ ->
+        nil
+    end
+  end
+
+  @impl true
+  def throttle_status do
+    case System.cmd("vcgencmd", ["get_throttled"], stderr_to_stdout: true) do
+      {"throttled=" <> rest, 0} ->
+        hex = String.trim(rest)
+        {value, _} = Integer.parse(hex, 16)
+
+        %{
+          "raw" => hex,
+          "under_voltage" => Bitwise.band(value, 0x1) != 0,
+          "frequency_capped" => Bitwise.band(value, 0x2) != 0,
+          "throttled" => Bitwise.band(value, 0x4) != 0,
+          "soft_temp_limit" => Bitwise.band(value, 0x8) != 0
+        }
+
+      _ ->
+        %{"raw" => "unknown"}
+    end
+  end
+
+  @impl true
   def run_codex_exec(prompt, schema_path) do
     home = "/home/pi"
     uid = get_uid()

@@ -16,6 +16,9 @@ defmodule Clawrig.MixProject do
           steps: [:assemble, &write_version_file/1]
         ]
       ],
+      description: "Device management UI for OpenClaw on Raspberry Pi",
+      source_url: "https://github.com/recursive-systems/clawrig",
+      homepage_url: "https://clawrig.co",
       aliases: aliases(),
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
@@ -58,7 +61,8 @@ defmodule Clawrig.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:bandit, "~> 1.5"},
-      {:req, "~> 0.5"}
+      {:req, "~> 0.5"},
+      {:mint_web_socket, "~> 1.0"}
     ]
   end
 

@@ -13,6 +13,7 @@ defmodule ClawrigWeb.DashboardLive do
   def mount(_params, _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Clawrig.PubSub, "clawrig:updates")
+      Phoenix.PubSub.subscribe(Clawrig.PubSub, "clawrig:node")
       send(self(), :refresh_status)
     end
 
@@ -36,6 +37,8 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:openai_polling, false)
       |> assign(:openai_poll_count, 0)
       |> assign(:ethernet_connected, false)
+      |> assign(:node_status, Clawrig.Node.Client.status())
+      |> assign(:node_device_id, Clawrig.Node.Client.device_id())
       |> assign(:local_ip, State.get(:local_ip))
       |> assign(:brave_mode, IntegrationsConfig.search_mode())
       |> assign(:brave_error, nil)
@@ -376,6 +379,10 @@ defmodule ClawrigWeb.DashboardLive do
      socket
      |> assign(:update_status, update_status)
      |> assign(:update_version, update_version)}
+  end
+
+  def handle_info({:node_status, status}, socket) do
+    {:noreply, assign(socket, :node_status, status)}
   end
 
   def handle_info({ClawrigWeb.WifiComponent, {:wifi_connected, ssid}}, socket) do

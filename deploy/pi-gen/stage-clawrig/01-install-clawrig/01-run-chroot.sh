@@ -72,22 +72,6 @@ chown 1000:1000 /home/pi/.openclaw/exec-approvals.json
 mkdir -p /home/pi/.openclaw/agents/main/agent
 chown -R 1000:1000 /home/pi/.openclaw
 
-# Install ClawRig OpenClaw plugin (skills + clawrig-info CLI tool)
-if [ -d /tmp/clawrig-plugin ]; then
-    # Install skills to OpenClaw's managed skills directory
-    for skill_dir in /tmp/clawrig-plugin/skills/*/; do
-        skill_name=$(basename "$skill_dir")
-        mkdir -p "/home/pi/.openclaw/skills/$skill_name"
-        cp "$skill_dir/SKILL.md" "/home/pi/.openclaw/skills/$skill_name/SKILL.md"
-    done
-    chown -R 1000:1000 /home/pi/.openclaw/skills
-
-    # Install CLI tool to /usr/local/bin (always on PATH)
-    install -m 755 /tmp/clawrig-plugin/scripts/clawrig-info /usr/local/bin/clawrig-info
-
-    rm -rf /tmp/clawrig-plugin
-fi
-
 # Enable user linger so user-level services persist across reboots.
 # loginctl enable-linger doesn't work in chroot, so create the marker directly.
 mkdir -p /var/lib/systemd/linger

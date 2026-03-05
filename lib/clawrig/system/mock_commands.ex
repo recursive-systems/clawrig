@@ -78,4 +78,21 @@ defmodule Clawrig.System.MockCommands do
   def run_codex_exec(_prompt, _schema_path) do
     {Jason.encode!(%{action: "none", reason: "mock: system healthy", confidence: 1.0}), 0}
   end
+
+  @impl true
+  def cpu_temperature, do: 45.2
+
+  @impl true
+  def cpu_voltage, do: 1.2
+
+  @impl true
+  def throttle_status do
+    %{
+      "raw" => "0x0",
+      "under_voltage" => false,
+      "frequency_capped" => false,
+      "throttled" => false,
+      "soft_temp_limit" => false
+    }
+  end
 end

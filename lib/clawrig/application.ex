@@ -14,6 +14,7 @@ defmodule Clawrig.Application do
         Clawrig.Wizard.State,
         Clawrig.Updater,
         Clawrig.Diagnostics.Agent,
+        Clawrig.Node.Client,
         ClawrigWeb.Endpoint
       ] ++ hotspot_task()
 

@@ -106,36 +106,24 @@ if [ -f "$SCRIPT_DIR/clawrig-updater-sudoers" ]; then
   sudo install -m 440 "$SCRIPT_DIR/clawrig-updater-sudoers" /etc/sudoers.d/clawrig-updater
 fi
 
-# Install ClawRig OpenClaw plugin
-if [ -d "$SCRIPT_DIR/clawrig-plugin" ]; then
-  echo "==> Installing ClawRig OpenClaw plugin..."
-  # Install skills to OpenClaw's managed skills directory
-  for skill_dir in "$SCRIPT_DIR"/clawrig-plugin/skills/*/; do
-    skill_name=$(basename "$skill_dir")
-    mkdir -p "/home/pi/.openclaw/skills/$skill_name"
-    cp "$skill_dir/SKILL.md" "/home/pi/.openclaw/skills/$skill_name/SKILL.md"
-  done
-  chown -R pi:pi /home/pi/.openclaw/skills
-  # Install CLI tool to /usr/local/bin (always on PATH)
-  sudo install -m 755 "$SCRIPT_DIR/clawrig-plugin/scripts/clawrig-info" /usr/local/bin/clawrig-info
-
-  # Configure exec tool for skill commands (gateway host, allowlist, no prompts)
-  python3 -c "
+# Configure exec tool for gateway (allowlist, no prompts)
+python3 -c "
 import json, os
 cfg_path = '/home/pi/.openclaw/openclaw.json'
-with open(cfg_path) as f:
-    cfg = json.load(f)
-tools = cfg.setdefault('tools', {})
-tools.pop('profile', None)
-tools['allow'] = ['group:messaging', 'read', 'exec']
-tools['exec'] = {'host': 'gateway', 'security': 'allowlist', 'ask': 'off'}
-with open(cfg_path, 'w') as f:
-    json.dump(cfg, f, indent=2)
+if os.path.exists(cfg_path):
+    with open(cfg_path) as f:
+        cfg = json.load(f)
+    tools = cfg.setdefault('tools', {})
+    tools.pop('profile', None)
+    tools['allow'] = ['group:messaging', 'read', 'exec']
+    tools['exec'] = {'host': 'gateway', 'security': 'allowlist', 'ask': 'off'}
+    with open(cfg_path, 'w') as f:
+        json.dump(cfg, f, indent=2)
+    os.chown(cfg_path, 1000, 1000)
 "
-  chown pi:pi /home/pi/.openclaw/openclaw.json
 
-  # Pre-bake exec approvals with wildcard allowlist (dedicated appliance)
-  cat > /home/pi/.openclaw/exec-approvals.json << 'APPROVALS'
+# Pre-bake exec approvals with wildcard allowlist (dedicated appliance)
+cat > /home/pi/.openclaw/exec-approvals.json << 'APPROVALS'
 {
   "version": 1,
   "agents": {
@@ -147,8 +135,7 @@ with open(cfg_path, 'w') as f:
   }
 }
 APPROVALS
-  chown pi:pi /home/pi/.openclaw/exec-approvals.json
-fi
+chown pi:pi /home/pi/.openclaw/exec-approvals.json
 
 # 7. Install systemd service + first-boot identity assignment
 echo ""

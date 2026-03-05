@@ -83,4 +83,10 @@ defmodule Clawrig.System.MacCommands do
   defdelegate has_ethernet_ip, to: Clawrig.System.MockCommands
   @impl true
   defdelegate run_codex_exec(prompt, schema_path), to: Clawrig.System.MockCommands
+  @impl true
+  defdelegate cpu_temperature, to: Clawrig.System.MockCommands
+  @impl true
+  defdelegate cpu_voltage, to: Clawrig.System.MockCommands
+  @impl true
+  defdelegate throttle_status, to: Clawrig.System.MockCommands
 end

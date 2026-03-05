@@ -9,6 +9,10 @@ config :clawrig, :system_commands, Clawrig.System.MockCommands
 config :clawrig, :state_path, Path.join(System.tmp_dir!(), "clawrig-test-wizard-state.json")
 config :clawrig, :oobe_complete, false
 
+config :clawrig,
+       :node_identity_path,
+       Path.join(System.tmp_dir!(), "clawrig-test-node-identity.json")
+
 config :logger, level: :warning
 
 config :phoenix, :plug_init_mode, :runtime
