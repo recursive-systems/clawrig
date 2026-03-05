@@ -1,3 +1,4 @@
 dnsmasq
 avahi-daemon
 iptables-persistent
+git

@@ -14,6 +14,16 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PIGEN_DIR="$SCRIPT_DIR/pi-gen"
 
+# Detect container runtime (same logic as build-release.sh)
+if command -v docker &>/dev/null && docker info &>/dev/null 2>&1; then
+  export DOCKER=docker
+elif command -v podman &>/dev/null; then
+  export DOCKER=podman
+else
+  echo "Error: docker or podman required" >&2
+  exit 1
+fi
+
 echo "============================================"
 echo "  ClawRig - Build Raspberry Pi Image"
 echo "============================================"
@@ -71,6 +81,14 @@ cp -a "$PIGEN_DIR/stage-clawrig" "$PIGEN_REPO/stage-clawrig"
 for stage in stage0 stage1 stage2; do
   touch "$PIGEN_REPO/$stage/SKIP_IMAGES"
 done
+
+# Patch pi-gen's ensure_next_loopdev for Podman compatibility.
+# In Podman containers, `losetup -f` may print "(lost)" warnings to stdout
+# which corrupt the device path. This patch suppresses stderr and pre-creates
+# missing /dev/loopN nodes.
+python3 "$SCRIPT_DIR/patches/apply-loopdev-patch.py" \
+  "$SCRIPT_DIR/patches/ensure-next-loopdev.sh" \
+  "$PIGEN_REPO/scripts/common"
 
 # -----------------------------------------------
 # Step 4: Build the image

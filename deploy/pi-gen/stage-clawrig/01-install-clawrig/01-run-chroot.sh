@@ -21,11 +21,17 @@ chmod 755 /usr/local/bin/codex
 rm -f /tmp/codex.tar.gz
 codex --version || echo "Warning: codex --version failed (may need runtime auth)"
 
-# Run onboard as the pi user (uid 1000) to set up config + daemon service
-# --non-interactive: no prompts
-# --accept-risk: required for non-interactive
-# --install-daemon: install the gateway systemd user service
-su - pi -c "openclaw onboard --non-interactive --accept-risk --install-daemon"
+# Run onboard as the pi user (uid 1000) to set up config + daemon service.
+# The gateway can't start inside a chroot, so allow failure — the critical
+# outputs (directory scaffold + systemd unit) are handled below if onboard fails.
+su - pi -c "openclaw onboard --non-interactive --accept-risk --install-daemon" || {
+  echo "Warning: openclaw onboard failed (expected in chroot — gateway can't bind)."
+  echo "Scaffolding directories manually..."
+  mkdir -p /home/pi/.openclaw/agents/main/sessions
+  mkdir -p /home/pi/.openclaw/workspace
+  mkdir -p /home/pi/.openclaw/skills
+  chown -R 1000:1000 /home/pi/.openclaw
+}
 
 # Verify
 su - pi -c "openclaw --version"
