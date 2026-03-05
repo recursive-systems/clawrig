@@ -1,6 +1,7 @@
 defmodule ClawrigWeb.DashboardLive do
   use ClawrigWeb, :live_view
 
+  alias Clawrig.Integrations.Config, as: IntegrationsConfig
   alias Clawrig.System.Commands
   alias Clawrig.Wizard.State
 
@@ -35,6 +36,11 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:openai_poll_count, 0)
       |> assign(:ethernet_connected, false)
       |> assign(:local_ip, State.get(:local_ip))
+      |> assign(
+        :brave_status,
+        if(IntegrationsConfig.brave_configured?(), do: :configured, else: :not_configured)
+      )
+      |> assign(:brave_error, nil)
 
     {:ok, socket}
   end
@@ -196,6 +202,44 @@ defmodule ClawrigWeb.DashboardLive do
     end
   end
 
+  # ---------- Integration events ----------
+
+  def handle_event("brave_submit_api_key", %{"api_key" => key}, socket) do
+    key = String.trim(key)
+
+    if key == "" do
+      {:noreply, assign(socket, :brave_error, "Please paste your Brave API key.")}
+    else
+      case IntegrationsConfig.write_brave_key(key) do
+        :ok ->
+          Task.start(fn -> Commands.impl().start_gateway() end)
+
+          {:noreply,
+           socket
+           |> assign(brave_status: :configured, brave_error: nil)
+           |> put_flash(:info, "Web search enabled. Gateway restarting...")}
+
+        {:error, msg} ->
+          {:noreply, assign(socket, :brave_error, msg)}
+      end
+    end
+  end
+
+  def handle_event("brave_remove", _params, socket) do
+    case IntegrationsConfig.remove_brave_key() do
+      :ok ->
+        Task.start(fn -> Commands.impl().start_gateway() end)
+
+        {:noreply,
+         socket
+         |> assign(brave_status: :not_configured, brave_error: nil)
+         |> put_flash(:info, "Web search removed. Gateway restarting...")}
+
+      {:error, msg} ->
+        {:noreply, assign(socket, :brave_error, msg)}
+    end
+  end
+
   def handle_event("page_visible", _params, socket) do
     if socket.assigns.openai_polling and socket.assigns.account_sub == :device_code do
       send(self(), :account_poll)
@@ -236,13 +280,21 @@ defmodule ClawrigWeb.DashboardLive do
 
       ethernet_connected = Commands.impl().has_ethernet_ip()
 
-      send(pid, {:status_result, gateway, internet, wifi_ssid, ethernet_connected})
+      brave_configured = IntegrationsConfig.brave_configured?()
+
+      send(
+        pid,
+        {:status_result, gateway, internet, wifi_ssid, ethernet_connected, brave_configured}
+      )
     end)
 
     {:noreply, socket}
   end
 
-  def handle_info({:status_result, gateway, internet, wifi_ssid, ethernet_connected}, socket) do
+  def handle_info(
+        {:status_result, gateway, internet, wifi_ssid, ethernet_connected, brave_configured},
+        socket
+      ) do
     openai_status =
       if State.get(:provider_done), do: :connected, else: :disconnected
 
@@ -260,7 +312,8 @@ defmodule ClawrigWeb.DashboardLive do
      |> assign(:wifi_ssid, wifi_ssid)
      |> assign(:ethernet_connected, ethernet_connected)
      |> assign(:openai_status, openai_status)
-     |> assign(:account_sub, account_sub)}
+     |> assign(:account_sub, account_sub)
+     |> assign(:brave_status, if(brave_configured, do: :configured, else: :not_configured))}
   end
 
   def handle_info(:check_update, socket) do

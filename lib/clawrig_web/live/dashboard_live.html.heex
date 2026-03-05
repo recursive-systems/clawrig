@@ -33,6 +33,9 @@
     <.link patch={~p"/telegram"} class={tab_class(@live_action, :telegram)}>
       Telegram
     </.link>
+    <.link patch={~p"/integrations"} class={tab_class(@live_action, :integrations)}>
+      Integrations
+    </.link>
     <.link patch={~p"/system"} class={tab_class(@live_action, :system)}>
       System
     </.link>
@@ -322,6 +325,52 @@
     <%!-- Telegram --%>
     <.dash_panel :if={@live_action == :telegram} title="Telegram" back>
       <p class="coming-soon">Telegram configuration is coming in a future update.</p>
+    </.dash_panel>
+
+    <%!-- Integrations --%>
+    <.dash_panel :if={@live_action == :integrations} title="Integrations" back>
+      <div class="integration-card">
+        <div class="integration-header">
+          <h3>Web Search</h3>
+          <span :if={@brave_status == :configured} class="integration-badge ok">Active</span>
+        </div>
+
+        <%= if @brave_status == :configured do %>
+          <p>Your AI agent can search the web using Brave Search.</p>
+          <div class="account-actions">
+            <button
+              class="btn subtle btn-sm"
+              phx-click="brave_remove"
+              data-confirm="Remove web search? Your agent will no longer be able to search the web."
+            >
+              Remove
+            </button>
+          </div>
+        <% else %>
+          <p>
+            Enable web search so your AI agent can look things up on the internet.
+            You'll need a Brave Search API key
+            (<a href="https://brave.com/search/api/" target="_blank" rel="noopener">sign up here</a>
+            &mdash; select the <strong>Data for Search</strong> plan).
+          </p>
+          <form phx-submit="brave_submit_api_key" class="account-input-group">
+            <label for="brave-api-key-input">Brave API Key</label>
+            <input
+              type="password"
+              name="api_key"
+              id="brave-api-key-input"
+              class={["account-input", @brave_error && "error"]}
+              placeholder="BSA-..."
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <p :if={@brave_error} class="account-input-hint error">{@brave_error}</p>
+            <button type="submit" class="btn primary" style="margin-top:12px">
+              Enable Web Search
+            </button>
+          </form>
+        <% end %>
+      </div>
     </.dash_panel>
 
     <%!-- System --%>

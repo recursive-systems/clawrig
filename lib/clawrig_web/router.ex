@@ -68,6 +68,7 @@ defmodule ClawrigWeb.Router do
       live "/wifi", DashboardLive, :wifi
       live "/account", DashboardLive, :account
       live "/telegram", DashboardLive, :telegram
+      live "/integrations", DashboardLive, :integrations
       live "/system", DashboardLive, :system
     end
   end
