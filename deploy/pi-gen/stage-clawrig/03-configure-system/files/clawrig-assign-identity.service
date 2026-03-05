@@ -1,0 +1,14 @@
+[Unit]
+Description=Assign unique ClawRig device identity on first boot
+Before=clawrig.service
+After=avahi-daemon.service
+ConditionPathExists=!/var/lib/clawrig/.identity-assigned
+
+[Service]
+Type=oneshot
+ExecStart=/opt/clawrig/bin/clawrig-assign-identity.sh
+ExecStartPost=/usr/bin/touch /var/lib/clawrig/.identity-assigned
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

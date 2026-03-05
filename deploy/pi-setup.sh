@@ -2,15 +2,29 @@
 set -e
 
 # Usage: scp this script + clawrig.tar.gz to the Pi, then run:
-#   bash pi-setup.sh
+#   bash pi-setup.sh [HOSTNAME]
+#
+# HOSTNAME is optional. Examples:
+#   bash pi-setup.sh                   # auto-generates clawrig-a3f7 (random 4-hex)
+#   bash pi-setup.sh clawrig-kitchen   # uses the given name
+#   bash pi-setup.sh clawrig-dev       # uses the given name
 #
 # Expects clawrig.tar.gz in the same directory as this script.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARBALL="$SCRIPT_DIR/clawrig.tar.gz"
 
+# Determine hostname: use argument, or generate a unique one
+if [ -n "$1" ]; then
+  DEVICE_HOSTNAME="$1"
+else
+  SHORT_ID=$(head -c 2 /dev/urandom | od -A n -t x1 | tr -d ' \n')
+  DEVICE_HOSTNAME="clawrig-${SHORT_ID}"
+fi
+
 echo "============================================"
 echo "  ClawRig OOBE - Raspberry Pi Setup"
+echo "  Device: ${DEVICE_HOSTNAME}"
 echo "============================================"
 
 if [ ! -f "$TARBALL" ]; then
@@ -55,10 +69,22 @@ sudo netfilter-persistent save
 
 # 5. Configure mDNS (avahi)
 echo ""
-echo "==> Configuring mDNS (clawrig.local)..."
-sudo hostnamectl set-hostname clawrig
+echo "==> Configuring mDNS (${DEVICE_HOSTNAME}.local)..."
+sudo hostnamectl set-hostname "$DEVICE_HOSTNAME"
+sudo sed -i "s/127.0.1.1.*/127.0.1.1\t${DEVICE_HOSTNAME}/" /etc/hosts
 sudo mkdir -p /etc/avahi/services
-sudo cp "$SCRIPT_DIR/clawrig-avahi.service" /etc/avahi/services/clawrig.service
+# Generate avahi service file with device-specific name
+sudo tee /etc/avahi/services/clawrig.service > /dev/null << AVAHI
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name>${DEVICE_HOSTNAME}</name>
+  <service>
+    <type>_http._tcp</type>
+    <port>4090</port>
+  </service>
+</service-group>
+AVAHI
 sudo systemctl enable avahi-daemon
 
 # 6. Create state + config directories
@@ -124,12 +150,16 @@ APPROVALS
   chown pi:pi /home/pi/.openclaw/exec-approvals.json
 fi
 
-# 7. Install systemd service
+# 7. Install systemd service + first-boot identity assignment
 echo ""
-echo "==> Installing systemd service..."
+echo "==> Installing systemd services..."
 sudo cp "$SCRIPT_DIR/clawrig.service" /etc/systemd/system/
+sudo mkdir -p /opt/clawrig/bin
+sudo install -m 755 "$SCRIPT_DIR/clawrig-assign-identity.sh" /opt/clawrig/bin/clawrig-assign-identity.sh
+sudo cp "$SCRIPT_DIR/clawrig-assign-identity.service" /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable clawrig
+sudo systemctl enable clawrig-assign-identity.service
 
 # 8. Configure hardware watchdog + self-healing
 echo ""
@@ -157,13 +187,25 @@ sudo systemctl enable clawrig-daily-repair.timer
 
 sudo systemctl daemon-reload
 
+# Derive SSID from hostname (matches Clawrig.DeviceIdentity logic)
+SUFFIX=$(echo "$DEVICE_HOSTNAME" | sed 's/^clawrig-//')
+if [ "$SUFFIX" != "$DEVICE_HOSTNAME" ]; then
+  SSID="ClawRig-$(echo "$SUFFIX" | tr '[:lower:]' '[:upper:]')-Setup"
+else
+  SSID="ClawRig-Setup"
+fi
+
 echo ""
 echo "============================================"
 echo "  Setup complete!"
+echo "  Device hostname: ${DEVICE_HOSTNAME}"
+echo "  mDNS address:    ${DEVICE_HOSTNAME}.local"
+echo "  Hotspot SSID:    ${SSID}"
+echo ""
 echo "  Reboot to start the OOBE wizard:"
 echo "    sudo reboot"
 echo ""
-echo "  After reboot, connect to 'ClawRig-Setup' WiFi."
+echo "  After reboot, connect to '${SSID}' WiFi."
 echo ""
 echo "  Self-healing enabled:"
 echo "    - Hardware watchdog (auto-reboot on hang)"

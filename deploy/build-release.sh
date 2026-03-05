@@ -81,6 +81,11 @@ else
   echo "  Warning: ClawRig plugin not found, skipping"
 fi
 
+# Identity assignment (first-boot unique hostname)
+IDENTITY_DIR="$SCRIPT_DIR/pi-gen/stage-clawrig/03-configure-system/files"
+cp "$IDENTITY_DIR/clawrig-assign-identity.sh" "$BUNDLE_DIR/"
+cp "$IDENTITY_DIR/clawrig-assign-identity.service" "$BUNDLE_DIR/"
+
 # Watchdog and self-healing files
 WATCHDOG_DIR="$SCRIPT_DIR/pi-gen/stage-clawrig/04-configure-watchdog/files"
 cp "$WATCHDOG_DIR/clawrig-gateway-watchdog.sh" "$BUNDLE_DIR/"
