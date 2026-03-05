@@ -2,6 +2,7 @@ defmodule ClawrigWeb.DashboardLive do
   use ClawrigWeb, :live_view
 
   alias Clawrig.Integrations.Config, as: IntegrationsConfig
+  alias Clawrig.Integrations.SearchProxy
   alias Clawrig.System.Commands
   alias Clawrig.Wizard.State
 
@@ -36,11 +37,10 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:openai_poll_count, 0)
       |> assign(:ethernet_connected, false)
       |> assign(:local_ip, State.get(:local_ip))
-      |> assign(
-        :brave_status,
-        if(IntegrationsConfig.brave_configured?(), do: :configured, else: :not_configured)
-      )
+      |> assign(:brave_mode, IntegrationsConfig.search_mode())
       |> assign(:brave_error, nil)
+      |> assign(:brave_usage, nil)
+      |> assign(:brave_registering, false)
 
     {:ok, socket}
   end
@@ -204,6 +204,25 @@ defmodule ClawrigWeb.DashboardLive do
 
   # ---------- Integration events ----------
 
+  def handle_event("brave_enable_managed", _params, socket) do
+    pid = self()
+
+    Task.start(fn ->
+      result = SearchProxy.register_device()
+      send(pid, {:brave_register_result, result})
+    end)
+
+    {:noreply, assign(socket, brave_registering: true, brave_error: nil)}
+  end
+
+  def handle_event("brave_show_byok", _params, socket) do
+    {:noreply, assign(socket, brave_mode: :byok_form)}
+  end
+
+  def handle_event("brave_back", _params, socket) do
+    {:noreply, assign(socket, brave_mode: :not_configured, brave_error: nil)}
+  end
+
   def handle_event("brave_submit_api_key", %{"api_key" => key}, socket) do
     key = String.trim(key)
 
@@ -216,7 +235,7 @@ defmodule ClawrigWeb.DashboardLive do
 
           {:noreply,
            socket
-           |> assign(brave_status: :configured, brave_error: nil)
+           |> assign(brave_mode: :byok, brave_error: nil)
            |> put_flash(:info, "Web search enabled. Gateway restarting...")}
 
         {:error, msg} ->
@@ -226,13 +245,13 @@ defmodule ClawrigWeb.DashboardLive do
   end
 
   def handle_event("brave_remove", _params, socket) do
-    case IntegrationsConfig.remove_brave_key() do
+    case IntegrationsConfig.remove_search_config() do
       :ok ->
         Task.start(fn -> Commands.impl().start_gateway() end)
 
         {:noreply,
          socket
-         |> assign(brave_status: :not_configured, brave_error: nil)
+         |> assign(brave_mode: :not_configured, brave_error: nil, brave_usage: nil)
          |> put_flash(:info, "Web search removed. Gateway restarting...")}
 
       {:error, msg} ->
@@ -280,11 +299,24 @@ defmodule ClawrigWeb.DashboardLive do
 
       ethernet_connected = Commands.impl().has_ethernet_ip()
 
-      brave_configured = IntegrationsConfig.brave_configured?()
+      brave_mode = IntegrationsConfig.search_mode()
+
+      brave_usage =
+        case IntegrationsConfig.managed_token() do
+          nil ->
+            nil
+
+          token ->
+            case SearchProxy.get_usage(token) do
+              {:ok, usage} -> usage
+              _ -> nil
+            end
+        end
 
       send(
         pid,
-        {:status_result, gateway, internet, wifi_ssid, ethernet_connected, brave_configured}
+        {:status_result, gateway, internet, wifi_ssid, ethernet_connected, brave_mode,
+         brave_usage}
       )
     end)
 
@@ -292,7 +324,8 @@ defmodule ClawrigWeb.DashboardLive do
   end
 
   def handle_info(
-        {:status_result, gateway, internet, wifi_ssid, ethernet_connected, brave_configured},
+        {:status_result, gateway, internet, wifi_ssid, ethernet_connected, brave_mode,
+         brave_usage},
         socket
       ) do
     openai_status =
@@ -305,6 +338,12 @@ defmodule ClawrigWeb.DashboardLive do
         true -> :choose_type
       end
 
+    # Don't overwrite brave_mode if user is in the BYOK form
+    current_brave_mode =
+      if socket.assigns.brave_mode == :byok_form,
+        do: :byok_form,
+        else: brave_mode
+
     {:noreply,
      socket
      |> assign(:gateway_status, gateway)
@@ -313,7 +352,8 @@ defmodule ClawrigWeb.DashboardLive do
      |> assign(:ethernet_connected, ethernet_connected)
      |> assign(:openai_status, openai_status)
      |> assign(:account_sub, account_sub)
-     |> assign(:brave_status, if(brave_configured, do: :configured, else: :not_configured))}
+     |> assign(:brave_mode, current_brave_mode)
+     |> assign(:brave_usage, brave_usage)}
   end
 
   def handle_info(:check_update, socket) do
@@ -340,6 +380,27 @@ defmodule ClawrigWeb.DashboardLive do
 
   def handle_info({ClawrigWeb.WifiComponent, {:wifi_connected, ssid}}, socket) do
     {:noreply, assign(socket, :wifi_ssid, ssid)}
+  end
+
+  # ---------- Brave registration info ----------
+
+  def handle_info({:brave_register_result, {:ok, %{"token" => token}}}, socket) do
+    case IntegrationsConfig.write_managed_search(token) do
+      :ok ->
+        Task.start(fn -> Commands.impl().start_gateway() end)
+
+        {:noreply,
+         socket
+         |> assign(brave_mode: :managed, brave_registering: false, brave_error: nil)
+         |> put_flash(:info, "Web search enabled. Gateway restarting...")}
+
+      {:error, msg} ->
+        {:noreply, assign(socket, brave_registering: false, brave_error: msg)}
+    end
+  end
+
+  def handle_info({:brave_register_result, {:error, msg}}, socket) do
+    {:noreply, assign(socket, brave_registering: false, brave_error: msg)}
   end
 
   # ---------- Account info ----------

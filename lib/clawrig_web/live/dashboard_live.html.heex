@@ -332,12 +332,31 @@
       <div class="integration-card">
         <div class="integration-header">
           <h3>Web Search</h3>
-          <span :if={@brave_status == :configured} class="integration-badge ok">Active</span>
+          <span :if={@brave_mode in [:managed, :byok]} class="integration-badge ok">Active</span>
         </div>
 
-        <%= if @brave_status == :configured do %>
-          <p>Your AI agent can search the web using Brave Search.</p>
-          <div class="account-actions">
+        <%!-- Managed mode: show usage --%>
+        <%= if @brave_mode == :managed do %>
+          <p>Your AI agent can search the web.</p>
+          <div :if={@brave_usage} class="usage-section">
+            <div class="usage-bar-label">
+              {@brave_usage["used"]} / {@brave_usage["limit"]} searches this month
+            </div>
+            <div class="usage-bar-track">
+              <div
+                class={[
+                  "usage-bar-fill",
+                  @brave_usage["used"] >= @brave_usage["limit"] && "full"
+                ]}
+                style={"width: #{min(100, round(@brave_usage["used"] / max(@brave_usage["limit"], 1) * 100))}%"}
+              >
+              </div>
+            </div>
+            <p :if={@brave_usage["used"] >= @brave_usage["limit"]} class="usage-limit-hint">
+              Resets {@brave_usage["resets_at"]}.
+            </p>
+          </div>
+          <div class="account-actions" style="margin-top:12px">
             <button
               class="btn subtle btn-sm"
               phx-click="brave_remove"
@@ -346,29 +365,70 @@
               Remove
             </button>
           </div>
+
+        <%!-- BYOK mode: configured with own key --%>
         <% else %>
-          <p>
-            Enable web search so your AI agent can look things up on the internet.
-            You'll need a Brave Search API key
-            (<a href="https://brave.com/search/api/" target="_blank" rel="noopener">sign up here</a>
-            &mdash; select the <strong>Data for Search</strong> plan).
-          </p>
-          <form phx-submit="brave_submit_api_key" class="account-input-group">
-            <label for="brave-api-key-input">Brave API Key</label>
-            <input
-              type="password"
-              name="api_key"
-              id="brave-api-key-input"
-              class={["account-input", @brave_error && "error"]}
-              placeholder="BSA-..."
-              autocomplete="off"
-              spellcheck="false"
-            />
-            <p :if={@brave_error} class="account-input-hint error">{@brave_error}</p>
-            <button type="submit" class="btn primary" style="margin-top:12px">
-              Enable Web Search
-            </button>
-          </form>
+          <%= if @brave_mode == :byok do %>
+            <p>Your AI agent can search the web using your Brave API key.</p>
+            <div class="account-actions">
+              <button
+                class="btn subtle btn-sm"
+                phx-click="brave_remove"
+                data-confirm="Remove web search? Your agent will no longer be able to search the web."
+              >
+                Remove
+              </button>
+            </div>
+
+          <%!-- BYOK form --%>
+          <% else %>
+            <%= if @brave_mode == :byok_form do %>
+              <p>
+                You'll need a Brave Search API key
+                (<a href="https://brave.com/search/api/" target="_blank" rel="noopener">sign up here</a>
+                &mdash; select the <strong>Data for Search</strong> plan).
+              </p>
+              <form phx-submit="brave_submit_api_key" class="account-input-group">
+                <label for="brave-api-key-input">Brave API Key</label>
+                <input
+                  type="password"
+                  name="api_key"
+                  id="brave-api-key-input"
+                  class={["account-input", @brave_error && "error"]}
+                  placeholder="BSA-..."
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <p :if={@brave_error} class="account-input-hint error">{@brave_error}</p>
+                <button type="submit" class="btn primary" style="margin-top:12px">
+                  Save API Key
+                </button>
+              </form>
+              <button class="btn ghost btn-sm" phx-click="brave_back" style="margin-top:8px">
+                Back
+              </button>
+
+            <%!-- Not configured: show both options --%>
+            <% else %>
+              <p>Enable web search so your AI agent can look things up on the internet.</p>
+              <p :if={@brave_error} class="account-input-hint error">{@brave_error}</p>
+              <button
+                class="btn primary"
+                phx-click="brave_enable_managed"
+                disabled={@brave_registering}
+                style="margin-top:12px"
+              >
+                {if @brave_registering, do: "Enabling...", else: "Enable Web Search"}
+              </button>
+              <p class="account-input-hint">Free &middot; 200 searches per month</p>
+              <div class="integration-divider">
+                <span>or</span>
+              </div>
+              <button class="btn subtle btn-sm" phx-click="brave_show_byok">
+                Use my own Brave API key
+              </button>
+            <% end %>
+          <% end %>
         <% end %>
       </div>
     </.dash_panel>
