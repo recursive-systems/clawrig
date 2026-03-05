@@ -48,6 +48,7 @@ defmodule ClawrigWeb.WizardLive do
      |> assign(:finish_message, nil)
      |> assign(:local_ip, state.local_ip)
      |> assign(:ip_confirmed, false)
+     |> assign(:mdns_url, Clawrig.DeviceIdentity.mdns_url())
      |> maybe_resume_device_code_polling()
      |> then(fn s -> if s.assigns.step == :receipt, do: detect_and_assign_ip(s), else: s end)}
   end

@@ -55,7 +55,7 @@ defmodule Clawrig.Application do
 
     case Clawrig.Wifi.Manager.start_hotspot() do
       :ok ->
-        Logger.info("ClawRig-Setup hotspot started successfully")
+        Logger.info("#{Clawrig.DeviceIdentity.hotspot_ssid()} hotspot started successfully")
         :ok
 
       {:error, reason} ->

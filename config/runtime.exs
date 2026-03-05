@@ -20,7 +20,13 @@ if config_env() == :prod do
       You can generate one by calling: mix phx.gen.secret
       """
 
-  host = System.get_env("PHX_HOST", "clawrig.local")
+  default_host =
+    case :inet.gethostname() do
+      {:ok, name} -> "#{name}.local"
+      _ -> "clawrig.local"
+    end
+
+  host = System.get_env("PHX_HOST", default_host)
 
   config :clawrig, ClawrigWeb.Endpoint,
     url: [host: host, port: 80, scheme: "http"],

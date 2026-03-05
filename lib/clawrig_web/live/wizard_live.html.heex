@@ -550,7 +550,7 @@
           <h3 class="ip-gate-title">Your dashboard address</h3>
           <div class="ip-gate-addresses">
             <code :if={@local_ip} class="ip-gate-addr">http://{@local_ip}</code>
-            <code class="ip-gate-addr">http://clawrig.local</code>
+            <code class="ip-gate-addr">{@mdns_url}</code>
           </div>
           <p class="ip-gate-hint">
             Bookmark this or write it down — you'll need it to reach your dashboard.

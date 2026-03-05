@@ -24,7 +24,7 @@ defmodule ClawrigWeb.WifiController do
       local_ip: ip
     })
 
-    render(conn, :continue_on_computer, ip: ip)
+    render(conn, :continue_on_computer, ip: ip, mdns_url: Clawrig.DeviceIdentity.mdns_url())
   end
 
   def scan(conn, _params) do
@@ -37,7 +37,7 @@ defmodule ClawrigWeb.WifiController do
     # safe_connect tears down the hotspot, tries WiFi, and restarts the
     # hotspot if the connection fails — so the user is never locked out.
     Manager.safe_connect(ssid, password)
-    render(conn, :connecting, ssid: ssid)
+    render(conn, :connecting, ssid: ssid, mdns_url: Clawrig.DeviceIdentity.mdns_url())
   end
 
   def connect(conn, _params) do

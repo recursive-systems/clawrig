@@ -97,8 +97,12 @@ defmodule Clawrig.System.PiCommands do
 
   @impl true
   def start_hotspot do
+    alias Clawrig.DeviceIdentity
+    conn = DeviceIdentity.hotspot_conn_name()
+    ssid = DeviceIdentity.hotspot_ssid()
+
     # Remove existing hotspot connection if any
-    System.cmd("nmcli", ["connection", "delete", "ClawRig-Hotspot"], stderr_to_stdout: true)
+    System.cmd("nmcli", ["connection", "delete", conn], stderr_to_stdout: true)
 
     case System.cmd("nmcli", [
            "connection",
@@ -108,11 +112,11 @@ defmodule Clawrig.System.PiCommands do
            "ifname",
            "wlan0",
            "con-name",
-           "ClawRig-Hotspot",
+           conn,
            "autoconnect",
            "no",
            "ssid",
-           "ClawRig-Setup",
+           ssid,
            "mode",
            "ap",
            "ipv4.method",
@@ -121,7 +125,7 @@ defmodule Clawrig.System.PiCommands do
            "192.168.4.1/24"
          ]) do
       {_, 0} ->
-        case System.cmd("nmcli", ["connection", "up", "ClawRig-Hotspot"]) do
+        case System.cmd("nmcli", ["connection", "up", conn]) do
           {_, 0} ->
             start_captive_portal()
             :ok
@@ -137,9 +141,10 @@ defmodule Clawrig.System.PiCommands do
 
   @impl true
   def stop_hotspot do
+    conn = Clawrig.DeviceIdentity.hotspot_conn_name()
     stop_captive_portal()
-    System.cmd("nmcli", ["connection", "down", "ClawRig-Hotspot"], stderr_to_stdout: true)
-    System.cmd("nmcli", ["connection", "delete", "ClawRig-Hotspot"], stderr_to_stdout: true)
+    System.cmd("nmcli", ["connection", "down", conn], stderr_to_stdout: true)
+    System.cmd("nmcli", ["connection", "delete", conn], stderr_to_stdout: true)
     :ok
   end
 
@@ -191,6 +196,12 @@ defmodule Clawrig.System.PiCommands do
         match?({_, 0}, System.cmd("which", ["systemctl"], stderr_to_stdout: true))
 
     if has_systemd do
+      # Ensure the user service directory exists and bootstrap a service file
+      # if `openclaw gateway install` hasn't created one yet. This works around
+      # a bug where `openclaw gateway install` fails with "systemctl is-enabled
+      # unavailable" when the service file doesn't exist.
+      ensure_gateway_service_file()
+
       # --force ensures the service file is regenerated with the current
       # gateway.auth.token from openclaw.json (onboard may have changed it).
       System.cmd("openclaw", ["gateway", "install", "--force"],
@@ -242,6 +253,45 @@ defmodule Clawrig.System.PiCommands do
 
       Port.close(port)
       :ok
+    end
+  end
+
+  defp ensure_gateway_service_file do
+    home = System.get_env("HOME") || "/home/pi"
+    service_dir = Path.join(home, ".config/systemd/user")
+    service_path = Path.join(service_dir, "openclaw-gateway.service")
+
+    unless File.exists?(service_path) do
+      File.mkdir_p!(service_dir)
+
+      openclaw_bin =
+        case System.cmd("which", ["openclaw"], stderr_to_stdout: true) do
+          {path, 0} -> String.trim(path)
+          _ -> "/usr/bin/openclaw"
+        end
+
+      File.write!(service_path, """
+      [Unit]
+      Description=OpenClaw Gateway
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      ExecStart=#{openclaw_bin} gateway run
+      Restart=on-failure
+      RestartSec=5
+      Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      Environment=HOME=#{home}
+
+      [Install]
+      WantedBy=default.target
+      """)
+
+      System.cmd("systemctl", ["--user", "daemon-reload"],
+        stderr_to_stdout: true,
+        env: user_env()
+      )
     end
   end
 
