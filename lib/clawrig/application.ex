@@ -12,6 +12,7 @@ defmodule Clawrig.Application do
         {Task.Supervisor, name: Clawrig.TaskSupervisor},
         Clawrig.Wifi.Manager,
         Clawrig.Wifi.Watchdog,
+        Clawrig.Gateway.Watchdog,
         Clawrig.Wizard.State,
         Clawrig.Updater,
         Clawrig.Diagnostics.Agent,
