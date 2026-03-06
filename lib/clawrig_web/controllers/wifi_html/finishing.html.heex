@@ -1,18 +1,19 @@
 <div class="wifi-card">
   <div class="wifi-header">
     <div class="wifi-logo">Claw<span class="rig">Rig</span></div>
-    <h1>Ethernet connected</h1>
-    <p>Your Pi is online and ready for setup.</p>
+    <h1>Switching to {@ssid}</h1>
+    <p>This page will close momentarily.</p>
   </div>
 
   <div class="wifi-transition">
+    <div class="wifi-spinner"></div>
     <p class="wifi-next-step">
-      Open one of these links <strong>on your computer</strong> to continue:
+      Continue setup on your computer at:
     </p>
 
-    <div class="wifi-address-box">
+    <div :if={@eth_ip} class="wifi-address-box">
       <span class="wifi-address-label">IP address</span>
-      <span class="wifi-address-value">http://{@ip}</span>
+      <span class="wifi-address-value">http://{@eth_ip}</span>
     </div>
 
     <div class="wifi-address-box">

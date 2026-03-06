@@ -33,16 +33,41 @@ defmodule ClawrigWeb.WifiController do
   end
 
   def connect(conn, %{"ssid" => ssid, "password" => password}) do
-    # Respond with transition page, then attempt connection asynchronously.
-    # safe_connect tears down the hotspot, tries WiFi, and restarts the
-    # hotspot if the connection fails — so the user is never locked out.
-    Manager.safe_connect(ssid, password)
-    render(conn, :connecting, ssid: ssid, mdns_url: Clawrig.DeviceIdentity.mdns_url())
+    # Don't connect yet — show confirmation page with the mDNS URL so the
+    # user can note it down. The actual connection happens when they click Finish,
+    # which tears down the hotspot (and this captive portal page with it).
+    eth_ip = if Commands.impl().has_ethernet_ip(), do: Commands.impl().detect_local_ip()
+
+    conn
+    |> put_session(:wifi_ssid, ssid)
+    |> put_session(:wifi_password, password)
+    |> render(:connecting,
+      ssid: ssid,
+      mdns_url: Clawrig.DeviceIdentity.mdns_url(),
+      eth_ip: eth_ip
+    )
   end
 
   def connect(conn, _params) do
     {:ok, networks} = Manager.scan()
     render(conn, :index, networks: networks, error: "Please select a network.")
+  end
+
+  def finish(conn, _params) do
+    ssid = get_session(conn, :wifi_ssid)
+    password = get_session(conn, :wifi_password)
+
+    mdns_url = Clawrig.DeviceIdentity.mdns_url()
+    eth_ip = if Commands.impl().has_ethernet_ip(), do: Commands.impl().detect_local_ip()
+
+    if ssid && password do
+      Manager.safe_connect(ssid, password)
+    end
+
+    conn
+    |> delete_session(:wifi_ssid)
+    |> delete_session(:wifi_password)
+    |> render(:finishing, ssid: ssid || "your network", mdns_url: mdns_url, eth_ip: eth_ip)
   end
 
   def status(conn, _params) do

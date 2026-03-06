@@ -1,22 +1,38 @@
 <div class="wifi-card">
   <div class="wifi-header">
-    <div class="wifi-logo">ClawRig</div>
+    <div class="wifi-logo">Claw<span class="rig">Rig</span></div>
     <h1>Network Status</h1>
   </div>
 
-  <div class="wifi-status">
+  <div class="wifi-status" id="wifi-status">
     <p>
-      Mode: <strong>{@status.mode}</strong>
+      Mode: <strong id="status-mode">{@status.mode}</strong>
     </p>
-    <p :if={@status.connected_ssid}>
+    <p :if={@status.connected_ssid} id="status-connected">
       Connected to: <strong>{@status.connected_ssid}</strong>
+      <span class="wifi-status-badge online">
+        <span class="wifi-status-dot"></span> Online
+      </span>
     </p>
-    <p :if={!@status.connected_ssid}>
+    <p :if={!@status.connected_ssid} id="status-disconnected">
       Not connected to any network.
     </p>
   </div>
 
   <a href="/portal" class="wifi-btn-subtle">Back to Wi-Fi setup</a>
-
-  <meta http-equiv="refresh" content="5" />
 </div>
+
+<script>
+  (function() {
+    function poll() {
+      fetch('/portal/status.json')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          var el = document.getElementById('status-mode');
+          if (el) el.textContent = d.mode;
+        })
+        .catch(function() {});
+    }
+    setInterval(poll, 5000);
+  })();
+</script>

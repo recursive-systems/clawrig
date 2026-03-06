@@ -49,6 +49,7 @@ defmodule ClawrigWeb.Router do
     get "/portal", WifiController, :index
     post "/portal/scan", WifiController, :scan
     post "/portal/connect", WifiController, :connect
+    post "/portal/finish", WifiController, :finish
     get "/portal/status", WifiController, :status
     post "/portal/skip-wifi", WifiController, :skip_wifi
   end

@@ -26,13 +26,12 @@ defmodule Clawrig.Wifi.Manager do
   end
 
   @impl true
-  def handle_call(:scan, _from, %{mode: :ap} = state) do
-    # Can't scan while wlan0 is in AP mode — return cached or empty list
-    {:reply, {:ok, state.networks}, state}
-  end
-
   def handle_call(:scan, _from, state) do
     networks = Commands.impl().scan_networks()
+
+    # nmcli may return empty in AP mode — fall back to cached results
+    networks = if networks == [], do: state.networks, else: networks
+
     {:reply, {:ok, networks}, %{state | networks: networks}}
   end
 

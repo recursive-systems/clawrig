@@ -3,96 +3,399 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0F172A" />
     <title>ClawRig Wi-Fi Setup</title>
+    <link rel="icon" type="image/png" href="/images/favicon-browser.png" />
+    <link rel="apple-touch-icon" href="/images/favicon-browser.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..700;1,8..60,400&display=swap"
+      rel="stylesheet"
+    />
     <style>
       :root {
         --bg: #0F172A;
+        --bg-elevated: #1E293B;
         --card: rgba(30,41,59,0.92);
         --border: rgba(255,255,255,0.06);
+        --border-hover: rgba(255,255,255,0.12);
         --ink: #F8FAFC;
         --ink-bright: #fff;
         --ink-secondary: #94A3B8;
+        --ink-muted: #64748B;
         --signal: #EAB308;
         --signal-light: #FACC15;
         --signal-glow: rgba(234,179,8,0.12);
         --go: #22C55E;
+        --go-bg: rgba(34,197,94,0.1);
         --stop: #ef4444;
+        --stop-bg: rgba(239,68,68,0.1);
+        --radius: 14px;
+        --radius-sm: 10px;
+        --patch-radius: 16px;
+        --felt-shadow: inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(0,0,0,0.3);
+        --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+        --font-body: 'Source Serif 4', 'Georgia', serif;
       }
       * { box-sizing: border-box; margin: 0; }
+
       body {
-        min-height: 100vh; font-family: 'Source Serif 4', 'Georgia', serif;
-        color: var(--ink); background: var(--bg); display: grid; place-items: center;
-        padding: 16px; -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+        font-family: var(--font-display);
+        color: var(--ink);
+        background: var(--bg);
+        display: grid;
+        place-items: center;
+        padding: 16px;
+        -webkit-font-smoothing: antialiased;
       }
+
+      /* Grain overlay */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+        opacity: 0.03;
+        pointer-events: none;
+        z-index: 9999;
+      }
+
+      /* Ambient glow */
+      body::after {
+        content: '';
+        position: fixed;
+        top: -300px;
+        right: -250px;
+        width: 700px;
+        height: 700px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(234, 179, 8, 0.08), transparent 70%);
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      a { color: var(--signal); text-decoration: underline; text-underline-offset: 3px; }
+      a:visited { color: var(--signal); }
+
       .wifi-card {
-        width: min(440px, 96vw); background: var(--card); border: 1px solid var(--border);
-        border-radius: 16px; padding: 28px 24px; box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+        width: min(440px, 96vw);
+        background: var(--card);
+        backdrop-filter: blur(24px) saturate(1.2);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 28px 24px;
+        box-shadow:
+          var(--felt-shadow),
+          0 24px 80px rgba(0,0,0,0.5),
+          0 2px 8px rgba(0,0,0,0.3);
+        position: relative;
+        z-index: 1;
       }
+
       .wifi-header { text-align: center; margin-bottom: 20px; }
+
       .wifi-logo {
-        font-size: 1rem; font-weight: 700; color: var(--ink-bright);
-        letter-spacing: -0.02em; margin-bottom: 12px;
+        font-family: var(--font-display);
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--ink-bright);
+        letter-spacing: -0.02em;
+        margin-bottom: 14px;
       }
-      .wifi-logo::before { content: none; }
-      .wifi-header h1 { font-size: 1.2rem; color: var(--ink-bright); margin-bottom: 4px; }
-      .wifi-header p { color: var(--ink-secondary); font-size: 0.9rem; }
+      .wifi-logo .rig { color: var(--signal); }
+
+      .wifi-header h1 {
+        font-family: var(--font-display);
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--ink-bright);
+        margin-bottom: 4px;
+        letter-spacing: -0.01em;
+      }
+      .wifi-header p { color: var(--ink-secondary); font-size: 0.9rem; line-height: 1.5; }
+
       .wifi-error {
-        background: rgba(239,68,68,0.1); color: var(--stop); padding: 10px 14px;
-        border-radius: 8px; font-size: 0.88rem; margin-bottom: 14px;
+        background: var(--stop-bg);
+        color: var(--stop);
+        padding: 10px 14px;
+        border-radius: var(--radius-sm);
+        font-size: 0.88rem;
+        margin-bottom: 14px;
+        border: 1px solid rgba(239,68,68,0.15);
       }
+
       .wifi-label {
-        display: block; font-size: 0.78rem; font-weight: 600; color: var(--ink-secondary);
-        text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;
+        display: block;
+        font-family: var(--font-display);
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--ink-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 6px;
       }
+
       .wifi-networks {
-        display: flex; flex-direction: column; gap: 4px;
-        max-height: 200px; overflow-y: auto; margin-bottom: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        margin-bottom: 16px;
       }
+
       .wifi-network {
-        display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-        border-radius: 8px; border: 1px solid var(--border); cursor: pointer;
-        transition: background 150ms ease;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+        cursor: pointer;
+        transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
       }
-      .wifi-network:hover { background: rgba(255,255,255,0.04); }
+      .wifi-network:hover {
+        background: rgba(255,255,255,0.04);
+        border-color: var(--border-hover);
+        transform: translateY(-1px);
+      }
       .wifi-network input[type="radio"] { accent-color: var(--signal); }
-      .wifi-network-name { flex: 1; font-size: 0.92rem; color: var(--ink-bright); }
-      .wifi-signal { font-size: 0.75rem; color: var(--ink-secondary); letter-spacing: 0.05em; }
+      .wifi-network-name {
+        flex: 1;
+        font-size: 0.92rem;
+        color: var(--ink-bright);
+        font-family: var(--font-display);
+        font-weight: 500;
+      }
+      .wifi-signal {
+        display: inline-flex;
+        align-items: center;
+      }
+      .wifi-signal svg { vertical-align: middle; }
       .wifi-lock { font-size: 0.7rem; }
+
       .wifi-input {
-        width: 100%; padding: 11px 14px; border-radius: 8px;
-        border: 1.5px solid var(--border); background: rgba(255,255,255,0.04);
-        color: var(--ink-bright); font-size: 0.9rem; outline: none;
-        margin-bottom: 16px; font-family: inherit;
+        width: 100%;
+        padding: 11px 14px;
+        border-radius: var(--radius-sm);
+        border: 1.5px solid var(--border);
+        background: rgba(255,255,255,0.04);
+        color: var(--ink-bright);
+        font-size: 0.9rem;
+        outline: none;
+        margin-bottom: 16px;
+        font-family: inherit;
+        transition: border-color 200ms ease, box-shadow 200ms ease;
       }
-      .wifi-input:focus { border-color: var(--signal); box-shadow: 0 0 0 3px var(--signal-glow); }
+      .wifi-input:focus {
+        border-color: var(--signal);
+        box-shadow: 0 0 0 3px var(--signal-glow);
+      }
+
       .wifi-btn {
-        width: 100%; padding: 12px; border: 0; border-radius: 10px;
-        background: var(--signal); color: #0F172A; font-size: 0.92rem; font-weight: 600;
-        cursor: pointer; font-family: inherit;
+        width: 100%;
+        padding: 12px;
+        border: 0;
+        border-radius: var(--radius-sm);
+        background: var(--signal);
+        color: #0F172A;
+        font-family: var(--font-display);
+        font-size: 0.92rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+        box-shadow:
+          0 2px 16px var(--signal-glow),
+          inset 0 1px 0 rgba(255,255,255,0.2),
+          inset 0 -1px 0 rgba(0,0,0,0.15);
       }
-      .wifi-btn:hover { background: var(--signal-light); }
+      .wifi-btn:hover {
+        background: var(--signal-light);
+        transform: translateY(-1px);
+        box-shadow:
+          0 6px 28px rgba(234,179,8,0.25),
+          inset 0 1px 0 rgba(255,255,255,0.25),
+          inset 0 -1px 0 rgba(0,0,0,0.15);
+      }
+      .wifi-btn:active { transform: translateY(0); }
+
+      .wifi-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+      }
+
       .wifi-btn-subtle {
-        display: block; width: 100%; text-align: center; padding: 10px;
-        background: rgba(255,255,255,0.06); color: var(--ink-secondary); border: 0;
-        border-radius: 8px; font-size: 0.85rem; cursor: pointer; font-family: inherit;
+        display: block;
+        width: 100%;
+        text-align: center;
+        padding: 10px;
+        background: rgba(255,255,255,0.06);
+        color: var(--ink-secondary);
+        border: 0;
+        border-radius: var(--radius-sm);
+        font-family: var(--font-display);
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
         text-decoration: none;
+        transition: background 150ms ease, color 150ms ease, transform 150ms ease;
       }
-      .wifi-btn-subtle:hover { background: rgba(255,255,255,0.1); color: var(--ink); }
+      .wifi-btn-subtle:hover {
+        background: rgba(255,255,255,0.1);
+        color: var(--ink);
+        transform: translateY(-1px);
+      }
+      .wifi-btn-subtle:active { transform: translateY(0); }
+
       .wifi-rescan { margin-top: 10px; }
       .wifi-form { margin-bottom: 0; }
+
       .wifi-transition { text-align: center; padding: 20px 0; }
+
       .wifi-spinner {
-        width: 40px; height: 40px; border: 3px solid var(--border);
-        border-top-color: var(--signal); border-radius: 50%;
-        animation: spin 800ms linear infinite; margin: 0 auto 16px;
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border);
+        border-top-color: var(--signal);
+        border-radius: 50%;
+        animation: spin 800ms linear infinite;
+        margin: 0 auto 16px;
       }
-      .wifi-next-step { font-size: 0.95rem; color: var(--ink); line-height: 1.6; margin-bottom: 12px; }
+
+      .wifi-next-step {
+        font-size: 0.95rem;
+        color: var(--ink);
+        line-height: 1.6;
+        margin-bottom: 12px;
+      }
       .wifi-next-step strong { color: var(--ink-bright); font-size: 1.05rem; }
+
       .wifi-fallback { font-size: 0.82rem; color: var(--ink-secondary); }
+      .wifi-fallback a { color: var(--signal); text-decoration: underline; text-underline-offset: 3px; }
+      .wifi-fallback a:hover { color: var(--signal-light); }
+
+      .wifi-success-icon {
+        font-size: 2.5rem;
+        line-height: 1;
+        color: var(--go);
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: var(--go-bg);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 12px;
+      }
+
+      .wifi-address-box {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 12px 16px;
+        margin-bottom: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        transition: border-color 200ms ease;
+      }
+      .wifi-address-box:hover { border-color: var(--border-hover); }
+
+      .wifi-address-label {
+        font-family: var(--font-display);
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: var(--ink-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .wifi-address-value {
+        font-family: var(--font-display);
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: var(--signal-light);
+        word-break: break-all;
+      }
+      .wifi-address-value a,
+      .wifi-address-box a {
+        color: var(--signal-light);
+        text-decoration: none;
+      }
+      .wifi-address-value a:visited,
+      .wifi-address-box a:visited {
+        color: var(--signal-light);
+      }
+
+      .wifi-hint {
+        font-size: 0.82rem;
+        color: var(--ink-secondary);
+        margin: 14px 0;
+      }
+
       .wifi-status { padding: 12px 0; }
       .wifi-status p { margin-bottom: 8px; color: var(--ink-secondary); font-size: 0.9rem; }
       .wifi-status strong { color: var(--ink-bright); }
+
+      .wifi-ethernet {
+        margin-bottom: 16px;
+        padding: 16px;
+        background: var(--go-bg);
+        border: 1px solid rgba(34,197,94,0.15);
+        border-radius: var(--radius-sm);
+      }
+      .wifi-ethernet-text {
+        font-size: 0.88rem;
+        color: var(--go);
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+      .wifi-divider {
+        text-align: center;
+        font-size: 0.82rem;
+        color: var(--ink-muted);
+        margin-top: 14px;
+      }
+
+      .wifi-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 100px;
+        font-family: var(--font-display);
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .wifi-status-badge.online {
+        background: var(--go-bg);
+        color: var(--go);
+      }
+      .wifi-status-badge.offline {
+        background: var(--stop-bg);
+        color: var(--stop);
+      }
+      .wifi-status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+        animation: pulse-dot 2s ease-in-out infinite;
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--signal);
+        outline-offset: 2px;
+      }
+
       @keyframes spin { to { transform: rotate(360deg); } }
+      @keyframes pulse-dot {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+      }
     </style>
   </head>
   <body>

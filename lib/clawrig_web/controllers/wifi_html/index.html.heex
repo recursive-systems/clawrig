@@ -1,6 +1,6 @@
 <div class="wifi-card">
   <div class="wifi-header">
-    <div class="wifi-logo">ClawRig</div>
+    <div class="wifi-logo">Claw<span class="rig">Rig</span></div>
     <h1>Wi-Fi Setup</h1>
     <p>Connect your Pi to your home network.</p>
   </div>
@@ -51,3 +51,11 @@
     <button type="submit" class="wifi-btn-subtle">Rescan networks</button>
   </form>
 </div>
+
+<script>
+  document.querySelector('.wifi-form').addEventListener('submit', function() {
+    var btn = this.querySelector('.wifi-btn');
+    btn.disabled = true;
+    btn.textContent = 'Connecting\u2026';
+  });
+</script>

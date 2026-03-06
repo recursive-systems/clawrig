@@ -1,37 +1,40 @@
 <div class="wifi-card">
   <div class="wifi-header">
-    <div class="wifi-logo">ClawRig</div>
-    <h1 id="connect-title">Connecting...</h1>
-    <p id="connect-subtitle">Connecting to <strong>{@ssid}</strong> and switching networks.</p>
+    <div class="wifi-logo">Claw<span class="rig">Rig</span></div>
+    <div class="wifi-success-icon">&#10003;</div>
+    <h1>Wi-Fi credentials saved</h1>
+    <p>Your Pi will connect to <strong>{@ssid}</strong> when you tap Finish below.</p>
   </div>
 
   <div class="wifi-transition">
-    <div class="wifi-spinner" id="connect-spinner"></div>
-    <p class="wifi-next-step" id="status-msg">
-      This takes about 15–20 seconds.
+    <p class="wifi-next-step">
+      Save this address to continue setup <strong>on your computer</strong>:
     </p>
-    <div id="connect-instructions" style="display:none">
-      <p class="wifi-next-step">
-        Open this link <strong>on your computer</strong> to continue:
-      </p>
-      <p class="wifi-fallback">
-        <strong><a href={@mdns_url}>{@mdns_url}</a></strong>
-      </p>
-    </div>
-  </div>
 
-  <script>
-    // After a delay, show "go to your computer" instructions.
-    // We can't reliably poll the Pi from this page because the hotspot
-    // is torn down during the WiFi connection attempt, disconnecting
-    // this device (phone) from the Pi's network.
-    setTimeout(function() {
-      document.getElementById("connect-title").textContent = "Wi-Fi credentials submitted";
-      document.getElementById("connect-subtitle").innerHTML =
-        "Your Pi should now be connecting to <strong>{@ssid}</strong>.";
-      document.getElementById("connect-spinner").style.display = "none";
-      document.getElementById("status-msg").style.display = "none";
-      document.getElementById("connect-instructions").style.display = "block";
-    }, 15000);
-  </script>
+    <div :if={@eth_ip} class="wifi-address-box">
+      <span class="wifi-address-label">IP address</span>
+      <span class="wifi-address-value">http://{@eth_ip}</span>
+    </div>
+
+    <div class="wifi-address-box">
+      <span class="wifi-address-label">Local address</span>
+      <span class="wifi-address-value">{@mdns_url}</span>
+    </div>
+
+    <p class="wifi-hint">
+      This page will close after you tap Finish.
+    </p>
+
+    <form method="post" action="/portal/finish" class="wifi-finish-form">
+      <button type="submit" class="wifi-btn">Finish</button>
+    </form>
+  </div>
 </div>
+
+<script>
+  document.querySelector('.wifi-finish-form').addEventListener('submit', function() {
+    var btn = this.querySelector('.wifi-btn');
+    btn.disabled = true;
+    btn.textContent = 'Finishing\u2026';
+  });
+</script>
