@@ -303,6 +303,23 @@
       }
       .wifi-address-box:hover { border-color: var(--border-hover); }
 
+      .wifi-address-copyable {
+        cursor: pointer;
+        transition: border-color 200ms ease, background 200ms ease;
+      }
+      .wifi-address-copyable:active {
+        background: rgba(255,255,255,0.08);
+      }
+      .wifi-copy-status {
+        font-size: 0.72rem;
+        color: var(--ink-secondary);
+        margin-top: 4px;
+        transition: color 200ms ease;
+      }
+      .wifi-copy-status.copied {
+        color: var(--signal);
+      }
+
       .wifi-address-label {
         font-family: var(--font-display);
         font-size: 0.7rem;

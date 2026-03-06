@@ -3,26 +3,22 @@
     <div class="wifi-logo">Claw<span class="rig">Rig</span></div>
     <div class="wifi-success-icon">&#10003;</div>
     <h1>Wi-Fi credentials saved</h1>
-    <p>Your Pi will connect to <strong>{@ssid}</strong> when you tap Finish below.</p>
+    <p>Your Pi will connect to <strong>{@ssid}</strong> when you tap Finish.</p>
   </div>
 
   <div class="wifi-transition">
     <p class="wifi-next-step">
-      Save this address to continue setup <strong>on your computer</strong>:
+      <strong>Copy this address</strong> before tapping Finish &mdash; this page will close:
     </p>
 
-    <div :if={@eth_ip} class="wifi-address-box">
-      <span class="wifi-address-label">IP address</span>
-      <span class="wifi-address-value">http://{@eth_ip}</span>
-    </div>
-
-    <div class="wifi-address-box">
-      <span class="wifi-address-label">Local address</span>
-      <span class="wifi-address-value">{@mdns_url}</span>
+    <div class="wifi-address-box wifi-address-copyable" id="address-box">
+      <span class="wifi-address-label">Your ClawRig address</span>
+      <span class="wifi-address-value" id="address-value">{@mdns_url}</span>
+      <span class="wifi-copy-status" id="copy-status">Tap to copy</span>
     </div>
 
     <p class="wifi-hint">
-      This page will close after you tap Finish.
+      Open this address on your computer to continue setup.
     </p>
 
     <form method="post" action="/portal/finish" class="wifi-finish-form">
@@ -32,9 +28,30 @@
 </div>
 
 <script>
+  document.getElementById('address-box').addEventListener('click', function() {
+    var addr = document.getElementById('address-value').textContent.trim();
+    var status = document.getElementById('copy-status');
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(addr).then(function() {
+        status.textContent = 'Copied!';
+        status.classList.add('copied');
+      });
+    } else {
+      // Fallback for captive portal webviews that block clipboard API
+      var range = document.createRange();
+      range.selectNodeContents(document.getElementById('address-value'));
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      try { document.execCommand('copy'); status.textContent = 'Copied!'; }
+      catch(e) { status.textContent = 'Selected \u2014 long-press to copy'; }
+      status.classList.add('copied');
+    }
+  });
+
   document.querySelector('.wifi-finish-form').addEventListener('submit', function() {
     var btn = this.querySelector('.wifi-btn');
     btn.disabled = true;
-    btn.textContent = 'Finishing\u2026';
+    btn.textContent = 'Connecting\u2026';
   });
 </script>

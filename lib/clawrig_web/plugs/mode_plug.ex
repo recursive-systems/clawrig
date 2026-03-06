@@ -4,7 +4,19 @@ defmodule ClawrigWeb.Plugs.ModePlug do
   def init(opts), do: opts
 
   def call(conn, _opts) do
-    assign(conn, :oobe_complete, oobe_complete?())
+    conn = assign(conn, :oobe_complete, oobe_complete?())
+
+    # When the hotspot is active, redirect all browser requests to the captive
+    # portal. This prevents Apple's CNA from navigating to / and landing on
+    # the wizard, which confuses the captive portal flow.
+    if hotspot_active?() do
+      conn
+      |> put_resp_header("location", "/portal")
+      |> send_resp(302, "")
+      |> halt()
+    else
+      conn
+    end
   end
 
   defp oobe_complete? do
@@ -16,6 +28,15 @@ defmodule ClawrigWeb.Plugs.ModePlug do
 
       val ->
         val
+    end
+  end
+
+  defp hotspot_active? do
+    try do
+      %{mode: mode} = Clawrig.Wifi.Manager.status()
+      mode == :ap
+    rescue
+      _ -> false
     end
   end
 end
