@@ -10,7 +10,8 @@ defmodule ClawrigWeb.WifiComponent do
      |> assign(:networks, [])
      |> assign(:wifi_error, nil)
      |> assign(:scanning, false)
-     |> assign(:selected, nil)}
+     |> assign(:selected, nil)
+     |> assign(:just_connected, false)}
   end
 
   @impl true
@@ -40,7 +41,7 @@ defmodule ClawrigWeb.WifiComponent do
     case WifiManager.connect(ssid, password) do
       :ok ->
         send(self(), {ClawrigWeb.WifiComponent, {:wifi_connected, ssid}})
-        {:noreply, assign(socket, wifi_error: nil, selected: nil)}
+        {:noreply, assign(socket, wifi_error: nil, selected: nil, just_connected: true)}
 
       {:error, reason} ->
         {:noreply, assign(socket, :wifi_error, to_string(reason))}
@@ -56,7 +57,11 @@ defmodule ClawrigWeb.WifiComponent do
     ~H"""
     <div id={@id} class="wifi-component">
       <%!-- Connection status banner --%>
-      <div class={["wifi-status-banner", if(@wifi_ssid, do: "connected", else: "disconnected")]}>
+      <div class={[
+        "wifi-status-banner",
+        if(@wifi_ssid, do: "connected", else: "disconnected"),
+        @just_connected && "just-connected"
+      ]}>
         <div class="wifi-status-icon">
           <svg
             :if={@wifi_ssid}

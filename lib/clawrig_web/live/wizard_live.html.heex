@@ -1,15 +1,15 @@
-<section class="shell">
-  <header class="shell-head">
-    <h1>
-      <img src={~p"/images/favicon.png"} alt="" class="shell-logo" />
-      <span class="shell-wordmark">Claw<span class="rig">Rig</span></span>
-    </h1>
+<div class="wizard">
+  <header class="wizard-header">
+    <div class="wizard-brand">
+      <img src={~p"/images/favicon.png"} alt="" class="wizard-logo" />
+      <span class="wizard-wordmark">Claw<span class="rig">Rig</span></span>
+    </div>
     <div class="step-meta">
       Step {step_number(@step)} of {length(@steps)} &middot; {step_title(@step)}
     </div>
   </header>
 
-  <section class="progress">
+  <div class="wizard-progress">
     <div class="progress-track">
       <div class="progress-bar" style={"width: #{step_progress(@step)}%"}></div>
     </div>
@@ -17,9 +17,9 @@
       <li :for={{s, i} <- Enum.with_index(@steps)} class={if i <= step_index(@step), do: "active"}>
       </li>
     </ol>
-  </section>
+  </div>
 
-  <section class="stage" aria-live="polite">
+  <main class="wizard-stage" aria-live="polite">
     <%!-- Preflight --%>
     <article
       class={panel_class(@step, :preflight)}
@@ -55,6 +55,9 @@
         <button :if={@preflight_status == :fail} class="btn subtle" phx-click="run_preflight">
           Retry
         </button>
+        <a :if={@preflight_status == :fail} href="/portal" class="btn ghost btn-sm mt-md">
+          Reconfigure Wi-Fi
+        </a>
       </div>
     </article>
 
@@ -104,16 +107,14 @@
             <img alt="" src={~p"/images/openai-mark.svg"} /> Sign in with OpenAI
           </button>
           <button
-            class="btn subtle"
+            class="btn subtle mt-md"
             phx-click="openai_use_api_key"
-            style="margin-top:10px"
           >
             Use API key instead
           </button>
           <button
-            class="btn ghost btn-sm"
+            class="btn ghost btn-sm mt-lg"
             phx-click="provider_back_to_type"
-            style="margin-top:16px"
           >
             Back
           </button>
@@ -128,9 +129,8 @@
             <h2>Completing sign-in…</h2>
             <p>Checking your authorization with OpenAI.</p>
             <button
-              class="btn ghost btn-sm"
+              class="btn ghost btn-sm mt-lg"
               phx-click="openai_back_to_choose"
-              style="margin-top:16px"
             >
               Start over
             </button>
@@ -176,9 +176,8 @@
             </div>
 
             <button
-              class="btn ghost btn-sm"
+              class="btn ghost btn-sm mt-md"
               phx-click="openai_back_to_choose"
-              style="margin-top:12px"
             >
               Cancel
             </button>
@@ -231,18 +230,16 @@
               </p>
               <button
                 type="submit"
-                class="btn primary"
+                class="btn primary mt-md"
                 disabled={@provider_status == :saving}
-                style="margin-top:12px"
               >
                 {if @provider_status == :saving, do: "Saving...", else: "Save API key"}
               </button>
             </form>
           </div>
           <button
-            class="btn ghost btn-sm"
+            class="btn ghost btn-sm mt-sm"
             phx-click="openai_back_to_choose"
-            style="margin-top:8px"
           >
             Back
           </button>
@@ -266,7 +263,7 @@
               The /v1 endpoint of your provider
             </p>
 
-            <label for="compat-api-key-input" style="margin-top:12px">API Key</label>
+            <label for="compat-api-key-input" class="mt-md">API Key</label>
             <input
               type="password"
               name="api_key"
@@ -276,7 +273,7 @@
               autocomplete="off"
             />
 
-            <label for="model-id-input" style="margin-top:12px">Model ID</label>
+            <label for="model-id-input" class="mt-md">Model ID</label>
             <input
               type="text"
               name="model_id"
@@ -289,7 +286,7 @@
               The model identifier your provider expects
             </p>
 
-            <label for="display-name-input" style="margin-top:12px">Display Name <span class="openai-input-optional">(optional)</span></label>
+            <label for="display-name-input" class="mt-md">Display Name <span class="openai-input-optional">(optional)</span></label>
             <input
               type="text"
               name="display_name"
@@ -299,23 +296,21 @@
               autocomplete="off"
             />
 
-            <p :if={@provider_error} class="openai-input-hint error" style="margin-top:8px">
+            <p :if={@provider_error} class="openai-input-hint error mt-sm">
               {@provider_error}
             </p>
 
             <button
               type="submit"
-              class="btn primary"
+              class="btn primary mt-lg"
               disabled={@provider_status == :saving}
-              style="margin-top:16px"
             >
               {if @provider_status == :saving, do: "Saving...", else: "Connect"}
             </button>
           </form>
           <button
-            class="btn ghost btn-sm"
+            class="btn ghost btn-sm mt-sm"
             phx-click="provider_back_to_type"
-            style="margin-top:8px"
           >
             Back
           </button>
@@ -360,25 +355,23 @@
           </h2>
           <p class="error">{@provider_error}</p>
           <%= if @provider_type == "openai" do %>
-            <button class="btn primary" phx-click="openai_start_device_code" style="margin-top:4px">
+            <button class="btn primary mt-xs" phx-click="openai_start_device_code">
               Try again
             </button>
             <button
-              class="btn subtle"
+              class="btn subtle mt-md"
               phx-click="openai_use_api_key"
-              style="margin-top:10px"
             >
               Use API key instead
             </button>
           <% else %>
-            <button class="btn primary" phx-click="choose_compatible" style="margin-top:4px">
+            <button class="btn primary mt-xs" phx-click="choose_compatible">
               Try again
             </button>
           <% end %>
           <button
-            class="btn ghost btn-sm"
+            class="btn ghost btn-sm mt-md"
             phx-click="provider_back_to_type"
-            style="margin-top:12px"
           >
             Change provider
           </button>
@@ -473,9 +466,8 @@
             </p>
             <button
               type="submit"
-              class="btn primary"
+              class="btn primary mt-md"
               disabled={@tg_status == :validating}
-              style="margin-top:12px"
             >
               {if @tg_status == :validating, do: "Validating...", else: "Connect bot"}
             </button>
@@ -568,9 +560,9 @@
         </button>
       </div>
     </article>
-  </section>
+  </main>
 
-  <footer class="shell-foot">
+  <footer class="wizard-footer">
     <button
       class={["btn ghost", at_start?(@step) && "nav-hidden"]}
       phx-click="nav_prev"
@@ -586,4 +578,4 @@
       {next_label(@step, assigns)}
     </button>
   </footer>
-</section>
+</div>

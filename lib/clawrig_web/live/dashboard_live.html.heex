@@ -173,7 +173,7 @@
         <button class="btn subtle" phx-click="account_use_api_key">
           Use API key instead
         </button>
-        <button class="btn ghost btn-sm" phx-click="account_back_to_type" style="margin-top:12px">
+        <button class="btn ghost btn-sm mt-md" phx-click="account_back_to_type">
           Back
         </button>
       </div>
@@ -267,7 +267,7 @@
           />
           <p class="account-input-hint">The /v1 endpoint of your provider</p>
 
-          <label for="account-compat-api-key-input" style="margin-top:12px">API Key</label>
+          <label for="account-compat-api-key-input" class="mt-md">API Key</label>
           <input
             type="password"
             name="api_key"
@@ -277,7 +277,7 @@
             autocomplete="off"
           />
 
-          <label for="account-model-id-input" style="margin-top:12px">Model ID</label>
+          <label for="account-model-id-input" class="mt-md">Model ID</label>
           <input
             type="text"
             name="model_id"
@@ -288,7 +288,7 @@
           />
           <p class="account-input-hint">The model identifier your provider expects</p>
 
-          <label for="account-display-name-input" style="margin-top:12px">Display Name <span style="font-weight:400;color:var(--muted);font-size:0.78rem">(optional)</span></label>
+          <label for="account-display-name-input" class="mt-md">Display Name <span class="openai-input-optional">(optional)</span></label>
           <input
             type="text"
             name="display_name"
@@ -298,15 +298,15 @@
             autocomplete="off"
           />
 
-          <p :if={@account_error} class="account-input-hint error" style="margin-top:8px">
+          <p :if={@account_error} class="account-input-hint error mt-sm">
             {@account_error}
           </p>
 
-          <button type="submit" class="btn primary" style="margin-top:16px">
+          <button type="submit" class="btn primary mt-lg">
             Connect
           </button>
         </form>
-        <button class="btn ghost btn-sm" phx-click="account_back_to_type" style="margin-top:8px">
+        <button class="btn ghost btn-sm mt-sm" phx-click="account_back_to_type">
           Back
         </button>
       </div>
@@ -362,7 +362,7 @@
               Resets {@brave_usage["resets_at"]}.
             </p>
           </div>
-          <div class="account-actions" style="margin-top:12px">
+          <div class="account-actions mt-md">
             <button
               class="btn subtle btn-sm"
               phx-click="brave_remove"
@@ -406,11 +406,11 @@
                   spellcheck="false"
                 />
                 <p :if={@brave_error} class="account-input-hint error">{@brave_error}</p>
-                <button type="submit" class="btn primary" style="margin-top:12px">
+                <button type="submit" class="btn primary mt-md">
                   Save API Key
                 </button>
               </form>
-              <button class="btn ghost btn-sm" phx-click="brave_back" style="margin-top:8px">
+              <button class="btn ghost btn-sm mt-sm" phx-click="brave_back">
                 Back
               </button>
 
@@ -419,10 +419,9 @@
               <p>Enable web search so your AI agent can look things up on the internet.</p>
               <p :if={@brave_error} class="account-input-hint error">{@brave_error}</p>
               <button
-                class="btn primary"
+                class="btn primary mt-md"
                 phx-click="brave_enable_managed"
                 disabled={@brave_registering}
-                style="margin-top:12px"
               >
                 {if @brave_registering, do: "Enabling...", else: "Enable Web Search"}
               </button>
@@ -476,7 +475,7 @@
             </label>
             <p class="setting-hint">
               {if @auto_update_enabled,
-                do: "Checking for updates every 30 minutes.",
+                do: "Checking for updates daily.",
                 else: "Automatic updates are paused."}
             </p>
           </div>
@@ -520,6 +519,81 @@
             <button class="btn subtle" phx-click="restart_gateway">Restart Gateway</button>
             <button class="btn subtle" phx-click="run_repair">Run Repair</button>
           </div>
+        </div>
+
+        <div class="system-action-group">
+          <h3>Remote Access</h3>
+          <%= if @tailscale == :loading do %>
+            <p class="setting-hint">Checking Tailscale status...</p>
+          <% else %>
+            <%= if @tailscale.running && @tailscale.ip do %>
+              <div class="tailscale-status tailscale-connected">
+                <div class="tailscale-status-row">
+                  <span class="wifi-status-badge online">
+                    <span class="wifi-status-dot"></span> Connected
+                  </span>
+                </div>
+                <div class="status-grid">
+                  <div class="status-item">
+                    <span class="status-label">Tailscale IP</span>
+                    <span class="status-value monospace">{@tailscale.ip}</span>
+                  </div>
+                  <div :if={@tailscale.hostname} class="status-item">
+                    <span class="status-label">Hostname</span>
+                    <span class="status-value">{@tailscale.hostname}</span>
+                  </div>
+                </div>
+                <button
+                  class="btn subtle btn-sm mt-md"
+                  phx-click="tailscale_disconnect"
+                  data-confirm="Disconnect from Tailscale? You'll lose remote access."
+                >
+                  Disconnect
+                </button>
+              </div>
+            <% else %>
+              <%= if @tailscale.installed do %>
+                <p class="setting-hint">
+                  Connect this device to your Tailscale network for remote SSH access.
+                </p>
+                <form phx-submit="tailscale_connect" class="account-input-group">
+                  <label for="tailscale-key-input">Auth Key</label>
+                  <input
+                    type="password"
+                    name="auth_key"
+                    id="tailscale-key-input"
+                    class={["account-input", @tailscale_error && "error"]}
+                    placeholder="tskey-auth-..."
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <p :if={@tailscale_error} class="account-input-hint error">{@tailscale_error}</p>
+                  <p :if={!@tailscale_error} class="account-input-hint">
+                    Get a key from your <a href="https://login.tailscale.com/admin/settings/keys" target="_blank" rel="noopener">Tailscale admin console</a>
+                  </p>
+                  <button
+                    type="submit"
+                    class="btn primary mt-md"
+                    disabled={@tailscale_connecting}
+                  >
+                    {if @tailscale_connecting, do: "Connecting...", else: "Connect"}
+                  </button>
+                </form>
+              <% else %>
+                <p class="setting-hint">
+                  Tailscale is not installed on this device. Install it to enable remote SSH access.
+                </p>
+                <p :if={@tailscale_error} class="account-input-hint error mt-sm">{@tailscale_error}</p>
+                <button
+                  class="btn primary mt-md"
+                  phx-click="tailscale_install"
+                  disabled={@tailscale_installing}
+                >
+                  {if @tailscale_installing, do: "Installing...", else: "Install Tailscale"}
+                </button>
+              <% end %>
+            <% end %>
+          <% end %>
         </div>
 
         <div class="system-action-group system-danger-zone">

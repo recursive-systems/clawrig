@@ -45,11 +45,17 @@
 
 body {
   min-height: 100vh;
-  font-family: var(--font-body);
+  font-family: var(--font-display);
   color: var(--ink);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
 }
+
+a { color: var(--signal); text-decoration: none; }
+a:visited { color: var(--signal); }
+a:hover { color: var(--signal-light); }
+.dash-content a { text-decoration: underline; }
+.dash-nav a { text-decoration: none; }
 
 /* Grain overlay */
 body::before {
@@ -76,63 +82,44 @@ body::after {
   z-index: 0;
 }
 
-.app {
+/* ═══════════════════════════════════════════
+   Wizard — full-screen responsive layout
+   ═══════════════════════════════════════════ */
+
+.wizard {
   min-height: 100vh;
   display: grid;
-  place-items: center;
-  padding: 24px;
+  grid-template-rows: auto auto 1fr auto;
   position: relative;
   z-index: 1;
 }
 
-/* ─── Shell ─── */
-.shell {
-  width: min(780px, 96vw);
-  background: var(--card);
-  backdrop-filter: blur(24px) saturate(1.2);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  box-shadow:
-    var(--felt-shadow),
-    0 24px 80px rgba(0,0,0,0.5),
-    0 2px 8px rgba(0,0,0,0.3);
-  display: grid;
-  grid-template-rows: auto auto 1fr auto;
-  gap: 0;
-  padding: 0;
-  overflow: hidden;
-}
-
-.shell-head {
+.wizard-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 20px 28px 0;
+  padding: 24px 40px 0;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
 }
 
-h1 {
-  font-family: var(--font-display);
-  font-size: 1.1rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--ink-bright);
+.wizard-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-h1::before { content: none; }
-
-.shell-logo {
-  width: 80px;
-  height: 80px;
-  border-radius: var(--radius);
+.wizard-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
   flex-shrink: 0;
-  filter: drop-shadow(0 6px 16px rgba(234, 179, 8, 0.18));
+  filter: drop-shadow(0 4px 12px rgba(234, 179, 8, 0.18));
 }
 
-.shell-wordmark {
+.wizard-wordmark {
   font-family: var(--font-display);
   font-size: 1.2rem;
   font-weight: 700;
@@ -140,11 +127,10 @@ h1::before { content: none; }
   color: var(--ink-bright);
 }
 
-.shell-wordmark .rig {
+.wizard-wordmark .rig {
   color: var(--signal);
 }
 
-.shell-head p { display: none; }
 .step-meta {
   font-family: var(--font-display);
   color: var(--ink-secondary);
@@ -156,7 +142,13 @@ h1::before { content: none; }
 }
 
 /* ─── Progress ─── */
-.progress { padding: 16px 28px 0; }
+.wizard-progress {
+  padding: 20px 40px 0;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+
 .progress-track {
   height: 3px;
   border-radius: 999px;
@@ -192,20 +184,18 @@ h1::before { content: none; }
 }
 
 /* ─── Stage ─── */
-.stage {
+.wizard-stage {
   position: relative;
   border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
   overflow: hidden;
-  background: var(--bg-elevated);
-  min-height: 320px;
-  margin-top: 16px;
+  min-height: 400px;
+  margin-top: 20px;
 }
 
 .panel {
   position: absolute;
   inset: 0;
-  padding: 36px 32px;
+  padding: 48px 40px;
   opacity: 0;
   pointer-events: none;
   transform: translateX(40px);
@@ -213,6 +203,10 @@ h1::before { content: none; }
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  max-width: 720px;
+  margin: 0 auto;
+  left: 0;
+  right: 0;
 }
 .panel.active { opacity: 1; pointer-events: auto; transform: translateX(0); }
 .panel.to-left { transform: translateX(-40px); opacity: 0; }
@@ -220,7 +214,7 @@ h1::before { content: none; }
 
 h2 {
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--ink-bright);
@@ -231,9 +225,55 @@ h2 {
   margin: 0 0 20px;
   color: var(--ink-secondary);
   max-width: 520px;
-  font-size: 0.94rem;
+  font-size: 1rem;
   line-height: 1.55;
 }
+
+/* ─── Wizard footer ─── */
+.wizard-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 20px 40px 28px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  border-top: 1px solid var(--border);
+}
+.wizard-footer .btn.nav-hidden { visibility: hidden; }
+
+/* ─── Shared brand (used by dashboard too) ─── */
+.shell-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 4px 12px rgba(234, 179, 8, 0.18));
+}
+
+.shell-wordmark {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink-bright);
+}
+
+.shell-wordmark .rig {
+  color: var(--signal);
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink-bright);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+h1::before { content: none; }
 
 /* ─── Device check step ─── */
 .check-center {
@@ -249,7 +289,7 @@ h2 {
 .check-center h2 {
   margin-top: 18px;
   margin-bottom: 4px;
-  font-size: 1.3rem;
+  font-size: 1.6rem;
   transition: color 400ms ease;
 }
 
@@ -258,7 +298,7 @@ h2 {
 
 .check-center p {
   margin: 0 auto 12px;
-  font-size: 0.92rem;
+  font-size: 1rem;
   max-width: 340px;
 }
 
@@ -367,7 +407,7 @@ h2 {
 .openai-center h2 {
   margin-top: 18px;
   margin-bottom: 4px;
-  font-size: 1.3rem;
+  font-size: 1.6rem;
   transition: color 400ms ease;
 }
 
@@ -375,8 +415,8 @@ h2 {
 
 .openai-center p {
   margin: 0 auto 16px;
-  font-size: 0.92rem;
-  max-width: 300px;
+  font-size: 1rem;
+  max-width: 340px;
 }
 
 .openai-icon-wrap {
@@ -786,7 +826,7 @@ h2 {
 .tg-center h2 {
   margin-top: 18px;
   margin-bottom: 4px;
-  font-size: 1.3rem;
+  font-size: 1.6rem;
 }
 
 .tg-center h2.tg-connected { color: var(--go); }
@@ -794,8 +834,8 @@ h2 {
 .tg-lead {
   margin: 0 auto 18px;
   color: var(--ink-secondary);
-  font-size: 0.92rem;
-  max-width: 360px;
+  font-size: 1rem;
+  max-width: 400px;
   line-height: 1.55;
 }
 
@@ -1065,14 +1105,14 @@ h2 {
 .done-center h2 {
   margin-top: 18px;
   margin-bottom: 4px;
-  font-size: 1.3rem;
+  font-size: 1.6rem;
   color: var(--go);
 }
 
 .done-center p {
   margin: 0 auto 12px;
-  font-size: 0.92rem;
-  max-width: 320px;
+  font-size: 1rem;
+  max-width: 360px;
 }
 
 .done-center .btn.primary {
@@ -1135,7 +1175,7 @@ h2 {
   margin: 0 0 10px;
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--fg);
+  color: var(--ink-bright);
 }
 
 .ip-gate-addresses {
@@ -1165,7 +1205,7 @@ h2 {
   gap: 8px;
   cursor: pointer;
   font-size: 0.9rem;
-  color: var(--fg);
+  color: var(--ink);
   user-select: none;
 }
 
@@ -1176,14 +1216,6 @@ h2 {
   cursor: pointer;
 }
 
-/* ─── Footer nav ─── */
-.shell-foot {
-  display: flex;
-  justify-content: space-between;
-  padding: 16px 28px 20px;
-}
-.shell-foot .btn.nav-hidden { visibility: hidden; }
-
 /* ─── Focus ─── */
 :focus-visible {
   outline: 2px solid var(--signal);
@@ -1193,6 +1225,10 @@ h2 {
 /* ─── Helper text ─── */
 .helper { margin-top: 10px; color: var(--ink-secondary); font-size: 0.9rem; }
 .hidden { display: none !important; }
+.mt-xs { margin-top: 4px; }
+.mt-sm { margin-top: 8px; }
+.mt-md { margin-top: 12px; }
+.mt-lg { margin-top: 16px; }
 
 /* ─── Mobile / Desktop toggle ─── */
 .show-mobile { display: none; }
@@ -1202,17 +1238,20 @@ h2 {
 }
 
 
-/* ─── Responsive ─── */
-@media (max-width: 920px) {
-  .shell { width: min(700px, 96vw); }
-}
+/* ─── Wizard responsive ─── */
 @media (max-width: 680px) {
-  .app { padding: 8px; }
-  .shell { width: 100%; border-radius: 14px; }
-  .shell-head { padding: 16px 20px 0; }
-  .progress { padding: 12px 20px 0; }
-  .panel { padding: 28px 20px; }
-  .shell-foot { padding: 12px 20px 16px; }
+  .wizard-header { padding: 16px 20px 0; }
+  .wizard-progress { padding: 14px 20px 0; }
+  .wizard-stage { margin-top: 14px; min-height: 320px; }
+  .panel { padding: 32px 20px; }
+  .wizard-footer { padding: 16px 20px 20px; }
+  .wizard-logo { width: 40px; height: 40px; }
+  .wizard-wordmark { font-size: 1.05rem; }
+  h2 { font-size: 1.15rem; }
+  .panel p { font-size: 0.94rem; }
+  .check-center h2, .openai-center h2, .tg-center h2, .done-center h2 { font-size: 1.3rem; }
+  .check-center p, .openai-center p, .done-center p { font-size: 0.92rem; }
+  .tg-lead { font-size: 0.92rem; }
 }
 
 
@@ -1220,8 +1259,15 @@ h2 {
    Dashboard
    ═══════════════════════════════════════════ */
 
-/* ─── Dashboard shell header ─── */
-.dashboard .shell-head {
+.dashboard {
+  min-height: 100vh;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ─── Dashboard header ─── */
+.shell-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1426,6 +1472,11 @@ h2 {
 
 .system-danger-zone h3 {
   color: var(--stop);
+}
+
+/* ─── Tailscale ─── */
+.tailscale-status-row {
+  margin-bottom: 12px;
 }
 
 /* ─── Account status ─── */
@@ -1655,7 +1706,7 @@ h2 {
 .log-output pre {
   margin: 0;
   padding: 16px;
-  font-family: var(--font-display);
+  font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
   font-size: 0.8rem;
   line-height: 1.6;
   color: var(--ink);
@@ -1692,6 +1743,15 @@ h2 {
 .wifi-status-banner.disconnected {
   border-color: rgba(245,158,11,0.2);
   background: rgba(245,158,11,0.04);
+}
+
+.wifi-status-banner.just-connected {
+  animation: wifi-connect-flash 1.5s ease;
+}
+@keyframes wifi-connect-flash {
+  0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+  40% { box-shadow: 0 0 16px 4px rgba(34,197,94,0.25); }
+  100% { box-shadow: none; }
 }
 
 .wifi-status-icon {
@@ -1737,10 +1797,13 @@ h2 {
 
 .wifi-status-badge {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .wifi-status-dot {
-  display: block;
+  display: inline-block;
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -2219,6 +2282,11 @@ h2 {
   font-size: 0.78rem;
   color: var(--ink-secondary);
   margin-top: 6px;
+}
+
+/* ─── Dashboard 3-column grid on wide screens ─── */
+@media (min-width: 900px) {
+  .status-grid { grid-template-columns: repeat(3, 1fr); }
 }
 
 /* ─── Dashboard responsive ─── */
