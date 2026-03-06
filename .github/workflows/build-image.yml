@@ -134,7 +134,7 @@ jobs:
         run: |
           TAG="v${CLAWRIG_VERSION}"
           IMG_ZIP=$(ls deploy/pi-gen/pi-gen-repo/deploy/image_*.zip)
-          ASSET_NAME="clawrig-${TAG}-pi4-arm64.img.zip"
+          ASSET_NAME="clawrig-${TAG}-arm64.img.zip"
           cp "$IMG_ZIP" "$ASSET_NAME"
           echo "asset_name=$ASSET_NAME" >> "$GITHUB_OUTPUT"
           echo "asset_path=$ASSET_NAME" >> "$GITHUB_OUTPUT"
