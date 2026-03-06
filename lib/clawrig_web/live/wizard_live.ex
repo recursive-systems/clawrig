@@ -869,7 +869,7 @@ defmodule ClawrigWeb.WizardLive do
 
   def provider_title(:choose_type), do: "AI Provider"
   def provider_title(:openai_choose), do: "OpenAI"
-  def provider_title(:openai_device_code), do: "Sign in with OpenAI"
+  def provider_title(:openai_device_code), do: "Sign in with ChatGPT"
   def provider_title(:openai_api_key), do: "OpenAI API key"
   def provider_title(:compat_form), do: "Connect Provider"
   def provider_title(:done), do: "Provider Connected"
@@ -881,10 +881,14 @@ defmodule ClawrigWeb.WizardLive do
   def provider_title_class(_), do: ""
 
   def provider_desc(:choose_type), do: "Choose how to connect your AI provider."
-  def provider_desc(:openai_choose), do: "Connect your OpenAI account to get started."
+
+  def provider_desc(:openai_choose),
+    do: "Sign in with your ChatGPT account, or use an API key."
 
   def provider_desc(:openai_device_code),
-    do: "Enter the code below on your phone to authorize this device."
+    do:
+      "You'll be signing in to Codex — the coding engine inside ChatGPT that powers OpenClaw. " <>
+        "Enter the code below to authorize this device."
 
   def provider_desc(:openai_api_key), do: "Paste your OpenAI API key to connect."
   def provider_desc(:compat_form), do: "Enter your provider's OpenAI-compatible endpoint details."

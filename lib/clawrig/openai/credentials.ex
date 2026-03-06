@@ -42,6 +42,8 @@ defmodule Clawrig.OpenAI.Credentials do
 
     store = put_in(store, ["profiles", profile_id], credential)
 
+    File.mkdir_p!(Path.dirname(auth_profiles_path()))
+
     case File.write(auth_profiles_path(), Jason.encode!(store, pretty: true)) do
       :ok ->
         Commands.impl().run_openclaw([

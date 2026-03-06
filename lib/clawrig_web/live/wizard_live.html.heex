@@ -104,7 +104,7 @@
           <h2>{provider_title(@provider_sub)}</h2>
           <p>{provider_desc(@provider_sub)}</p>
           <button class="btn openai" phx-click="openai_start_device_code">
-            <img alt="" src={~p"/images/openai-mark.svg"} /> Sign in with OpenAI
+            <img alt="" src={~p"/images/openai-mark.svg"} /> Sign in with ChatGPT
           </button>
           <button
             class="btn subtle mt-md"
@@ -138,8 +138,16 @@
             <h2>{provider_title(@provider_sub)}</h2>
             <p>{provider_desc(@provider_sub)}</p>
 
+            <div class="device-code-prereq">
+              <strong>Before you start:</strong> On a computer, go to
+              <a href="https://chatgpt.com/settings" target="_blank" class="openai-link">ChatGPT Settings</a>
+              &rarr; Security &rarr; enable <strong>"Device code authorization for Codex"</strong>.
+            </div>
+
             <div :if={@openai_user_code} class="device-code-display">
-              <span class="device-code-value" id="device-code-text">{@openai_user_code}</span>
+              <span class="device-code-value" id="device-code-text">
+                <span :for={char <- String.graphemes(@openai_user_code)} class={["device-code-char", char == "-" && "device-code-dash"]}>{char}</span>
+              </span>
               <button
                 class="btn subtle btn-sm"
                 id="copy-device-code"

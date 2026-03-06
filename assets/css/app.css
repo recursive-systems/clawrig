@@ -666,6 +666,21 @@ h1::before { content: none; }
   font-size: 0.78rem;
 }
 
+/* ─── Device code prerequisite ─── */
+.device-code-prereq {
+  background: rgba(255, 200, 50, 0.08);
+  border: 1.5px solid rgba(255, 200, 50, 0.25);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.device-code-prereq strong {
+  color: var(--ink-bright);
+}
+
 /* ─── Device code display ─── */
 .device-code-display {
   display: flex;
@@ -679,11 +694,24 @@ h1::before { content: none; }
 }
 
 .device-code-value {
-  font-family: var(--font-display);
+  font-family: "SF Mono", "Fira Code", "JetBrains Mono", ui-monospace, monospace;
   font-size: 1.8rem;
   font-weight: 700;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.08em;
   color: var(--ink-bright);
+  display: flex;
+  gap: 2px;
+}
+
+.device-code-char {
+  display: inline-block;
+  min-width: 1.1em;
+  text-align: center;
+}
+
+.device-code-dash {
+  min-width: 0.6em;
+  opacity: 0.5;
 }
 
 /* ─── OpenAI QR row ─── */

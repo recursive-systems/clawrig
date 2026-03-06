@@ -11,7 +11,7 @@ defmodule Clawrig.Wizard.MockDeviceCode do
     {:ok,
      %{
        device_auth_id: "mock-device-auth-id",
-       user_code: "TEST-CODE",
+       user_code: "OI10-lL5S",
        interval: 2
      }}
   end
@@ -20,7 +20,7 @@ defmodule Clawrig.Wizard.MockDeviceCode do
     count = Process.get(:mock_dc_poll_count, 0)
     Process.put(:mock_dc_poll_count, count + 1)
 
-    if count < 3 do
+    if count < 30 do
       :pending
     else
       {:ok,
