@@ -11,6 +11,7 @@ defmodule Clawrig.Application do
         {Phoenix.PubSub, name: Clawrig.PubSub},
         {Task.Supervisor, name: Clawrig.TaskSupervisor},
         Clawrig.Wifi.Manager,
+        Clawrig.Wifi.Watchdog,
         Clawrig.Wizard.State,
         Clawrig.Updater,
         Clawrig.Diagnostics.Agent,
