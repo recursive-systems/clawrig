@@ -89,4 +89,12 @@ defmodule Clawrig.System.MacCommands do
   defdelegate cpu_voltage, to: Clawrig.System.MockCommands
   @impl true
   defdelegate throttle_status, to: Clawrig.System.MockCommands
+  @impl true
+  defdelegate tailscale_status, to: Clawrig.System.MockCommands
+  @impl true
+  defdelegate tailscale_up(auth_key), to: Clawrig.System.MockCommands
+  @impl true
+  defdelegate tailscale_down, to: Clawrig.System.MockCommands
+  @impl true
+  defdelegate tailscale_install, to: Clawrig.System.MockCommands
 end

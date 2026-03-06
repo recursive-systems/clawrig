@@ -95,4 +95,13 @@ defmodule Clawrig.System.MockCommands do
       "soft_temp_limit" => false
     }
   end
+
+  @impl true
+  def tailscale_status, do: %{installed: false, running: false, ip: nil, hostname: nil}
+  @impl true
+  def tailscale_up(_auth_key), do: {:error, "Not available in dev mode"}
+  @impl true
+  def tailscale_down, do: {:error, "Not available in dev mode"}
+  @impl true
+  def tailscale_install, do: {:error, "Not available in dev mode"}
 end

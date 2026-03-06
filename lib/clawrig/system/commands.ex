@@ -16,6 +16,15 @@ defmodule Clawrig.System.Commands do
   @callback cpu_temperature() :: float() | nil
   @callback cpu_voltage() :: float() | nil
   @callback throttle_status() :: map()
+  @callback tailscale_status() :: %{
+              installed: boolean(),
+              running: boolean(),
+              ip: String.t() | nil,
+              hostname: String.t() | nil
+            }
+  @callback tailscale_up(auth_key :: String.t()) :: :ok | {:error, String.t()}
+  @callback tailscale_down() :: :ok | {:error, String.t()}
+  @callback tailscale_install() :: :ok | {:error, String.t()}
 
   def impl do
     Application.get_env(:clawrig, :system_commands, Clawrig.System.MockCommands)

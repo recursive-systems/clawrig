@@ -38,12 +38,60 @@ defmodule Clawrig.System.PiCommands do
 
   @impl true
   def connect_wifi(ssid, password) do
+    # Delete any stale connection profile for this SSID first
+    System.cmd("nmcli", ["connection", "delete", ssid], stderr_to_stdout: true)
+
     case System.cmd("nmcli", ["device", "wifi", "connect", ssid, "password", password],
            stderr_to_stdout: true
          ) do
       {_, 0} ->
         ip = detect_local_ip()
         {:ok, ip}
+
+      {err, _} ->
+        if String.contains?(err, "key-mgmt") do
+          # WPA3/mixed networks need explicit SAE key management
+          connect_wifi_sae(ssid, password)
+        else
+          {:error, err}
+        end
+    end
+  end
+
+  defp connect_wifi_sae(ssid, password) do
+    # Clean up any partial profile from the failed attempt
+    System.cmd("nmcli", ["connection", "delete", ssid], stderr_to_stdout: true)
+
+    case System.cmd(
+           "nmcli",
+           [
+             "connection",
+             "add",
+             "type",
+             "wifi",
+             "ifname",
+             "wlan0",
+             "con-name",
+             ssid,
+             "ssid",
+             ssid,
+             "wifi-sec.key-mgmt",
+             "sae",
+             "wifi-sec.psk",
+             password
+           ],
+           stderr_to_stdout: true
+         ) do
+      {_, 0} ->
+        case System.cmd("nmcli", ["connection", "up", ssid], stderr_to_stdout: true) do
+          {_, 0} ->
+            ip = detect_local_ip()
+            {:ok, ip}
+
+          {err, _} ->
+            System.cmd("nmcli", ["connection", "delete", ssid], stderr_to_stdout: true)
+            {:error, err}
+        end
 
       {err, _} ->
         {:error, err}
@@ -209,6 +257,10 @@ defmodule Clawrig.System.PiCommands do
         env: user_env()
       )
 
+      # Patch the generated service file with a startup delay so the gateway
+      # doesn't get starved on cold boot when competing with other services.
+      patch_gateway_startup_delay()
+
       # daemon-reload so systemd picks up the regenerated service file
       # (without this, restart uses the stale in-memory unit with an old token).
       System.cmd("systemctl", ["--user", "daemon-reload"],
@@ -256,6 +308,20 @@ defmodule Clawrig.System.PiCommands do
     end
   end
 
+  defp patch_gateway_startup_delay do
+    home = System.get_env("HOME") || "/home/pi"
+    service_path = Path.join([home, ".config/systemd/user/openclaw-gateway.service"])
+
+    if File.exists?(service_path) do
+      content = File.read!(service_path)
+
+      unless String.contains?(content, "ExecStartPre") do
+        patched = String.replace(content, "ExecStart=", "ExecStartPre=/bin/sleep 15\nExecStart=")
+        File.write!(service_path, patched)
+      end
+    end
+  end
+
   defp ensure_gateway_service_file do
     home = System.get_env("HOME") || "/home/pi"
     service_dir = Path.join(home, ".config/systemd/user")
@@ -278,6 +344,7 @@ defmodule Clawrig.System.PiCommands do
 
       [Service]
       Type=simple
+      ExecStartPre=/bin/sleep 15
       ExecStart=#{openclaw_bin} gateway run
       Restart=on-failure
       RestartSec=5
@@ -367,5 +434,79 @@ defmodule Clawrig.System.PiCommands do
       stderr_to_stdout: true,
       env: [{"HOME", home}, {"XDG_RUNTIME_DIR", "/run/user/#{uid}"}]
     )
+  end
+
+  @impl true
+  def tailscale_status do
+    installed =
+      match?({_, 0}, System.cmd("which", ["tailscale"], stderr_to_stdout: true))
+
+    if installed do
+      case System.cmd("sudo", ["tailscale", "status", "--json"], stderr_to_stdout: true) do
+        {json, 0} ->
+          case Jason.decode(json) do
+            {:ok, data} ->
+              self_node = data["Self"] || %{}
+
+              ip =
+                case self_node["TailscaleIPs"] do
+                  [ipv4 | _] -> ipv4
+                  _ -> nil
+                end
+
+              %{
+                installed: true,
+                running: true,
+                ip: ip,
+                hostname: self_node["HostName"]
+              }
+
+            _ ->
+              %{installed: true, running: false, ip: nil, hostname: nil}
+          end
+
+        _ ->
+          %{installed: true, running: false, ip: nil, hostname: nil}
+      end
+    else
+      %{installed: false, running: false, ip: nil, hostname: nil}
+    end
+  end
+
+  @impl true
+  def tailscale_up(auth_key) do
+    case System.cmd("sudo", ["tailscale", "up", "--authkey", auth_key, "--ssh"],
+           stderr_to_stdout: true
+         ) do
+      {_, 0} -> :ok
+      {err, _} -> {:error, String.trim(err)}
+    end
+  end
+
+  @impl true
+  def tailscale_down do
+    case System.cmd("sudo", ["tailscale", "down"], stderr_to_stdout: true) do
+      {_, 0} -> :ok
+      {err, _} -> {:error, String.trim(err)}
+    end
+  end
+
+  @impl true
+  def tailscale_install do
+    script_path = "/tmp/tailscale-install.sh"
+
+    with {_, 0} <-
+           System.cmd("curl", ["-fsSL", "-o", script_path, "https://tailscale.com/install.sh"],
+             stderr_to_stdout: true
+           ),
+         {_, 0} <-
+           System.cmd("sudo", ["bash", script_path], stderr_to_stdout: true) do
+      File.rm(script_path)
+      :ok
+    else
+      {err, _} ->
+        File.rm(script_path)
+        {:error, String.trim(err)}
+    end
   end
 end

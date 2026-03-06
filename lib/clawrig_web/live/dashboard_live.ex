@@ -44,6 +44,10 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:brave_error, nil)
       |> assign(:brave_usage, nil)
       |> assign(:brave_registering, false)
+      |> assign(:tailscale, :loading)
+      |> assign(:tailscale_error, nil)
+      |> assign(:tailscale_connecting, false)
+      |> assign(:tailscale_installing, false)
 
     {:ok, socket}
   end
@@ -84,6 +88,43 @@ defmodule ClawrigWeb.DashboardLive do
     end)
 
     {:noreply, put_flash(socket, :info, "Rebooting in 2 seconds...")}
+  end
+
+  def handle_event("tailscale_connect", %{"auth_key" => auth_key}, socket) do
+    auth_key = String.trim(auth_key)
+
+    if auth_key == "" do
+      {:noreply, assign(socket, :tailscale_error, "Please enter an auth key.")}
+    else
+      socket = assign(socket, tailscale_connecting: true, tailscale_error: nil)
+
+      pid = self()
+
+      Task.start(fn ->
+        result = Commands.impl().tailscale_up(auth_key)
+        send(pid, {:tailscale_result, result})
+      end)
+
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("tailscale_install", _params, socket) do
+    socket = assign(socket, tailscale_installing: true, tailscale_error: nil)
+    pid = self()
+
+    Task.start(fn ->
+      result = Commands.impl().tailscale_install()
+      send(pid, {:tailscale_install_result, result})
+    end)
+
+    {:noreply, socket}
+  end
+
+  def handle_event("tailscale_disconnect", _params, socket) do
+    Commands.impl().tailscale_down()
+    tailscale = Commands.impl().tailscale_status()
+    {:noreply, assign(socket, tailscale: tailscale)}
   end
 
   def handle_event("check_update", _params, socket) do
@@ -316,10 +357,12 @@ defmodule ClawrigWeb.DashboardLive do
             end
         end
 
+      tailscale = Commands.impl().tailscale_status()
+
       send(
         pid,
         {:status_result, gateway, internet, wifi_ssid, ethernet_connected, brave_mode,
-         brave_usage}
+         brave_usage, tailscale}
       )
     end)
 
@@ -328,7 +371,7 @@ defmodule ClawrigWeb.DashboardLive do
 
   def handle_info(
         {:status_result, gateway, internet, wifi_ssid, ethernet_connected, brave_mode,
-         brave_usage},
+         brave_usage, tailscale},
         socket
       ) do
     openai_status =
@@ -356,7 +399,8 @@ defmodule ClawrigWeb.DashboardLive do
      |> assign(:openai_status, openai_status)
      |> assign(:account_sub, account_sub)
      |> assign(:brave_mode, current_brave_mode)
-     |> assign(:brave_usage, brave_usage)}
+     |> assign(:brave_usage, brave_usage)
+     |> assign(:tailscale, tailscale)}
   end
 
   def handle_info(:check_update, socket) do
@@ -383,6 +427,36 @@ defmodule ClawrigWeb.DashboardLive do
 
   def handle_info({:node_status, status}, socket) do
     {:noreply, assign(socket, :node_status, status)}
+  end
+
+  def handle_info({:tailscale_install_result, result}, socket) do
+    case result do
+      :ok ->
+        tailscale = Commands.impl().tailscale_status()
+
+        {:noreply,
+         assign(socket,
+           tailscale: tailscale,
+           tailscale_installing: false,
+           tailscale_error: nil
+         )}
+
+      {:error, reason} ->
+        {:noreply, assign(socket, tailscale_installing: false, tailscale_error: reason)}
+    end
+  end
+
+  def handle_info({:tailscale_result, result}, socket) do
+    case result do
+      :ok ->
+        tailscale = Commands.impl().tailscale_status()
+
+        {:noreply,
+         assign(socket, tailscale: tailscale, tailscale_connecting: false, tailscale_error: nil)}
+
+      {:error, reason} ->
+        {:noreply, assign(socket, tailscale_connecting: false, tailscale_error: reason)}
+    end
   end
 
   def handle_info({ClawrigWeb.WifiComponent, {:wifi_connected, ssid}}, socket) do
