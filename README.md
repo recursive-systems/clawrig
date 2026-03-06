@@ -64,7 +64,6 @@ mix precommit   # compile (warnings-as-errors) + format + test
 | `SECRET_KEY_BASE` | Phoenix session secret (required in prod) | — |
 | `PHX_HOST` | Hostname for URL generation | `<hostname>.local` |
 | `PORT` | HTTP listen port | `4090` |
-| `SEARCH_PROXY_SECRET` | Registration secret for search proxy | — |
 | `GITHUB_TOKEN` | Optional; higher rate limits for OTA update checks | — |
 
 Application config (in `config/`):

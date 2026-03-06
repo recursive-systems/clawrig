@@ -7,10 +7,6 @@ end
 config :clawrig, ClawrigWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4090"))]
 
-# Search proxy registration secret (all environments)
-config :clawrig,
-  search_proxy_secret: System.get_env("SEARCH_PROXY_SECRET", "")
-
 if config_env() == :prod do
   # Wizard state persistence path (only override in prod)
   config :clawrig,

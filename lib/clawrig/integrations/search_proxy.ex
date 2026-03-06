@@ -13,17 +13,14 @@ defmodule Clawrig.Integrations.SearchProxy do
   """
   def register_device do
     hostname = Clawrig.DeviceIdentity.hostname()
-    secret = registration_secret()
+    device_id = Clawrig.Node.Client.device_id()
 
     case Req.post("#{proxy_url()}/v1/device/register",
-           json: %{hostname: hostname, secret: secret},
+           json: %{device_id: device_id, hostname: hostname},
            receive_timeout: 15_000
          ) do
       {:ok, %{status: 201, body: body}} ->
         {:ok, body}
-
-      {:ok, %{status: 401}} ->
-        {:error, "Registration denied. Invalid secret."}
 
       {:ok, %{body: %{"error" => _, "message" => msg}}} ->
         {:error, msg}
@@ -54,9 +51,5 @@ defmodule Clawrig.Integrations.SearchProxy do
       {:error, %{reason: reason}} ->
         {:error, "Connection failed: #{inspect(reason)}"}
     end
-  end
-
-  defp registration_secret do
-    Application.get_env(:clawrig, :search_proxy_secret, "")
   end
 end
