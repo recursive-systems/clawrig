@@ -14,7 +14,7 @@ defmodule Clawrig.Updater do
   use GenServer
   require Logger
 
-  @check_interval :timer.minutes(30)
+  @check_interval :timer.hours(24)
   @install_dir "/opt/clawrig"
   @staging_dir "/opt/clawrig-staging"
   @prev_dir "/opt/clawrig-prev"
@@ -101,7 +101,7 @@ defmodule Clawrig.Updater do
 
     if oobe_complete?() and auto_update_enabled?() do
       schedule_check()
-      Logger.info("[Updater] Scheduled update checks every #{div(@check_interval, 60_000)}m")
+      Logger.info("[Updater] Scheduled daily update checks")
     else
       reason = if !oobe_complete?(), do: "OOBE not complete", else: "auto-updates disabled"
       Logger.info("[Updater] #{reason} — update checks disabled")
@@ -369,7 +369,9 @@ defmodule Clawrig.Updater do
     if tarball do
       tarball_path = Path.join(@staging_dir, tarball)
 
-      case System.cmd("tar", ["-xzf", tarball_path, "-C", @staging_dir], stderr_to_stdout: true) do
+      case System.cmd("tar", ["-xzf", tarball_path, "-C", @staging_dir, "--strip-components=1"],
+             stderr_to_stdout: true
+           ) do
         {_, 0} -> :ok
         {output, _} -> {:error, "tar extraction failed: #{output}"}
       end
