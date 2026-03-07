@@ -44,7 +44,7 @@ Hooks.QRCode = {
     const url = this.el.dataset.url
     if (url && window.QR) {
       const qr = window.QR.generate(url, 0)
-      this.el.innerHTML = window.QR.toSVG(qr, {fg: "#ffffff", bg: "transparent", padding: 1})
+      this.el.innerHTML = window.QR.toSVG(qr, {fg: "#000000", bg: "#ffffff", padding: 1})
     }
   }
 }
