@@ -3,6 +3,7 @@ defmodule ClawrigWeb.DashboardLive do
 
   alias Clawrig.Integrations.Config, as: IntegrationsConfig
   alias Clawrig.Integrations.SearchProxy
+  alias Clawrig.PreviewState
   alias Clawrig.System.Commands
   alias Clawrig.Wizard.State
 
@@ -48,13 +49,15 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:tailscale_error, nil)
       |> assign(:tailscale_connecting, false)
       |> assign(:tailscale_installing, false)
+      |> assign(:preview_scenario, nil)
 
     {:ok, socket}
   end
 
   @impl true
-  def handle_params(_params, _uri, socket) do
-    {:noreply, socket}
+  def handle_params(params, _uri, socket) do
+    preview_overrides = PreviewState.apply_dashboard(params)
+    {:noreply, assign(socket, preview_overrides)}
   end
 
   # ---------- Events ----------
@@ -317,56 +320,62 @@ defmodule ClawrigWeb.DashboardLive do
   def handle_info(:refresh_status, socket) do
     Process.send_after(self(), :refresh_status, @refresh_interval)
 
-    # Run status checks in a separate process so the LiveView stays responsive
-    # (gateway_status can take 10+ seconds due to RPC probe timeout).
-    pid = self()
+    # In preview mode we intentionally freeze live status polling so scenarios
+    # stay deterministic for review links.
+    if socket.assigns[:preview_scenario] do
+      {:noreply, socket}
+    else
+      # Run status checks in a separate process so the LiveView stays responsive
+      # (gateway_status can take 10+ seconds due to RPC probe timeout).
+      pid = self()
 
-    Task.start(fn ->
-      gateway = Commands.impl().gateway_status()
-      internet = Commands.impl().check_internet()
+      Task.start(fn ->
+        gateway = Commands.impl().gateway_status()
+        internet = Commands.impl().check_internet()
 
-      wifi_ssid =
-        try do
-          {result, 0} = System.cmd("nmcli", ["-t", "-f", "ACTIVE,SSID", "dev", "wifi"])
+        wifi_ssid =
+          try do
+            {result, 0} = System.cmd("nmcli", ["-t", "-f", "ACTIVE,SSID", "dev", "wifi"])
 
-          result
-          |> String.split("\n")
-          |> Enum.find_value(fn line ->
-            case String.split(line, ":", parts: 2) do
-              ["yes", ssid] -> ssid
-              _ -> nil
-            end
-          end)
-        rescue
-          _ -> nil
-        end
+            result
+            |> String.split("\n")
+            |> Enum.find_value(fn line ->
+              case String.split(line, ":", parts: 2) do
+                ["yes", ssid] -> ssid
+                _ -> nil
+              end
+            end)
+          rescue
+            _ -> nil
+          end
 
-      ethernet_connected = Commands.impl().has_ethernet_ip()
+        ethernet_connected = Commands.impl().has_ethernet_ip()
 
-      brave_mode = IntegrationsConfig.search_mode()
+        brave_mode = IntegrationsConfig.search_mode()
 
-      brave_usage =
-        case IntegrationsConfig.managed_token() do
-          nil ->
-            nil
+        brave_usage =
+          case IntegrationsConfig.managed_token() do
+            nil ->
+              nil
 
-          token ->
-            case SearchProxy.get_usage(token) do
-              {:ok, usage} -> usage
-              _ -> nil
-            end
-        end
+            token ->
+              case SearchProxy.get_usage(token) do
+                {:ok, usage} -> usage
+                _ -> nil
+              end
+          end
 
-      tailscale = Commands.impl().tailscale_status()
+        tailscale = Commands.impl().tailscale_status()
 
-      send(
-        pid,
-        {:status_result, gateway, internet, wifi_ssid, ethernet_connected, brave_mode,
-         brave_usage, tailscale}
-      )
-    end)
+        send(
+          pid,
+          {:status_result, gateway, internet, wifi_ssid, ethernet_connected, brave_mode,
+           brave_usage, tailscale}
+        )
+      end)
 
-    {:noreply, socket}
+      {:noreply, socket}
+    end
   end
 
   def handle_info(
@@ -374,33 +383,37 @@ defmodule ClawrigWeb.DashboardLive do
          brave_usage, tailscale},
         socket
       ) do
-    openai_status =
-      if State.get(:provider_done), do: :connected, else: :disconnected
+    if socket.assigns[:preview_scenario] do
+      {:noreply, socket}
+    else
+      openai_status =
+        if State.get(:provider_done), do: :connected, else: :disconnected
 
-    account_sub =
-      cond do
-        socket.assigns.account_sub != :idle -> socket.assigns.account_sub
-        openai_status == :connected -> :idle
-        true -> :choose_type
-      end
+      account_sub =
+        cond do
+          socket.assigns.account_sub != :idle -> socket.assigns.account_sub
+          openai_status == :connected -> :idle
+          true -> :choose_type
+        end
 
-    # Don't overwrite brave_mode if user is in the BYOK form
-    current_brave_mode =
-      if socket.assigns.brave_mode == :byok_form,
-        do: :byok_form,
-        else: brave_mode
+      # Don't overwrite brave_mode if user is in the BYOK form
+      current_brave_mode =
+        if socket.assigns.brave_mode == :byok_form,
+          do: :byok_form,
+          else: brave_mode
 
-    {:noreply,
-     socket
-     |> assign(:gateway_status, gateway)
-     |> assign(:internet, internet)
-     |> assign(:wifi_ssid, wifi_ssid)
-     |> assign(:ethernet_connected, ethernet_connected)
-     |> assign(:openai_status, openai_status)
-     |> assign(:account_sub, account_sub)
-     |> assign(:brave_mode, current_brave_mode)
-     |> assign(:brave_usage, brave_usage)
-     |> assign(:tailscale, tailscale)}
+      {:noreply,
+       socket
+       |> assign(:gateway_status, gateway)
+       |> assign(:internet, internet)
+       |> assign(:wifi_ssid, wifi_ssid)
+       |> assign(:ethernet_connected, ethernet_connected)
+       |> assign(:openai_status, openai_status)
+       |> assign(:account_sub, account_sub)
+       |> assign(:brave_mode, current_brave_mode)
+       |> assign(:brave_usage, brave_usage)
+       |> assign(:tailscale, tailscale)}
+    end
   end
 
   def handle_info(:check_update, socket) do

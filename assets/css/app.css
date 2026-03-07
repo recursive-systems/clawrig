@@ -1287,6 +1287,20 @@ h1::before { content: none; }
   border-radius: 100px;
 }
 
+.preview-badge {
+  margin-left: 10px;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #6d28d9;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border: 1px solid rgba(109, 40, 217, 0.35);
+  border-radius: 999px;
+  background: rgba(109, 40, 217, 0.1);
+}
+
 /* ─── Dashboard navigation tabs ─── */
 .dash-nav {
   display: flex;
@@ -1341,6 +1355,28 @@ h1::before { content: none; }
 /* ─── Dashboard content area ─── */
 .dash-content {
   padding: 28px;
+}
+
+/* ─── Setup progress (post-wizard bootstrap) ─── */
+.setup-inline-banner {
+  margin-bottom: 14px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: rgba(59, 130, 246, 0.08);
+  border-radius: var(--radius-sm);
+}
+
+.setup-inline-banner strong {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+
+.setup-inline-banner span {
+  font-size: 0.82rem;
+  color: var(--ink-secondary);
 }
 
 /* ─── Status grid ─── */

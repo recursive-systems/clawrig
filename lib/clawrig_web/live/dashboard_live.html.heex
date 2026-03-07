@@ -3,6 +3,7 @@
     <h1>
       <img src={~p"/images/favicon.png"} alt="" class="shell-logo" />
       <span class="shell-wordmark">Claw<span class="rig">Rig</span></span>
+      <span :if={@preview_scenario} class="preview-badge">Preview: {@preview_scenario}</span>
     </h1>
     <span class="version">v{@version}</span>
   </header>
@@ -66,8 +67,15 @@
   </nav>
 
   <section class="dash-content" aria-live="polite">
-    <%!-- Dashboard / Status Overview --%>
+    <% bootstrapping? = @live_action == :index and (@gateway_status == :loading or @internet == :loading or @openai_status == :loading) %>
+
     <.dash_panel :if={@live_action == :index}>
+      <div :if={bootstrapping?} class="setup-inline-banner">
+        <strong>Setting things up…</strong>
+        <span>We’re finishing first-time checks. This usually takes a few seconds.</span>
+      </div>
+
+      <%!-- Dashboard / Status Overview --%>
       <div class="status-grid">
         <div class="status-item">
           <span class="status-label">OpenClaw Gateway</span>
