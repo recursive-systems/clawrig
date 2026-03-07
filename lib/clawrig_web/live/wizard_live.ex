@@ -641,7 +641,8 @@ defmodule ClawrigWeb.WizardLive do
   def preflight_desc(:pass), do: "Internet connection verified."
 
   def preflight_desc(:fail),
-    do: "Connect to Wi-Fi from the taskbar or plug in an ethernet cable, then retry."
+    do:
+      "Connect to Wi-Fi from the taskbar or plug in an ethernet cable, then retry. Tip: copy your Wi-Fi password before switching to the ClawRig network so you can paste it quickly."
 
   def preflight_desc(:checking), do: "Checking your connection..."
   def preflight_desc(_), do: "Checking your connection..."
