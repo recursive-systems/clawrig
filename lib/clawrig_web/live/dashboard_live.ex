@@ -49,6 +49,8 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:tailscale_error, nil)
       |> assign(:tailscale_connecting, false)
       |> assign(:tailscale_installing, false)
+      |> assign(:tailscale_dev_override, nil)
+      |> assign(:dev_tailscale_bypass_enabled, dev_tailscale_bypass_enabled?())
       |> assign(:preview_scenario, nil)
 
     {:ok, socket}
@@ -99,16 +101,28 @@ defmodule ClawrigWeb.DashboardLive do
     if auth_key == "" do
       {:noreply, assign(socket, :tailscale_error, "Please enter an auth key.")}
     else
-      socket = assign(socket, tailscale_connecting: true, tailscale_error: nil)
+      if dev_tailscale_bypass_enabled?() and String.starts_with?(auth_key, "tskey-test-") do
+        {:noreply,
+         socket
+         |> assign(
+           tailscale: %{installed: true, running: true, ip: "100.64.0.99", hostname: "clawrig-dev"},
+           tailscale_dev_override: %{installed: true, running: true, ip: "100.64.0.99", hostname: "clawrig-dev"},
+           tailscale_error: nil,
+           tailscale_connecting: false
+         )
+         |> put_flash(:info, "Dev mode: mock Tailscale connected")}
+      else
+        socket = assign(socket, tailscale_connecting: true, tailscale_error: nil)
 
-      pid = self()
+        pid = self()
 
-      Task.start(fn ->
-        result = Commands.impl().tailscale_up(auth_key)
-        send(pid, {:tailscale_result, result})
-      end)
+        Task.start(fn ->
+          result = Commands.impl().tailscale_up(auth_key)
+          send(pid, {:tailscale_result, result})
+        end)
 
-      {:noreply, socket}
+        {:noreply, socket}
+      end
     end
   end
 
@@ -124,10 +138,61 @@ defmodule ClawrigWeb.DashboardLive do
     {:noreply, socket}
   end
 
+  def handle_event("tailscale_mock_install", _params, socket) do
+    if dev_tailscale_bypass_enabled?() do
+      mock = %{installed: true, running: false, ip: nil, hostname: nil}
+
+      {:noreply,
+       socket
+       |> assign(
+         tailscale: mock,
+         tailscale_dev_override: mock,
+         tailscale_installing: false,
+         tailscale_error: nil
+       )
+       |> put_flash(:info, "Dev mode: mock Tailscale installed")}
+    else
+      {:noreply, socket}
+    end
+  end
+
   def handle_event("tailscale_disconnect", _params, socket) do
-    Commands.impl().tailscale_down()
-    tailscale = Commands.impl().tailscale_status()
-    {:noreply, assign(socket, tailscale: tailscale)}
+    if dev_tailscale_bypass_enabled?() and socket.assigns[:tailscale_dev_override] do
+      disconnected = %{installed: true, running: false, ip: nil, hostname: nil}
+
+      {:noreply,
+       socket
+       |> assign(tailscale: disconnected, tailscale_dev_override: disconnected, tailscale_error: nil)
+       |> put_flash(:info, "Tailscale disconnected.")}
+    else
+      down_result = Commands.impl().tailscale_down()
+      tailscale = Commands.impl().tailscale_status()
+
+      # Treat disconnect as idempotent:
+      # if Tailscale is already disconnected (including external key/session revocation),
+      # we still surface success-like UX instead of a hard error.
+      cond do
+        tailscale.running == false ->
+          {:noreply,
+           socket
+           |> assign(tailscale: tailscale, tailscale_error: nil)
+           |> put_flash(:info, "Tailscale disconnected.")}
+
+        down_result == :ok ->
+          {:noreply,
+           socket
+           |> assign(tailscale: tailscale, tailscale_error: nil)
+           |> put_flash(:info, "Tailscale disconnected.")}
+
+        match?({:error, _}, down_result) ->
+          {:error, reason} = down_result
+
+          {:noreply,
+           socket
+           |> assign(tailscale: tailscale, tailscale_error: reason)
+           |> put_flash(:error, "Could not disconnect Tailscale.")}
+      end
+    end
   end
 
   def handle_event("check_update", _params, socket) do
@@ -402,6 +467,8 @@ defmodule ClawrigWeb.DashboardLive do
           do: :byok_form,
           else: brave_mode
 
+      tailscale_effective = socket.assigns[:tailscale_dev_override] || tailscale
+
       {:noreply,
        socket
        |> assign(:gateway_status, gateway)
@@ -412,7 +479,7 @@ defmodule ClawrigWeb.DashboardLive do
        |> assign(:account_sub, account_sub)
        |> assign(:brave_mode, current_brave_mode)
        |> assign(:brave_usage, brave_usage)
-       |> assign(:tailscale, tailscale)}
+       |> assign(:tailscale, tailscale_effective)}
     end
   end
 
@@ -739,6 +806,10 @@ defmodule ClawrigWeb.DashboardLive do
       end
 
     String.trim("--- Repair Log ---\n#{repair_log}\n\n--- Gateway Log ---\n#{gateway_log}")
+  end
+
+  defp dev_tailscale_bypass_enabled? do
+    System.get_env("CLAWRIG_ENABLE_DEV_TAILSCALE_BYPASS", "false") == "true"
   end
 
   # ---------- View helpers ----------

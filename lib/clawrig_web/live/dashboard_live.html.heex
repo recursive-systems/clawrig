@@ -603,6 +603,9 @@
                   <p :if={!@tailscale_error} class="account-input-hint">
                     Get a key from your <a href="https://login.tailscale.com/admin/settings/keys" target="_blank" rel="noopener">Tailscale admin console</a>
                   </p>
+                  <p :if={@dev_tailscale_bypass_enabled} class="account-input-hint">
+                    Dev mode: use a mock key like <code>tskey-test-local</code> to simulate connect/disconnect.
+                  </p>
                   <button
                     type="submit"
                     class="btn primary mt-md"
@@ -616,13 +619,19 @@
                   Tailscale is not installed on this device. Install it to enable remote SSH access.
                 </p>
                 <p :if={@tailscale_error} class="account-input-hint error mt-sm">{@tailscale_error}</p>
-                <button
-                  class="btn primary mt-md"
-                  phx-click="tailscale_install"
-                  disabled={@tailscale_installing}
-                >
-                  {if @tailscale_installing, do: "Installing...", else: "Install Tailscale"}
-                </button>
+                <%= if @dev_tailscale_bypass_enabled do %>
+                  <button class="btn primary mt-md" phx-click="tailscale_mock_install">
+                    Mock Install (Dev)
+                  </button>
+                <% else %>
+                  <button
+                    class="btn primary mt-md"
+                    phx-click="tailscale_install"
+                    disabled={@tailscale_installing}
+                  >
+                    {if @tailscale_installing, do: "Installing...", else: "Install Tailscale"}
+                  </button>
+                <% end %>
               <% end %>
             <% end %>
           <% end %>
