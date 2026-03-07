@@ -23,6 +23,7 @@ defmodule ClawrigWeb.WizardLive do
      |> assign(:provider_done, state.provider_done || false)
      |> assign(:provider_status, nil)
      |> assign(:provider_error, nil)
+     |> assign(:dev_auth_bypass_enabled, dev_auth_bypass_enabled?())
      |> assign(:provider_sub, provider_sub_on_mount(state))
      |> assign(:provider_type, state.provider_type)
      |> assign(:provider_name, state.provider_name)
@@ -40,7 +41,8 @@ defmodule ClawrigWeb.WizardLive do
      |> assign(:tg_chat_id, state.tg_chat_id)
      |> assign(:tg_bot_name, state.tg_bot_name)
      |> assign(:tg_bot_username, state.tg_bot_username)
-     |> assign(:tg_sub, if(state.tg_chat_id, do: :done, else: :intro))
+     |> assign(:tg_sub, telegram_sub_on_mount(state))
+     |> assign(:tg_baseline_update_id, Map.get(state, :tg_baseline_update_id))
      |> assign(:tg_status, nil)
      |> assign(:tg_error, nil)
      |> assign(:tg_polling, false)
@@ -54,7 +56,18 @@ defmodule ClawrigWeb.WizardLive do
   end
 
   @impl true
-  def handle_params(_params, _uri, socket) do
+  def handle_params(params, _uri, socket) do
+    socket =
+      if preview_enabled?() and is_map(params) and params["preview_step"] in Enum.map(@steps, &Atom.to_string/1) do
+        step = String.to_existing_atom(params["preview_step"])
+
+        socket
+        |> assign(:step, step)
+        |> maybe_set_preview_substate(params)
+      else
+        socket
+      end
+
     {:noreply, socket}
   end
 
@@ -218,6 +231,11 @@ defmodule ClawrigWeb.WizardLive do
     end
   end
 
+  def handle_event("tg_check_now", _params, socket) do
+    send(self(), :tg_poll)
+    {:noreply, assign(socket, tg_status: :checking, tg_error: nil)}
+  end
+
   def handle_event("tg_skip", _params, socket) do
     {:noreply, socket}
   end
@@ -369,45 +387,65 @@ defmodule ClawrigWeb.WizardLive do
   end
 
   def handle_info({:do_save_api_key, key}, socket) do
-    {output, exit_code} =
-      Commands.impl().run_openclaw([
-        "onboard",
-        "--non-interactive",
-        "--accept-risk",
-        "--auth-choice",
-        "openai-api-key",
-        "--openai-api-key",
-        key,
-        "--skip-channels",
-        "--skip-health",
-        "--skip-skills",
-        "--skip-daemon",
-        "--skip-ui"
-      ])
-
-    if exit_code == 0 do
+    if dev_auth_bypass_enabled?() and String.starts_with?(key, "sk_test_") do
       State.merge(%{
         provider_done: true,
         provider_type: "openai",
-        provider_auth_method: "api-key",
+        provider_auth_method: "api-key-mock",
         openai_device_auth_id: nil,
         openai_user_code: nil
       })
 
       {:noreply,
-       assign(socket,
+       socket
+       |> put_flash(:info, "Dev mode: mock provider auth enabled")
+       |> assign(
          provider_done: true,
          provider_sub: :done,
          provider_status: :saved,
          provider_error: nil
        )}
     else
-      {:noreply,
-       assign(socket,
-         provider_status: nil,
-         provider_sub: :error,
-         provider_error: "Could not save API key. #{String.trim(output)}"
-       )}
+      {output, exit_code} =
+        Commands.impl().run_openclaw([
+          "onboard",
+          "--non-interactive",
+          "--accept-risk",
+          "--auth-choice",
+          "openai-api-key",
+          "--openai-api-key",
+          key,
+          "--skip-channels",
+          "--skip-health",
+          "--skip-skills",
+          "--skip-daemon",
+          "--skip-ui"
+        ])
+
+      if exit_code == 0 do
+        State.merge(%{
+          provider_done: true,
+          provider_type: "openai",
+          provider_auth_method: "api-key",
+          openai_device_auth_id: nil,
+          openai_user_code: nil
+        })
+
+        {:noreply,
+         assign(socket,
+           provider_done: true,
+           provider_sub: :done,
+           provider_status: :saved,
+           provider_error: nil
+         )}
+      else
+        {:noreply,
+         assign(socket,
+           provider_status: nil,
+           provider_sub: :error,
+           provider_error: "Could not save API key. #{String.trim(output)}"
+         )}
+      end
     end
   end
 
@@ -447,17 +485,26 @@ defmodule ClawrigWeb.WizardLive do
   def handle_info({:do_tg_validate, token}, socket) do
     case Telegram.validate_token(token) do
       {:ok, %{bot_name: bot_name, bot_username: bot_username}} ->
-        State.merge(%{tg_token: token, tg_bot_name: bot_name, tg_bot_username: bot_username})
-        send(self(), :tg_start_polling)
+        baseline_update_id = Telegram.latest_update_id(token)
+
+        State.merge(%{
+          tg_token: token,
+          tg_bot_name: bot_name,
+          tg_bot_username: bot_username,
+          tg_baseline_update_id: baseline_update_id,
+          tg_chat_id: nil
+        })
 
         {:noreply,
          assign(socket,
            tg_token: token,
            tg_bot_name: bot_name,
            tg_bot_username: bot_username,
+           tg_chat_id: nil,
            tg_sub: :chat,
-           tg_status: nil,
-           tg_error: nil
+           tg_status: :waiting_for_start,
+           tg_error: nil,
+           tg_baseline_update_id: baseline_update_id
          )}
 
       {:error, msg} ->
@@ -478,16 +525,25 @@ defmodule ClawrigWeb.WizardLive do
     if socket.assigns.tg_sub != :chat || socket.assigns.tg_chat_id do
       {:noreply, assign(socket, :tg_polling, false)}
     else
-      case Telegram.detect_chat(socket.assigns.tg_token) do
-        {:ok, %{chat_id: chat_id, first_name: _first_name}} ->
-          State.merge(%{tg_chat_id: chat_id})
+      case Telegram.detect_chat(socket.assigns.tg_token, socket.assigns[:tg_baseline_update_id]) do
+        {:ok, %{chat_id: chat_id, first_name: _first_name, update_id: update_id}} ->
+          State.merge(%{tg_chat_id: chat_id, tg_baseline_update_id: update_id})
           Telegram.save_config(socket.assigns.tg_token, chat_id, socket.assigns.tg_bot_name)
 
-          {:noreply, assign(socket, tg_chat_id: chat_id, tg_sub: :done, tg_polling: false)}
+          {:noreply,
+           assign(socket,
+             tg_chat_id: chat_id,
+             tg_sub: :done,
+             tg_polling: false,
+             tg_baseline_update_id: update_id
+           )}
 
         :no_messages ->
-          Process.send_after(self(), :tg_poll, 2000)
-          {:noreply, socket}
+          {:noreply,
+           assign(socket,
+             tg_status: :waiting_for_start,
+             tg_error: "No new /start found yet. Send /start to your bot, then tap Check now."
+           )}
       end
     end
   end
@@ -523,7 +579,12 @@ defmodule ClawrigWeb.WizardLive do
 
     # Best-effort gateway start (non-blocking).
     # If this fails, the watchdog will pick it up within ~2 minutes.
-    Task.start(fn -> Commands.impl().start_gateway() end)
+    Task.start(fn ->
+      Commands.impl().start_gateway()
+      # Give startup a brief head start, then send a clear readiness hint in Telegram.
+      Process.sleep(3000)
+      Telegram.send_setup_complete(state.tg_token, state.tg_chat_id)
+    end)
 
     {:noreply, socket |> put_flash(:info, "Setup complete!") |> redirect(to: "/")}
   end
@@ -585,6 +646,78 @@ defmodule ClawrigWeb.WizardLive do
       assign(socket, openai_polling: true, openai_poll_count: 0, openai_resuming: true)
     else
       socket
+    end
+  end
+
+  defp maybe_set_preview_substate(socket, params) do
+    case socket.assigns.step do
+      :provider ->
+        sub = params["provider_sub"] || "choose_type"
+
+        provider_sub =
+          case sub do
+            "choose_type" -> :choose_type
+            "openai_choose" -> :openai_choose
+            "openai_device_code" -> :openai_device_code
+            "openai_api_key" -> :openai_api_key
+            "compat_form" -> :compat_form
+            "done" -> :done
+            "error" -> :error
+            _ -> :choose_type
+          end
+
+        assign(socket, :provider_sub, provider_sub)
+
+      :telegram ->
+        # Only force telegram substate when explicitly requested via query param.
+        # This prevents links like `tg_sub=create` from snapping users back to token entry
+        # after they successfully validate and move forward.
+        case params["tg_sub"] do
+          nil ->
+            socket
+
+          sub ->
+            tg_sub =
+              case sub do
+                "intro" -> :intro
+                "create" -> :create
+                "chat" -> :chat
+                "done" -> :done
+                _ -> :intro
+              end
+
+            # If token is already present and requested sub is :create, keep current state.
+            # This avoids bouncing back to create screen while testing /start flow.
+            if tg_sub == :create and socket.assigns[:tg_token] do
+              socket
+            else
+              assign(socket, :tg_sub, tg_sub)
+            end
+        end
+
+      _ ->
+        socket
+    end
+  end
+
+  defp preview_enabled? do
+    System.get_env("CLAWRIG_ENABLE_PREVIEW_STATES", "false") == "true"
+  end
+
+  defp dev_auth_bypass_enabled? do
+    System.get_env("CLAWRIG_ENABLE_DEV_AUTH_BYPASS", "false") == "true"
+  end
+
+  defp telegram_sub_on_mount(state) do
+    cond do
+      state.tg_chat_id ->
+        :done
+
+      state.tg_token ->
+        :chat
+
+      true ->
+        :intro
     end
   end
 

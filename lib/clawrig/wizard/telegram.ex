@@ -20,26 +20,45 @@ defmodule Clawrig.Wizard.Telegram do
     end
   end
 
-  def detect_chat(token) do
+  def latest_update_id(token) do
     case Req.get("https://api.telegram.org/bot#{token}/getUpdates",
-           params: [timeout: 0, limit: 5]
+           params: [timeout: 0, limit: 1]
+         ) do
+      {:ok, %{status: 200, body: %{"ok" => true, "result" => [update | _]}}} ->
+        update["update_id"]
+
+      _ ->
+        nil
+    end
+  end
+
+  def detect_chat(token, since_update_id \\ nil) do
+    case Req.get("https://api.telegram.org/bot#{token}/getUpdates",
+           params: [timeout: 0, limit: 20]
          ) do
       {:ok, %{status: 200, body: %{"ok" => true, "result" => results}}} when results != [] ->
         results
         |> Enum.reverse()
         |> Enum.find_value(fn update ->
-          msg = update["message"]
+          update_id = update["update_id"]
 
-          if msg && msg["chat"]["type"] == "private" do
-            chat_id = to_string(msg["chat"]["id"])
-            first_name = msg["chat"]["first_name"] || "there"
-            {chat_id, first_name}
+          if is_integer(since_update_id) and is_integer(update_id) and update_id <= since_update_id do
+            nil
+          else
+            msg = update["message"]
+            text = (msg && msg["text"] && String.trim(msg["text"])) || ""
+
+            if msg && msg["chat"]["type"] == "private" and text == "/start" do
+              chat_id = to_string(msg["chat"]["id"])
+              first_name = msg["chat"]["first_name"] || "there"
+              {chat_id, first_name, update_id}
+            end
           end
         end)
         |> case do
-          {chat_id, first_name} ->
+          {chat_id, first_name, update_id} ->
             send_welcome(token, chat_id, first_name)
-            {:ok, %{chat_id: chat_id, first_name: first_name}}
+            {:ok, %{chat_id: chat_id, first_name: first_name, update_id: update_id}}
 
           nil ->
             :no_messages
@@ -80,13 +99,29 @@ defmodule Clawrig.Wizard.Telegram do
     {:ok, true}
   end
 
+  def send_setup_complete(token, chat_id) do
+    if token && chat_id do
+      Task.start(fn ->
+        Req.post("https://api.telegram.org/bot#{token}/sendMessage",
+          json: %{
+            chat_id: chat_id,
+            text:
+              "✅ Setup is complete. OpenClaw is now starting up. Send a message here in a few seconds and I'll respond."
+          }
+        )
+      end)
+    end
+
+    :ok
+  end
+
   defp send_welcome(token, chat_id, first_name) do
     Task.start(fn ->
       Req.post("https://api.telegram.org/bot#{token}/sendMessage",
         json: %{
           chat_id: chat_id,
           text:
-            "Hey #{first_name}! This chat is now linked to your Pi. Once setup is complete, you'll be able to talk to OpenClaw right here."
+            "Hey #{first_name}! This chat is now linked to your Pi. Keep going through setup. You can chat with OpenClaw here once setup is complete."
         }
       )
     end)

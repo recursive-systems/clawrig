@@ -228,6 +228,9 @@
                   do: @provider_error,
                   else: raw("Starts with <code>sk-</code>")}
               </p>
+              <p :if={@dev_auth_bypass_enabled} class="openai-input-hint">
+                Dev mode: you can use a mock key like <code>sk_test_local_preview</code>.
+              </p>
               <button
                 type="submit"
                 class="btn primary mt-md"
@@ -502,12 +505,19 @@
             <p class="tg-qr-label">Scan to open <strong>@{@tg_bot_username}</strong></p>
           </div>
           <p class="tg-lead">
-            Scan the QR code or search for your bot in Telegram. Send it any message — like "hello".
+            Scan the QR code or search for your bot in Telegram. Send <strong>/start</strong>, then tap <strong>Check now</strong>.
+          </p>
+          <p class="helper">
+            Heads up: this step links your chat, but OpenClaw replies start after you finish the remaining setup steps.
           </p>
           <div class="tg-polling">
             <div class="tg-polling-dot"></div>
-            <span>Waiting for your message…</span>
+            <span>{if @tg_status == :checking, do: "Checking for new /start…", else: "Waiting for a new /start message…"}</span>
           </div>
+          <div class="mt-sm">
+            <button class="btn secondary btn-sm" phx-click="tg_check_now">Check now</button>
+          </div>
+          <p :if={@tg_error} class="helper">{@tg_error}</p>
         </div>
 
         <%!-- Done --%>
@@ -522,6 +532,9 @@
           </div>
           <h2 class="tg-connected">Connected</h2>
           <p class="tg-lead">Your bot is linked. You'll get notifications right on your phone.</p>
+          <p class="helper">
+            After you tap <strong>Finish setup</strong>, OpenClaw starts in the background. If your first message doesn't get a response immediately, wait a few seconds and try once more.
+          </p>
         </div>
       </div>
     </article>

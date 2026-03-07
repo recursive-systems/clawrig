@@ -13,6 +13,7 @@ defmodule Clawrig.Wizard.State do
     tg_chat_id: nil,
     tg_bot_name: nil,
     tg_bot_username: nil,
+    tg_baseline_update_id: nil,
     local_ip: nil,
     provider_type: nil,
     provider_name: nil,
