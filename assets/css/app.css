@@ -1303,6 +1303,7 @@ h1::before { content: none; }
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--ink-secondary);
+  text-decoration: none;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -1313,15 +1314,28 @@ h1::before { content: none; }
   border-radius: var(--radius-xs) var(--radius-xs) 0 0;
 }
 
-.dash-tab:hover {
+/* Normalize browser link-state overrides so tabs don't keep odd visited colors */
+.dash-tab:link,
+.dash-tab:visited {
+  color: var(--ink-secondary);
+}
+
+.dash-tab:hover,
+.dash-tab:focus-visible {
   color: var(--ink);
   background: rgba(255,255,255,0.03);
 }
 
-.dash-tab.active {
+.dash-tab.active,
+.dash-tab[aria-current="page"] {
   color: var(--signal);
   border-bottom-color: var(--signal);
   background: rgba(234,179,8,0.04);
+}
+
+.dash-tab.active:visited,
+.dash-tab[aria-current="page"]:visited {
+  color: var(--signal);
 }
 
 /* ─── Dashboard content area ─── */

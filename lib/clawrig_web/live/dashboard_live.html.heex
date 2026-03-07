@@ -21,22 +21,46 @@
   </div>
 
   <nav class="dash-nav" role="tablist">
-    <.link patch={~p"/"} class={tab_class(@live_action, :index)}>
+    <.link
+      patch={~p"/"}
+      class={tab_class(@live_action, :index)}
+      aria-current={if @live_action == :index, do: "page", else: nil}
+    >
       Dashboard
     </.link>
-    <.link patch={~p"/wifi"} class={tab_class(@live_action, :wifi)}>
+    <.link
+      patch={~p"/wifi"}
+      class={tab_class(@live_action, :wifi)}
+      aria-current={if @live_action == :wifi, do: "page", else: nil}
+    >
       Wi-Fi
     </.link>
-    <.link patch={~p"/account"} class={tab_class(@live_action, :account)}>
+    <.link
+      patch={~p"/account"}
+      class={tab_class(@live_action, :account)}
+      aria-current={if @live_action == :account, do: "page", else: nil}
+    >
       Provider
     </.link>
-    <.link patch={~p"/telegram"} class={tab_class(@live_action, :telegram)}>
+    <.link
+      patch={~p"/telegram"}
+      class={tab_class(@live_action, :telegram)}
+      aria-current={if @live_action == :telegram, do: "page", else: nil}
+    >
       Telegram
     </.link>
-    <.link patch={~p"/integrations"} class={tab_class(@live_action, :integrations)}>
+    <.link
+      patch={~p"/integrations"}
+      class={tab_class(@live_action, :integrations)}
+      aria-current={if @live_action == :integrations, do: "page", else: nil}
+    >
       Integrations
     </.link>
-    <.link patch={~p"/system"} class={tab_class(@live_action, :system)}>
+    <.link
+      patch={~p"/system"}
+      class={tab_class(@live_action, :system)}
+      aria-current={if @live_action == :system, do: "page", else: nil}
+    >
       System
     </.link>
   </nav>
