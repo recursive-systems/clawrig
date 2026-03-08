@@ -29,8 +29,12 @@ defmodule Clawrig.Node.Client do
     :tick_interval,
     :request_id_counter,
     :pending_requests,
+    :last_error,
+    :last_connected_at,
+    :last_disconnected_at,
     status: :disconnected,
-    backoff: @initial_backoff
+    backoff: @initial_backoff,
+    reconnect_attempts: 0
   ]
 
   # --- Public API ---
@@ -45,6 +49,10 @@ defmodule Clawrig.Node.Client do
 
   def device_id do
     GenServer.call(__MODULE__, :device_id)
+  end
+
+  def status_detail do
+    GenServer.call(__MODULE__, :status_detail)
   end
 
   # --- Callbacks ---
@@ -65,6 +73,16 @@ defmodule Clawrig.Node.Client do
     {:reply, state.status, state}
   end
 
+  def handle_call(:status_detail, _from, state) do
+    {:reply, %{
+      status: state.status,
+      last_error: state.last_error,
+      last_connected_at: state.last_connected_at,
+      last_disconnected_at: state.last_disconnected_at,
+      reconnect_attempts: state.reconnect_attempts
+    }, state}
+  end
+
   def handle_call(:device_id, _from, state) do
     case Identity.ensure_keypair() do
       {:ok, %{public_key: pub}} -> {:reply, Identity.fingerprint(pub), state}
@@ -79,12 +97,12 @@ defmodule Clawrig.Node.Client do
         {:ok, new_state} ->
           Logger.info("[Node] Connecting to Gateway at #{@gateway_host}:#{@gateway_port}")
           broadcast(:connecting)
-          {:noreply, %{new_state | status: :connecting, backoff: @initial_backoff}}
+          {:noreply, %{new_state | status: :connecting, backoff: @initial_backoff, reconnect_attempts: 0}}
 
         {:error, reason} ->
           Logger.warning("[Node] Gateway connection failed: #{inspect(reason)}")
           schedule_reconnect(state.backoff)
-          {:noreply, %{state | backoff: next_backoff(state.backoff)}}
+          {:noreply, %{state | backoff: next_backoff(state.backoff), last_error: "connect failed: #{inspect(reason)}", reconnect_attempts: state.reconnect_attempts + 1, last_disconnected_at: now_iso()}}
       end
     else
       schedule_connect_check()
@@ -358,7 +376,7 @@ defmodule Clawrig.Node.Client do
     broadcast(:connected)
     schedule_heartbeat(tick_interval)
 
-    {:ok, %{state | status: :connected, device_token: device_token, tick_interval: tick_interval}}
+    {:ok, %{state | status: :connected, device_token: device_token, tick_interval: tick_interval, last_error: nil, last_connected_at: now_iso(), reconnect_attempts: 0}}
   end
 
   defp handle_ok_response(_id, _payload, state), do: {:ok, state}
@@ -433,7 +451,11 @@ defmodule Clawrig.Node.Client do
       status: :disconnected,
       backoff: next_backoff(state.backoff),
       request_id_counter: state.request_id_counter,
-      pending_requests: %{}
+      pending_requests: %{},
+      last_error: to_string(reason),
+      last_connected_at: state.last_connected_at,
+      last_disconnected_at: now_iso(),
+      reconnect_attempts: state.reconnect_attempts + 1
     }
   end
 
@@ -471,6 +493,7 @@ defmodule Clawrig.Node.Client do
 
   defp broadcast(status) do
     Phoenix.PubSub.broadcast(Clawrig.PubSub, "clawrig:node", {:node_status, status})
+    Phoenix.PubSub.broadcast(Clawrig.PubSub, "clawrig:node", {:node_status_detail, status_detail()})
   end
 
   defp clawrig_version do
@@ -478,6 +501,11 @@ defmodule Clawrig.Node.Client do
       {:ok, version} -> String.trim(version)
       _ -> "0.0.0-dev"
     end
+  end
+
+
+  defp now_iso do
+    DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
   end
 
   defp gateway_auth do

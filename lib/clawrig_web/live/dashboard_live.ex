@@ -39,6 +39,7 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:openai_poll_count, 0)
       |> assign(:ethernet_connected, false)
       |> assign(:node_status, Clawrig.Node.Client.status())
+      |> assign(:node_detail, Clawrig.Node.Client.status_detail())
       |> assign(:node_device_id, Clawrig.Node.Client.device_id())
       |> assign(:local_ip, State.get(:local_ip))
       |> assign(:brave_mode, IntegrationsConfig.search_mode())
@@ -458,11 +459,12 @@ defmodule ClawrigWeb.DashboardLive do
           end
 
         tailscale = Commands.impl().tailscale_status()
+        node_detail = Clawrig.Node.Client.status_detail()
 
         send(
           pid,
           {:status_result, gateway, internet, wifi_ssid, ethernet_connected, brave_mode,
-           brave_usage, tailscale, autoheal, autoheal_log}
+           brave_usage, tailscale, autoheal, autoheal_log, node_detail}
         )
       end)
 
@@ -472,7 +474,7 @@ defmodule ClawrigWeb.DashboardLive do
 
   def handle_info(
         {:status_result, gateway, internet, wifi_ssid, ethernet_connected, brave_mode,
-         brave_usage, tailscale, autoheal, autoheal_log},
+         brave_usage, tailscale, autoheal, autoheal_log, node_detail},
         socket
       ) do
     if socket.assigns[:preview_scenario] do
@@ -508,7 +510,8 @@ defmodule ClawrigWeb.DashboardLive do
        |> assign(:brave_usage, brave_usage)
        |> assign(:tailscale, tailscale_effective)
        |> assign(:autoheal, autoheal)
-       |> assign(:autoheal_log, autoheal_log)}
+       |> assign(:autoheal_log, autoheal_log)
+       |> assign(:node_detail, node_detail)}
     end
   end
 
@@ -536,6 +539,10 @@ defmodule ClawrigWeb.DashboardLive do
 
   def handle_info({:node_status, status}, socket) do
     {:noreply, assign(socket, :node_status, status)}
+  end
+
+  def handle_info({:node_status_detail, detail}, socket) do
+    {:noreply, assign(socket, :node_detail, detail)}
   end
 
   def handle_info({:tailscale_install_result, result}, socket) do

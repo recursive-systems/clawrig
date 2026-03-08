@@ -485,6 +485,20 @@
               <span class="status-value monospace">{String.slice(@node_device_id, 0..11)}...</span>
             </div>
             <div class="status-item">
+              <span class="status-label">Node retries</span>
+              <span class="status-value">{@node_detail[:reconnect_attempts] || 0}</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Last node connect</span>
+              <span class="status-value monospace">{@node_detail[:last_connected_at] || "Never"}</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Last node error</span>
+              <span class={["status-value", if(@node_detail[:last_error], do: "warn", else: "ok")] }>
+                {@node_detail[:last_error] || "None"}
+              </span>
+            </div>
+            <div class="status-item">
               <span class="status-label">Version</span>
               <span class="status-value">{@version}</span>
             </div>
