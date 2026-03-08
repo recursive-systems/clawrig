@@ -106,4 +106,24 @@ defmodule Clawrig.UpdaterTest do
       assert Updater.post_update_auth_probe_public("5.4.0") == :ok
     end
   end
+
+  describe "reconcile_outcome_public/3" do
+    test "auto update with auth required rolls back" do
+      assert Updater.reconcile_outcome_public(:auto, true, {:error, :reauth_required}) ==
+               :rolled_back_auth_required
+    end
+
+    test "manual update with auth required requests reauth post update" do
+      assert Updater.reconcile_outcome_public(:manual, true, {:error, :reauth_required}) ==
+               :pending_reauth_post_update
+    end
+
+    test "healthy service and auth passes updates successfully" do
+      assert Updater.reconcile_outcome_public(:manual, true, :ok) == :updated
+    end
+
+    test "unhealthy service fails reconciliation regardless of mode" do
+      assert Updater.reconcile_outcome_public(:auto, false, :ok) == :health_failed
+    end
+  end
 end

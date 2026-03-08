@@ -55,6 +55,11 @@ defmodule Clawrig.Updater do
   @doc "Run the post-update auth probe for testability and diagnostics."
   def post_update_auth_probe_public(version), do: post_update_auth_probe(version)
 
+  @doc "Resolve reconciliation outcome for testability and diagnostics."
+  def reconcile_outcome_public(mode, service_active?, auth_probe_result) do
+    reconcile_outcome(mode, service_active?, auth_probe_result)
+  end
+
   @doc "Enable or disable automatic update checks."
   def set_auto_update(enabled) when is_boolean(enabled) do
     GenServer.call(__MODULE__, {:set_auto_update, enabled})
@@ -182,32 +187,37 @@ defmodule Clawrig.Updater do
         # Give the service a moment to stabilize after restart
         Process.sleep(5_000)
 
-        case System.cmd("sudo", ["systemctl", "is-active", "clawrig"], stderr_to_stdout: true) do
-          {"active\n", 0} ->
-            case post_update_auth_probe(version) do
-              :ok ->
-                Logger.info("[Updater] Post-update health check passed for v#{version}")
-                File.rm(@pending_marker)
-                sudo_rm_rf(@prev_dir)
-                broadcast({:ok, :updated, version})
+        service_active? =
+          case System.cmd("sudo", ["systemctl", "is-active", "clawrig"], stderr_to_stdout: true) do
+            {"active\n", 0} -> true
+            _ -> false
+          end
 
-              {:error, :reauth_required} when mode == :auto ->
-                Logger.warning("[Updater] Post-update auth probe requires re-auth for auto update v#{version}; rolling back")
-                rollback()
-                File.rm(@pending_marker)
-                State.merge(%{update_resume_version: version, update_resume_reason: :rolled_back_auth_required})
-                broadcast({:ok, :rolled_back_auth_required, version})
+        auth_probe_result = if service_active?, do: post_update_auth_probe(version), else: {:error, :service_unhealthy}
 
-              {:error, :reauth_required} ->
-                Logger.warning("[Updater] Post-update auth probe requires re-auth for manual update v#{version}")
-                File.rm(@pending_marker)
-                sudo_rm_rf(@prev_dir)
-                State.merge(%{update_resume_version: version, update_resume_reason: :pending_reauth_post_update})
-                broadcast({:ok, :pending_reauth_post_update, version})
-            end
+        case reconcile_outcome(mode, service_active?, auth_probe_result) do
+          :updated ->
+            Logger.info("[Updater] Post-update health check passed for v#{version}")
+            File.rm(@pending_marker)
+            sudo_rm_rf(@prev_dir)
+            broadcast({:ok, :updated, version})
 
-          {output, _} ->
-            Logger.error("[Updater] Post-update health check failed: #{output} — rolling back")
+          :rolled_back_auth_required ->
+            Logger.warning("[Updater] Post-update auth probe requires re-auth for auto update v#{version}; rolling back")
+            rollback()
+            File.rm(@pending_marker)
+            State.merge(%{update_resume_version: version, update_resume_reason: :rolled_back_auth_required})
+            broadcast({:ok, :rolled_back_auth_required, version})
+
+          :pending_reauth_post_update ->
+            Logger.warning("[Updater] Post-update auth probe requires re-auth for manual update v#{version}")
+            File.rm(@pending_marker)
+            sudo_rm_rf(@prev_dir)
+            State.merge(%{update_resume_version: version, update_resume_reason: :pending_reauth_post_update})
+            broadcast({:ok, :pending_reauth_post_update, version})
+
+          :health_failed ->
+            Logger.error("[Updater] Post-update health check failed — rolling back")
             rollback()
             File.rm(@pending_marker)
             broadcast({:error, "health check failed after update to v#{version}, rolled back"})
@@ -553,6 +563,12 @@ defmodule Clawrig.Updater do
       _ -> true
     end
   end
+
+  defp reconcile_outcome(_mode, false, _auth_probe_result), do: :health_failed
+  defp reconcile_outcome(_mode, true, :ok), do: :updated
+  defp reconcile_outcome(:auto, true, {:error, :reauth_required}), do: :rolled_back_auth_required
+  defp reconcile_outcome(:manual, true, {:error, :reauth_required}), do: :pending_reauth_post_update
+  defp reconcile_outcome(_mode, true, _), do: :health_failed
 
   defp maybe_defer_for_recovery_path(remote_version, local_version) do
     case classify_update_risk(remote_version, local_version) do
