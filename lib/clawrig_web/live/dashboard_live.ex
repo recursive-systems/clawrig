@@ -48,6 +48,7 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:node_detail, Clawrig.Node.Client.status_detail())
       |> assign(:node_device_id, Clawrig.Node.Client.device_id())
       |> assign(:local_ip, State.get(:local_ip))
+      |> assign(:mdns_url, Clawrig.DeviceIdentity.mdns_url())
       |> assign(:brave_mode, IntegrationsConfig.search_mode())
       |> assign(:brave_error, nil)
       |> assign(:brave_usage, nil)
@@ -59,7 +60,14 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:tailscale_dev_override, nil)
       |> assign(:dev_tailscale_bypass_enabled, dev_tailscale_bypass_enabled?())
       |> assign(:preview_scenario, nil)
-      |> assign(:autoheal, %{"enabled" => true, "health" => "unknown", "last_run_at" => nil, "last_result" => "unknown", "last_action" => nil, "last_check" => nil})
+      |> assign(:autoheal, %{
+        "enabled" => true,
+        "health" => "unknown",
+        "last_run_at" => nil,
+        "last_result" => "unknown",
+        "last_action" => nil,
+        "last_check" => nil
+      })
       |> assign(:autoheal_log, [])
       |> assign(:password_change_error, nil)
       |> assign(:password_change_ok, nil)
@@ -103,7 +111,11 @@ defmodule ClawrigWeb.DashboardLive do
     case Commands.impl().autoheal_set_enabled(!enabled) do
       :ok ->
         msg = if enabled, do: "Auto-healing disabled.", else: "Auto-healing enabled."
-        {:noreply, socket |> assign(:autoheal, Map.put(socket.assigns.autoheal, "enabled", !enabled)) |> put_flash(:info, msg)}
+
+        {:noreply,
+         socket
+         |> assign(:autoheal, Map.put(socket.assigns.autoheal, "enabled", !enabled))
+         |> put_flash(:info, msg)}
 
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Could not update auto-healing: #{reason}")}
@@ -120,7 +132,15 @@ defmodule ClawrigWeb.DashboardLive do
     end
   end
 
-  def handle_event("validate_change_dashboard_password", %{"current_password" => current, "new_password" => new_pw, "new_password_confirm" => confirm}, socket) do
+  def handle_event(
+        "validate_change_dashboard_password",
+        %{
+          "current_password" => current,
+          "new_password" => new_pw,
+          "new_password_confirm" => confirm
+        },
+        socket
+      ) do
     current = current || ""
     new_pw = new_pw || ""
     confirm = confirm || ""
@@ -143,7 +163,15 @@ defmodule ClawrigWeb.DashboardLive do
      )}
   end
 
-  def handle_event("change_dashboard_password", %{"current_password" => current, "new_password" => new_pw, "new_password_confirm" => confirm}, socket) do
+  def handle_event(
+        "change_dashboard_password",
+        %{
+          "current_password" => current,
+          "new_password" => new_pw,
+          "new_password_confirm" => confirm
+        },
+        socket
+      ) do
     cond do
       String.trim(new_pw || "") == "" ->
         {:noreply,
@@ -218,8 +246,18 @@ defmodule ClawrigWeb.DashboardLive do
         {:noreply,
          socket
          |> assign(
-           tailscale: %{installed: true, running: true, ip: "100.64.0.99", hostname: "clawrig-dev"},
-           tailscale_dev_override: %{installed: true, running: true, ip: "100.64.0.99", hostname: "clawrig-dev"},
+           tailscale: %{
+             installed: true,
+             running: true,
+             ip: "100.64.0.99",
+             hostname: "clawrig-dev"
+           },
+           tailscale_dev_override: %{
+             installed: true,
+             running: true,
+             ip: "100.64.0.99",
+             hostname: "clawrig-dev"
+           },
            tailscale_error: nil,
            tailscale_connecting: false
          )
@@ -275,7 +313,11 @@ defmodule ClawrigWeb.DashboardLive do
 
       {:noreply,
        socket
-       |> assign(tailscale: disconnected, tailscale_dev_override: disconnected, tailscale_error: nil)
+       |> assign(
+         tailscale: disconnected,
+         tailscale_dev_override: disconnected,
+         tailscale_error: nil
+       )
        |> put_flash(:info, "Tailscale disconnected.")}
     else
       down_result = Commands.impl().tailscale_down()
@@ -1044,6 +1086,117 @@ defmodule ClawrigWeb.DashboardLive do
     end
   end
 
+  def dashboard_headline(assigns) do
+    cond do
+      loading_dashboard?(assigns) ->
+        "ClawRig is getting ready"
+
+      provider_needs_attention?(assigns) ->
+        "Finish connecting your AI provider"
+
+      network_needs_attention?(assigns) ->
+        "Reconnect ClawRig to your network"
+
+      gateway_needs_attention?(assigns) ->
+        "OpenClaw needs attention"
+
+      true ->
+        "Your ClawRig is ready"
+    end
+  end
+
+  def dashboard_summary(assigns) do
+    cond do
+      loading_dashboard?(assigns) ->
+        "We’re still running first checks. This usually settles within a few seconds."
+
+      provider_needs_attention?(assigns) ->
+        "Your dashboard is up, but OpenClaw will not be fully usable until your provider is connected."
+
+      network_needs_attention?(assigns) ->
+        "ClawRig is reachable right now, but it is not fully connected to your normal network."
+
+      gateway_needs_attention?(assigns) ->
+        "The device is online, but the OpenClaw gateway is not healthy yet. Review system status or restart it."
+
+      true ->
+        "Use this dashboard for quick health checks, reconnects, updates, and recovery if anything changes later."
+    end
+  end
+
+  def dashboard_next_step(assigns) do
+    cond do
+      provider_needs_attention?(assigns) ->
+        %{
+          title: "Connect your AI provider",
+          detail: "Finish OpenAI sign-in or add an API key so OpenClaw can start responding.",
+          route: :account,
+          cta: "Open Provider"
+        }
+
+      network_needs_attention?(assigns) ->
+        %{
+          title: "Reconnect network access",
+          detail: "Review Wi-Fi and ethernet status so the Pi stays reachable after setup.",
+          route: :wifi,
+          cta: "Open Wi-Fi"
+        }
+
+      gateway_needs_attention?(assigns) ->
+        %{
+          title: "Review system status",
+          detail:
+            "Use the System tab for logs, repair actions, updater status, and auto-heal history.",
+          route: :system,
+          cta: "Open System"
+        }
+
+      true ->
+        %{
+          title: "You’re in ownership mode now",
+          detail:
+            "Bookmark this page, then use Telegram, Integrations, and System whenever you need them.",
+          route: :telegram,
+          cta: "Open Telegram"
+        }
+    end
+  end
+
+  def dashboard_access_note(local_ip, mdns_url) do
+    cond do
+      is_binary(local_ip) and local_ip != "" ->
+        "Primary: http://#{local_ip}. Fallback: #{mdns_url} on networks and browsers that support mDNS."
+
+      true ->
+        "Use #{mdns_url} when mDNS works. If that fails, look up the current IP in the System tab."
+    end
+  end
+
+  def dashboard_primary_url(local_ip, mdns_url) do
+    if is_binary(local_ip) and local_ip != "", do: "http://#{local_ip}", else: mdns_url
+  end
+
+  def dashboard_patch(:index), do: ~p"/"
+  def dashboard_patch(:wifi), do: ~p"/wifi"
+  def dashboard_patch(:account), do: ~p"/account"
+  def dashboard_patch(:telegram), do: ~p"/telegram"
+  def dashboard_patch(:integrations), do: ~p"/integrations"
+  def dashboard_patch(:system), do: ~p"/system"
+
   def tab_class(live_action, tab) when live_action == tab, do: "dash-tab active"
   def tab_class(_live_action, _tab), do: "dash-tab"
+
+  defp loading_dashboard?(assigns) do
+    assigns.gateway_status == :loading or assigns.internet == :loading or
+      assigns.openai_status == :loading
+  end
+
+  defp provider_needs_attention?(assigns), do: assigns.openai_status == :disconnected
+
+  defp network_needs_attention?(assigns) do
+    assigns.internet == false or
+      (assigns.wifi_ssid in [nil, :loading] and assigns.ethernet_connected == false)
+  end
+
+  defp gateway_needs_attention?(assigns), do: assigns.gateway_status in [:stopped, :disconnected]
 end

@@ -64,7 +64,8 @@ defmodule ClawrigWeb.WizardLive do
   @impl true
   def handle_params(params, _uri, socket) do
     socket =
-      if preview_enabled?() and is_map(params) and params["preview_step"] in Enum.map(@steps, &Atom.to_string/1) do
+      if preview_enabled?() and is_map(params) and
+           params["preview_step"] in Enum.map(@steps, &Atom.to_string/1) do
         step = String.to_existing_atom(params["preview_step"])
 
         socket
@@ -247,7 +248,11 @@ defmodule ClawrigWeb.WizardLive do
   end
 
   # Security
-  def handle_event("validate_dashboard_password", %{"password" => password, "password_confirm" => confirm}, socket) do
+  def handle_event(
+        "validate_dashboard_password",
+        %{"password" => password, "password_confirm" => confirm},
+        socket
+      ) do
     password = String.trim(password || "")
     confirm = String.trim(confirm || "")
 
@@ -267,7 +272,11 @@ defmodule ClawrigWeb.WizardLive do
      )}
   end
 
-  def handle_event("set_dashboard_password", %{"password" => password, "password_confirm" => confirm}, socket) do
+  def handle_event(
+        "set_dashboard_password",
+        %{"password" => password, "password_confirm" => confirm},
+        socket
+      ) do
     password = String.trim(password || "")
     confirm = String.trim(confirm || "")
 
@@ -859,10 +868,13 @@ defmodule ClawrigWeb.WizardLive do
   def preflight_title(:fail), do: "No internet"
   def preflight_title(_), do: "Connectivity"
 
-  def preflight_desc(:pass), do: "Internet connection verified."
+  def preflight_desc(:pass),
+    do: "Internet connection verified. You can keep going here or move to another device later."
 
   def preflight_desc(:fail),
-    do: "Connect to Wi-Fi from the taskbar or plug in an ethernet cable, then retry."
+    do:
+      "Connect to Wi-Fi from the taskbar or plug in an ethernet cable, then retry. " <>
+        "You do not need to restart setup."
 
   def preflight_desc(:checking), do: "Checking your connection..."
   def preflight_desc(_), do: "Checking your connection..."
@@ -883,12 +895,14 @@ defmodule ClawrigWeb.WizardLive do
   def provider_desc(:choose_type), do: "Choose how to connect your AI provider."
 
   def provider_desc(:openai_choose),
-    do: "Sign in with your ChatGPT account, or use an API key."
+    do:
+      "Sign in with your ChatGPT account, or use an API key. " <>
+        "Computer is recommended for sign-in, but setup can resume on any device."
 
   def provider_desc(:openai_device_code),
     do:
-      "You'll be signing in to Codex — the coding engine inside ChatGPT that powers OpenClaw. " <>
-        "Enter the code below to authorize this device."
+      "You'll be signing in to Codex inside ChatGPT to authorize this ClawRig. " <>
+        "Keep this page open while you finish sign-in on the device that feels easiest."
 
   def provider_desc(:openai_api_key), do: "Paste your OpenAI API key to connect."
   def provider_desc(:compat_form), do: "Enter your provider's OpenAI-compatible endpoint details."

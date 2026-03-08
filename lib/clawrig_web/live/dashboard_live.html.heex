@@ -67,12 +67,38 @@
   </nav>
 
   <section class="dash-content" aria-live="polite">
-    <% bootstrapping? = @live_action == :index and (@gateway_status == :loading or @internet == :loading or @openai_status == :loading) %>
+    <% bootstrapping? =
+      @live_action == :index and
+        (@gateway_status == :loading or @internet == :loading or @openai_status == :loading) %>
 
     <.dash_panel :if={@live_action == :index}>
       <div :if={bootstrapping?} class="setup-inline-banner">
         <strong>Setting things up…</strong>
         <span>We’re finishing first-time checks. This usually takes a few seconds.</span>
+      </div>
+
+      <% next_step = dashboard_next_step(assigns) %>
+      <div class="dashboard-overview">
+        <div class="dashboard-hero-card">
+          <span class="dashboard-overview-label">Overview</span>
+          <h2>{dashboard_headline(assigns)}</h2>
+          <p>{dashboard_summary(assigns)}</p>
+        </div>
+
+        <div class="dashboard-hero-card">
+          <span class="dashboard-overview-label">Dashboard Address</span>
+          <code class="dashboard-access-code">{dashboard_primary_url(@local_ip, @mdns_url)}</code>
+          <p>{dashboard_access_note(@local_ip, @mdns_url)}</p>
+        </div>
+
+        <div class="dashboard-hero-card">
+          <span class="dashboard-overview-label">Next Step</span>
+          <strong>{next_step.title}</strong>
+          <p>{next_step.detail}</p>
+          <.link patch={dashboard_patch(next_step.route)} class="btn subtle btn-sm">
+            {next_step.cta}
+          </.link>
+        </div>
       </div>
 
       <%!-- Dashboard / Status Overview --%>
@@ -200,7 +226,14 @@
           </button>
           <button class="provider-type-card" phx-click="account_choose_compatible">
             <div class="provider-type-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <path d="M12 2L2 7l10 5 10-5-10-5z" />
                 <path d="M2 17l10 5 10-5" />
                 <path d="M2 12l10 5 10-5" />
@@ -216,7 +249,10 @@
 
       <%!-- OpenAI: choose auth method --%>
       <div :if={@account_sub == :choose} class="account-section account-choose">
-        <p class="account-lead">Connect your OpenAI account to use the gateway.</p>
+        <p class="account-lead">
+          Connect your OpenAI account to use the gateway. If ChatGPT sign-in feels easier on a bigger screen,
+          use a computer for this step and return here afterward.
+        </p>
         <button class="btn openai" phx-click="account_start_device_code">
           <img alt="" src={~p"/images/openai-mark.svg"} /> Sign in with OpenAI
         </button>
@@ -236,7 +272,10 @@
         phx-hook="PageFocus"
       >
         <h3>Sign in with OpenAI</h3>
-        <p>Scan the QR code with your phone, then enter the code to authorize this device.</p>
+        <p>
+          Scan the QR code with your phone or open the link on a computer, then enter the code to authorize this device.
+          Your dashboard will keep waiting here while you finish sign-in.
+        </p>
 
         <div class="openai-qr-row">
           <div
@@ -338,7 +377,9 @@
           />
           <p class="account-input-hint">The model identifier your provider expects</p>
 
-          <label for="account-display-name-input" class="mt-md">Display Name <span class="openai-input-optional">(optional)</span></label>
+          <label for="account-display-name-input" class="mt-md">
+            Display Name <span class="openai-input-optional">(optional)</span>
+          </label>
           <input
             type="text"
             name="display_name"
@@ -422,7 +463,7 @@
             </button>
           </div>
 
-        <%!-- BYOK mode: configured with own key --%>
+          <%!-- BYOK mode: configured with own key --%>
         <% else %>
           <%= if @brave_mode == :byok do %>
             <p>Your AI agent can search the web using your Brave API key.</p>
@@ -436,13 +477,14 @@
               </button>
             </div>
 
-          <%!-- BYOK form --%>
+            <%!-- BYOK form --%>
           <% else %>
             <%= if @brave_mode == :byok_form do %>
               <p>
                 You'll need a Brave Search API key
-                (<a href="https://brave.com/search/api/" target="_blank" rel="noopener">sign up here</a>
-                &mdash; select the <strong>Data for Search</strong> plan).
+                (<a href="https://brave.com/search/api/" target="_blank" rel="noopener">sign up here</a> &mdash; select the
+                <strong>Data for Search</strong>
+                plan).
               </p>
               <form phx-submit="brave_submit_api_key" class="account-input-group">
                 <label for="brave-api-key-input">Brave API Key</label>
@@ -464,7 +506,7 @@
                 Back
               </button>
 
-            <%!-- Not configured: show both options --%>
+              <%!-- Not configured: show both options --%>
             <% else %>
               <p>Enable web search so your AI agent can look things up on the internet.</p>
               <p :if={@brave_error} class="account-input-hint error">{@brave_error}</p>
@@ -500,7 +542,9 @@
             </div>
             <div :if={@node_device_id} class="status-item">
               <span class="status-label">Device ID</span>
-              <span class="status-value monospace">{String.slice(@node_device_id, 0..11)}...</span>
+              <span class="status-value monospace">
+                {String.slice(@node_device_id, 0..11)}...
+              </span>
             </div>
             <div class="status-item">
               <span class="status-label">Node retries</span>
@@ -508,11 +552,13 @@
             </div>
             <div class="status-item">
               <span class="status-label">Last node connect</span>
-              <span class="status-value monospace">{@node_detail[:last_connected_at] || "Never"}</span>
+              <span class="status-value monospace">
+                {@node_detail[:last_connected_at] || "Never"}
+              </span>
             </div>
             <div class="status-item">
               <span class="status-label">Last node error</span>
-              <span class={["status-value", if(@node_detail[:last_error], do: "warn", else: "ok")] }>
+              <span class={["status-value", if(@node_detail[:last_error], do: "warn", else: "ok")]}>
                 {@node_detail[:last_error] || "None"}
               </span>
             </div>
@@ -636,13 +682,36 @@
 
         <div class="system-action-group">
           <h3>Dashboard Security</h3>
-          <form phx-change="validate_change_dashboard_password" phx-submit="change_dashboard_password" class="openai-input-group" style="max-width:420px;">
+          <form
+            phx-change="validate_change_dashboard_password"
+            phx-submit="change_dashboard_password"
+            class="openai-input-group"
+            style="max-width:420px;"
+          >
             <label>Current password</label>
-            <input type="password" name="current_password" value={@password_current_value} class="openai-input" autocomplete="current-password" />
+            <input
+              type="password"
+              name="current_password"
+              value={@password_current_value}
+              class="openai-input"
+              autocomplete="current-password"
+            />
             <label class="mt-md">New password</label>
-            <input type="password" name="new_password" value={@password_new_value} class="openai-input" autocomplete="new-password" />
+            <input
+              type="password"
+              name="new_password"
+              value={@password_new_value}
+              class="openai-input"
+              autocomplete="new-password"
+            />
             <label class="mt-md">Confirm new password</label>
-            <input type="password" name="new_password_confirm" value={@password_new_confirm_value} class="openai-input" autocomplete="new-password" />
+            <input
+              type="password"
+              name="new_password_confirm"
+              value={@password_new_confirm_value}
+              class="openai-input"
+              autocomplete="new-password"
+            />
             <.password_feedback
               min_length={Clawrig.DashboardAuth.min_length()}
               password={@password_new_value}
@@ -683,7 +752,10 @@
           <div class="status-grid mt-md">
             <div class="status-item">
               <span class="status-label">Health</span>
-              <span class={["status-value", if(@autoheal["health"] == "healthy", do: "ok", else: "warn")] }>
+              <span class={[
+                "status-value",
+                if(@autoheal["health"] == "healthy", do: "ok", else: "warn")
+              ]}>
                 {autoheal_health_label(@autoheal["health"])}
               </span>
             </div>
@@ -715,7 +787,9 @@
             <div class="dash-section-header">
               <h3>Auto-heal History</h3>
             </div>
-            <div :if={Enum.empty?(@autoheal_log)} class="setting-hint">No recent auto-heal events.</div>
+            <div :if={Enum.empty?(@autoheal_log)} class="setting-hint">
+              No recent auto-heal events.
+            </div>
             <div :if={!Enum.empty?(@autoheal_log)} class="log-output">
               <pre><%= for entry <- @autoheal_log do %>{entry["ts"] || ""} | {entry["check"] || "check"} | {entry["action"] || "action"} | {entry["result"] || "result"} | {entry["detail"] || ""}
 <% end %></pre>
@@ -769,12 +843,22 @@
                     autocomplete="off"
                     spellcheck="false"
                   />
-                  <p :if={@tailscale_error} class="account-input-hint error">{@tailscale_error}</p>
+                  <p :if={@tailscale_error} class="account-input-hint error">
+                    {@tailscale_error}
+                  </p>
                   <p :if={!@tailscale_error} class="account-input-hint">
-                    Get a key from your <a href="https://login.tailscale.com/admin/settings/keys" target="_blank" rel="noopener">Tailscale admin console</a>
+                    Get a key from your
+                    <a
+                      href="https://login.tailscale.com/admin/settings/keys"
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      Tailscale admin console
+                    </a>
                   </p>
                   <p :if={@dev_tailscale_bypass_enabled} class="account-input-hint">
-                    Dev mode: use a mock key like <code>tskey-test-local</code> to simulate connect/disconnect.
+                    Dev mode: use a mock key like <code>tskey-test-local</code>
+                    to simulate connect/disconnect.
                   </p>
                   <button
                     type="submit"
@@ -788,7 +872,9 @@
                 <p class="setting-hint">
                   Tailscale is not installed on this device. Install it to enable remote SSH access.
                 </p>
-                <p :if={@tailscale_error} class="account-input-hint error mt-sm">{@tailscale_error}</p>
+                <p :if={@tailscale_error} class="account-input-hint error mt-sm">
+                  {@tailscale_error}
+                </p>
                 <%= if @dev_tailscale_bypass_enabled do %>
                   <button class="btn primary mt-md" phx-click="tailscale_mock_install">
                     Mock Install (Dev)

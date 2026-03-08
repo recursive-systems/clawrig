@@ -33,7 +33,15 @@ clawrig-*.tar
 
 # In case you use Node.js/npm, you want to ignore these.
 npm-debug.log
+/node_modules/
 /assets/node_modules/
+/playwright-report/
+/test-results/
+/.tmp/
+/wizard-state.json
+/.oobe-complete
+/priv/node-identity.json
+/priv/dashboard-auth.json
 
 # Deploy build artifacts
 /deploy/bundle/
@@ -44,4 +52,3 @@ npm-debug.log
 /deploy/pi-gen/stage-clawrig/01-install-clawrig/files/clawrig.service
 /deploy/pi-gen/stage-clawrig/02-configure-networking/files/dnsmasq-captive.conf
 /deploy/pi-gen/stage-clawrig/02-configure-networking/files/clawrig-avahi.service
-

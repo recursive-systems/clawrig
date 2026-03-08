@@ -1,5 +1,17 @@
 import Config
 
+system_commands =
+  case System.get_env("CLAWRIG_SYSTEM_COMMANDS", "mac") do
+    "mock" -> Clawrig.System.MockCommands
+    "mac" -> Clawrig.System.MacCommands
+    other -> raise "Unsupported CLAWRIG_SYSTEM_COMMANDS in dev: #{inspect(other)}"
+  end
+
+state_path = System.get_env("CLAWRIG_STATE_PATH", "wizard-state.json")
+oobe_marker = System.get_env("CLAWRIG_OOBE_MARKER", ".oobe-complete")
+node_identity_path = System.get_env("CLAWRIG_NODE_IDENTITY_PATH", "priv/node-identity.json")
+dashboard_auth_path = System.get_env("CLAWRIG_DASHBOARD_AUTH_PATH", "priv/dashboard-auth.json")
+
 # NOTE: If localhost:4090 hits Docker instead of Phoenix, use 127.0.0.1:4090 directly.
 # Docker Desktop's gvproxy may claim port 4090 on IPv6.
 config :clawrig, ClawrigWeb.Endpoint,
@@ -25,13 +37,13 @@ config :clawrig, ClawrigWeb.Endpoint,
 
 config :clawrig, dev_routes: true
 
-# Use MockCommands in dev (works on macOS without nmcli)
-config :clawrig, :system_commands, Clawrig.System.MacCommands
-config :clawrig, :state_path, "wizard-state.json"
-config :clawrig, :oobe_marker, ".oobe-complete"
+# Use mock or macOS command shims in dev so browser-based testing can run without a Pi.
+config :clawrig, :system_commands, system_commands
+config :clawrig, :state_path, state_path
+config :clawrig, :oobe_marker, oobe_marker
 config :clawrig, :device_code_module, Clawrig.Wizard.MockDeviceCode
-config :clawrig, :node_identity_path, "priv/node-identity.json"
-config :clawrig, :dashboard_auth_path, "priv/dashboard-auth.json"
+config :clawrig, :node_identity_path, node_identity_path
+config :clawrig, :dashboard_auth_path, dashboard_auth_path
 
 config :logger, :default_formatter, format: "[$level] $message\n"
 

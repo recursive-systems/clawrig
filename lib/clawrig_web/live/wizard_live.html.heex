@@ -29,6 +29,13 @@
       data-run={to_string(!@preflight_done)}
     >
       <div class="check-center">
+        <div class="setup-journey-card">
+          <strong>Phone-led setup, one saved state.</strong>
+          <p>
+            Start here, then switch to another device later if that feels easier.
+            ClawRig keeps your progress and lets you resume without starting over.
+          </p>
+        </div>
         <div class="check-list">
           <div class="check-item">
             <div class="check-icon-wrap">
@@ -68,6 +75,11 @@
         <div :if={@provider_sub == :choose_type} class="openai-sub active">
           <h2>{provider_title(@provider_sub)}</h2>
           <p>{provider_desc(@provider_sub)}</p>
+          <div class="setup-inline-note">
+            <strong>Recommended flow:</strong>
+            stay on your phone for setup, then use a computer only if
+            ChatGPT sign-in feels easier there.
+          </div>
           <div class="provider-type-cards">
             <button class="provider-type-card" phx-click="choose_openai">
               <div class="provider-type-icon">
@@ -80,7 +92,14 @@
             </button>
             <button class="provider-type-card" phx-click="choose_compatible">
               <div class="provider-type-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
                   <path d="M12 2L2 7l10 5 10-5-10-5z" />
                   <path d="M2 17l10 5 10-5" />
                   <path d="M2 12l10 5 10-5" />
@@ -121,7 +140,12 @@
         </div>
 
         <%!-- OpenAI: device code polling --%>
-        <div :if={@provider_sub == :openai_device_code} class="openai-sub active" id="openai-device-code" phx-hook="PageFocus">
+        <div
+          :if={@provider_sub == :openai_device_code}
+          class="openai-sub active"
+          id="openai-device-code"
+          phx-hook="PageFocus"
+        >
           <%= if @openai_resuming do %>
             <div class="openai-icon-wrap">
               <div class="check-spinner"></div>
@@ -139,14 +163,36 @@
             <p>{provider_desc(@provider_sub)}</p>
 
             <div class="device-code-prereq">
-              <strong>Before you start:</strong> On a computer, go to
-              <a href="https://chatgpt.com/settings" target="_blank" class="openai-link">ChatGPT Settings</a>
+              <strong>Before you start:</strong>
+              On a computer, go to
+              <a href="https://chatgpt.com/settings" target="_blank" class="openai-link">
+                ChatGPT Settings
+              </a>
               &rarr; Security &rarr; enable <strong>"Device code authorization for Codex"</strong>.
+            </div>
+
+            <div class="setup-handoff-card">
+              <strong>Prefer a bigger screen for sign-in?</strong>
+              <p>
+                Keep this page open. You can continue this same setup on another device with one of these links:
+              </p>
+              <div class="setup-addresses">
+                <code :if={@local_ip}>http://{@local_ip}/setup</code>
+                <code>{@mdns_url}/setup</code>
+              </div>
+              <p class="setup-handoff-hint">
+                Computer is recommended for ChatGPT sign-in. Phone is fine for the rest of setup.
+              </p>
             </div>
 
             <div :if={@openai_user_code} class="device-code-display">
               <span class="device-code-value" id="device-code-text">
-                <span :for={char <- String.graphemes(@openai_user_code)} class={["device-code-char", char == "-" && "device-code-dash"]}>{char}</span>
+                <span
+                  :for={char <- String.graphemes(@openai_user_code)}
+                  class={["device-code-char", char == "-" && "device-code-dash"]}
+                >
+                  {char}
+                </span>
               </span>
               <button
                 class="btn subtle btn-sm"
@@ -174,13 +220,15 @@
                 target="_blank"
                 class="btn primary show-mobile"
               >
-                Open auth.openai.com
+                Open ChatGPT sign-in
               </a>
             </div>
 
             <div :if={@openai_polling} class="tg-polling">
               <div class="tg-polling-dot"></div>
-              <span>Waiting for authorization…</span>
+              <span>
+                Waiting for sign-in to finish… You can come back here on this device or another one.
+              </span>
             </div>
 
             <button
@@ -297,7 +345,9 @@
               The model identifier your provider expects
             </p>
 
-            <label for="display-name-input" class="mt-md">Display Name <span class="openai-input-optional">(optional)</span></label>
+            <label for="display-name-input" class="mt-md">
+              Display Name <span class="openai-input-optional">(optional)</span>
+            </label>
             <input
               type="text"
               name="display_name"
@@ -353,7 +403,14 @@
               <%= if @provider_type == "openai" do %>
                 <img alt="OpenAI" src={~p"/images/openai-mark.svg"} />
               <% else %>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
                   <circle cx="12" cy="12" r="10" />
                   <line x1="12" y1="8" x2="12" y2="12" />
                   <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -411,12 +468,15 @@
           </div>
           <h2>Telegram</h2>
           <p class="tg-lead">
-            This is how you'll talk to your Pi. Send it messages, get status updates, and control OpenClaw — all from your phone.
+            This is how you'll talk to your Pi. Send it messages, get status updates, and control OpenClaw from your phone.
           </p>
           <p class="tg-prereq">
             You'll need the <strong>Telegram app</strong>
             installed on your phone (Android or iPhone).
           </p>
+          <div class="setup-inline-note">
+            This step is optional. If you'd rather finish setup first, press Skip and connect Telegram from the dashboard later.
+          </div>
           <button class="btn primary" phx-click="tg_start">Set up Telegram</button>
           <p class="tg-skip-hint">or press Skip to set up later</p>
         </div>
@@ -435,8 +495,12 @@
               data-url="https://t.me/BotFather"
             >
             </div>
-            <p class="tg-qr-label">Use your <strong>phone camera</strong> to open <strong>@BotFather</strong></p>
-            <p class="helper">If scanning is difficult, open Telegram on your phone and search for <strong>@BotFather</strong>.</p>
+            <p class="tg-qr-label">
+              Use your <strong>phone camera</strong> to open <strong>@BotFather</strong>
+            </p>
+            <p class="helper">
+              If scanning is difficult, open Telegram on your phone and search for <strong>@BotFather</strong>.
+            </p>
           </div>
           <ol class="tg-steps">
             <li>
@@ -511,8 +575,12 @@
               data-url={"https://t.me/#{@tg_bot_username}"}
             >
             </div>
-            <p class="tg-qr-label">Use your <strong>phone camera</strong> to open <strong>@{@tg_bot_username}</strong></p>
-            <p class="helper">If scan fails, open Telegram on your phone, search <strong>@{@tg_bot_username}</strong>, then send <strong>/start</strong>.</p>
+            <p class="tg-qr-label">
+              Use your <strong>phone camera</strong> to open <strong>@{@tg_bot_username}</strong>
+            </p>
+            <p class="helper">
+              If scan fails, open Telegram on your phone, search <strong>@{@tg_bot_username}</strong>, then send <strong>/start</strong>.
+            </p>
           </div>
           <p class="tg-lead">
             Scan the QR code or search for your bot in Telegram. Send <strong>/start</strong>, then tap <strong>Check now</strong>.
@@ -522,7 +590,11 @@
           </p>
           <div class="tg-polling">
             <div class="tg-polling-dot"></div>
-            <span>{if @tg_status == :checking, do: "Checking for new /start…", else: "Waiting for a new /start message…"}</span>
+            <span>
+              {if @tg_status == :checking,
+                do: "Checking for new /start…",
+                else: "Waiting for a new /start message…"}
+            </span>
           </div>
           <div class="mt-sm">
             <button class="btn secondary btn-sm" phx-click="tg_check_now">Check now</button>
@@ -553,14 +625,38 @@
     <article class={panel_class(@step, :security)}>
       <div class="done-center">
         <h2>Secure your dashboard</h2>
-        <p>Set a local password to protect ClawRig on your network.</p>
+        <p>
+          Set a local password so anyone on your network cannot open your dashboard without permission.
+        </p>
+        <div class="setup-inline-note">
+          This password only protects the dashboard. Your setup progress is already saved.
+        </div>
 
-        <form phx-change="validate_dashboard_password" phx-submit="set_dashboard_password" class="openai-input-group" style="max-width:420px;margin:0 auto;">
+        <form
+          phx-change="validate_dashboard_password"
+          phx-submit="set_dashboard_password"
+          class="openai-input-group"
+          style="max-width:420px;margin:0 auto;"
+        >
           <label for="dashboard-password">Password</label>
-          <input id="dashboard-password" type="password" name="password" value={@dashboard_password_value} class="openai-input" autocomplete="new-password" />
+          <input
+            id="dashboard-password"
+            type="password"
+            name="password"
+            value={@dashboard_password_value}
+            class="openai-input"
+            autocomplete="new-password"
+          />
 
           <label for="dashboard-password-confirm" class="mt-md">Confirm password</label>
-          <input id="dashboard-password-confirm" type="password" name="password_confirm" value={@dashboard_password_confirm_value} class="openai-input" autocomplete="new-password" />
+          <input
+            id="dashboard-password-confirm"
+            type="password"
+            name="password_confirm"
+            value={@dashboard_password_confirm_value}
+            class="openai-input"
+            autocomplete="new-password"
+          />
 
           <.password_feedback
             min_length={Clawrig.DashboardAuth.min_length()}
@@ -585,21 +681,46 @@
           </svg>
         </div>
         <h2>You're all set</h2>
-        <p>Your Pi is configured. OpenClaw will start automatically in the background.</p>
+        <p>
+          Your Pi is configured. OpenClaw will start automatically in the background, then your dashboard becomes your main home base.
+        </p>
 
         <div class="ip-gate-card">
-          <h3 class="ip-gate-title">Your dashboard address</h3>
-          <div class="ip-gate-addresses">
-            <code :if={@local_ip} class="ip-gate-addr">http://{@local_ip}</code>
-            <code class="ip-gate-addr">{@mdns_url}</code>
+          <h3 class="ip-gate-title">Save these before you finish</h3>
+          <div class="receipt-access-grid">
+            <div class="receipt-access-card">
+              <span class="receipt-access-label">Primary</span>
+              <strong>Use your IP address</strong>
+              <code class="ip-gate-addr">
+                {if @local_ip, do: "http://#{@local_ip}", else: @mdns_url}
+              </code>
+              <p>
+                <%= if @local_ip do %>
+                  The IP address is the most reliable way back in from any browser.
+                <% else %>
+                  If you only see the .local address right now, finish setup and check the System tab for the current IP after the dashboard loads.
+                <% end %>
+              </p>
+            </div>
+            <div class="receipt-access-card">
+              <span class="receipt-access-label">Convenience</span>
+              <strong>Try your .local address</strong>
+              <code class="ip-gate-addr">{@mdns_url}</code>
+              <p>
+                Good for Safari and Firefox on your home network. Chrome may not resolve it reliably.
+              </p>
+            </div>
+            <div class="receipt-access-card">
+              <span class="receipt-access-label">Recovery</span>
+              <strong>If you lose the link later</strong>
+              <p>
+                Open the dashboard's System tab to re-check the IP, or ask your Telegram bot where your dashboard is.
+              </p>
+            </div>
           </div>
-          <p class="ip-gate-hint">
-            Bookmark this or write it down — you'll need it to reach your dashboard.
-            <span :if={@tg_chat_id}>You can also ask your Telegram bot "Where's my dashboard?" anytime.</span>
-          </p>
           <label class="ip-gate-confirm" phx-click="confirm_ip">
             <input type="checkbox" checked={@ip_confirmed} />
-            <span>I've saved my dashboard address</span>
+            <span>I've saved my dashboard access details</span>
           </label>
         </div>
 

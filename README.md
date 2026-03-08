@@ -57,6 +57,18 @@ mix test
 mix precommit   # compile (warnings-as-errors) + format + test
 ```
 
+Browser-based UX checks (no Pi required):
+
+```bash
+npm install
+npm run e2e:install
+npm run e2e
+```
+
+The Playwright harness starts ClawRig on a separate local port with mock system
+commands, preview states, dev auth bypass, and isolated temp state files so you
+can exercise portal, setup, and dashboard flows end-to-end.
+
 ## Configuration
 
 | Environment variable | Description | Default |

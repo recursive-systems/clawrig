@@ -26,7 +26,7 @@ defmodule ClawrigWeb.DashboardLiveTest do
     test "renders wifi section", %{conn: conn} do
       # /wifi is also matched by the captive portal scope, so navigate via live_patch
       {:ok, view, _html} = live(conn, ~p"/")
-      html = view |> element(~s|a[href="/wifi"]|) |> render_click()
+      html = view |> element(~s|nav.dash-nav a[href="/wifi"]|) |> render_click()
       assert html =~ "Wi-Fi"
     end
   end

@@ -80,4 +80,12 @@ defmodule ClawrigWeb.Router do
       live "/system", DashboardLive, :system
     end
   end
+
+  if Application.compile_env(:clawrig, :dev_routes) do
+    scope "/__e2e__", ClawrigWeb do
+      pipe_through :api
+
+      post "/reset", E2eController, :reset
+    end
+  end
 end

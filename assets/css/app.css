@@ -302,6 +302,64 @@ h1::before { content: none; }
   max-width: 340px;
 }
 
+.setup-journey-card,
+.setup-inline-note,
+.setup-handoff-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 14px 16px;
+  margin: 0 auto 18px;
+  border: 1px solid rgba(234,179,8,0.18);
+  border-radius: 12px;
+  background: rgba(234,179,8,0.08);
+  text-align: left;
+}
+
+.setup-journey-card strong,
+.setup-inline-note strong,
+.setup-handoff-card strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink-bright);
+  font-size: 0.92rem;
+}
+
+.setup-journey-card p,
+.setup-inline-note,
+.setup-handoff-card p,
+.setup-handoff-hint {
+  color: var(--ink-secondary);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.setup-inline-note {
+  margin-top: 4px;
+  margin-bottom: 18px;
+}
+
+.setup-inline-note strong {
+  display: inline;
+  margin-right: 4px;
+}
+
+.setup-addresses {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.setup-addresses code {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(15,23,42,0.45);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--ink-bright);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
 .check-list {
   display: flex;
   flex-direction: column;
@@ -1201,7 +1259,7 @@ h1::before { content: none; }
 .ip-gate-card {
   margin: 16px auto 12px;
   padding: 18px 20px;
-  max-width: 340px;
+  max-width: 520px;
   border: 1.5px solid var(--border);
   border-radius: 12px;
   background: var(--card);
@@ -1251,6 +1309,47 @@ h1::before { content: none; }
   height: 18px;
   accent-color: var(--signal);
   cursor: pointer;
+}
+
+.receipt-access-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.receipt-access-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+  padding: 14px;
+  text-align: left;
+}
+
+.receipt-access-card strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink-bright);
+  font-size: 0.95rem;
+}
+
+.receipt-access-card p {
+  margin: 0;
+  max-width: none;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+.receipt-access-label {
+  display: inline-flex;
+  margin-bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(234,179,8,0.12);
+  color: var(--signal-light);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 /* ─── Focus ─── */
@@ -1421,6 +1520,61 @@ h1::before { content: none; }
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 14px;
+}
+
+.dashboard-overview {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.dashboard-hero-card {
+  padding: 18px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--patch-radius);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.dashboard-overview-label {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ink-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.dashboard-hero-card h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.dashboard-hero-card p {
+  margin: 0;
+  max-width: none;
+  color: var(--ink-secondary);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.dashboard-hero-card strong {
+  color: var(--ink-bright);
+  font-size: 0.95rem;
+}
+
+.dashboard-access-code {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(15,23,42,0.45);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--ink-bright);
+  overflow-wrap: anywhere;
 }
 
 .status-item {
@@ -2382,6 +2536,7 @@ h1::before { content: none; }
   .dash-nav { padding: 0 20px; gap: 2px; }
   .dash-tab { padding: 8px 12px; font-size: 0.78rem; }
   .dash-content { padding: 20px; }
+  .dashboard-overview { grid-template-columns: 1fr; }
   .status-grid { grid-template-columns: 1fr; }
   .action-grid { flex-direction: column; }
   .wifi-net-form { flex-direction: column; }
