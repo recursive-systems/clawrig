@@ -4,7 +4,13 @@ defmodule ClawrigWeb.DashboardLiveTest do
 
   setup do
     Application.put_env(:clawrig, :oobe_complete, true)
-    on_exit(fn -> Application.delete_env(:clawrig, :oobe_complete) end)
+    System.put_env("CLAWRIG_ENABLE_PREVIEW_STATES", "true")
+
+    on_exit(fn ->
+      Application.delete_env(:clawrig, :oobe_complete)
+      System.delete_env("CLAWRIG_ENABLE_PREVIEW_STATES")
+    end)
+
     :ok
   end
 
@@ -38,6 +44,24 @@ defmodule ClawrigWeb.DashboardLiveTest do
       assert html =~ "System"
       assert html =~ "Auto-healing"
       assert html =~ "Run Fix Now"
+    end
+
+    test "renders pending recovery preview copy", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/system?preview=update-pending-recovery")
+      assert html =~ "Update paused for safety"
+      assert html =~ "connected through Tailscale"
+    end
+
+    test "renders pending reauth preview copy", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/system?preview=update-pending-reauth")
+      assert html =~ "Reconnect OpenAI to continue"
+      assert html =~ "Open Account Settings"
+    end
+
+    test "renders ready retry preview copy", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/system?preview=update-ready-retry")
+      assert html =~ "Ready to retry update"
+      assert html =~ "Retry Update Now"
     end
   end
 end
