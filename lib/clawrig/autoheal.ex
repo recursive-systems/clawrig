@@ -3,6 +3,8 @@ defmodule Clawrig.Autoheal do
   Lightweight state and action log storage for gateway auto-healing.
   """
 
+  alias Clawrig.System.Commands
+
   @default_state %{
     "enabled" => true,
     "last_run_at" => nil,
@@ -32,16 +34,74 @@ defmodule Clawrig.Autoheal do
   def set_enabled(enabled) when is_boolean(enabled) do
     current = state()
 
-    write_state(Map.merge(current, %{
-      "enabled" => enabled,
-      "last_action" => if(enabled, do: "enabled", else: "disabled"),
-      "last_run_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
-      "last_result" => "ok"
-    }))
+    write_state(
+      Map.merge(current, %{
+        "enabled" => enabled,
+        "last_action" => if(enabled, do: "enabled", else: "disabled"),
+        "last_run_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
+        "last_result" => "ok"
+      })
+    )
   end
 
   def update_status(attrs) when is_map(attrs) do
     write_state(Map.merge(state(), attrs))
+  end
+
+  def run_fix_now do
+    now = DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+
+    case Commands.impl().gateway_status() do
+      :running ->
+        payload = %{
+          "last_run_at" => now,
+          "last_result" => "ok",
+          "last_action" => "no-op",
+          "last_check" => "manual-run",
+          "health" => "healthy"
+        }
+
+        update_status(payload)
+        log_action(%{
+          "check" => "manual-run",
+          "action" => "no-op",
+          "result" => "ok",
+          "detail" => "Gateway already running; no action needed"
+        })
+
+        {:ok, :noop, state()}
+
+      _ ->
+        _ = Commands.impl().start_gateway()
+        Process.sleep(1500)
+
+        gateway_after = Commands.impl().gateway_status()
+
+        {result, health, detail} =
+          if gateway_after == :running do
+            {"ok", "healthy", "Gateway restart successful"}
+          else
+            {"warn", "degraded", "Gateway restart attempted but still not connected"}
+          end
+
+        payload = %{
+          "last_run_at" => now,
+          "last_result" => result,
+          "last_action" => "restart-gateway",
+          "last_check" => "manual-run",
+          "health" => health
+        }
+
+        update_status(payload)
+        log_action(%{
+          "check" => "manual-run",
+          "action" => "restart-gateway",
+          "result" => result,
+          "detail" => detail
+        })
+
+        {:ok, :restart_attempted, state()}
+    end
   end
 
   def log_action(entry) when is_map(entry) do
