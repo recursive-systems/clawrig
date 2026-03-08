@@ -12,7 +12,9 @@ defmodule Clawrig.PreviewState do
     "node-connected",
     "node-blocked-gateway",
     "node-handshake-failed",
-    "update-pending-recovery"
+    "update-pending-recovery",
+    "update-pending-reauth",
+    "update-rolled-back-auth"
   ]
 
   def enabled? do
@@ -102,6 +104,22 @@ defmodule Clawrig.PreviewState do
     %{
       update_status: {:pending_recovery_path,
        "A new update (v5.4.0) is ready. To avoid interruptions, install it when you’re at home or connected through Tailscale."},
+      update_version: "5.4.0"
+    }
+  end
+
+  defp scenario_overrides("update-pending-reauth") do
+    %{
+      update_status: {:pending_reauth_post_update,
+       "Update v5.4.0 finished, but OpenAI needs to be reconnected before AI features can continue. Open the Account tab to reconnect."},
+      update_version: "5.4.0"
+    }
+  end
+
+  defp scenario_overrides("update-rolled-back-auth") do
+    %{
+      update_status: {:rolled_back_auth_required,
+       "Automatic update to v5.4.0 was rolled back to avoid interrupting service. Reconnect OpenAI, then try again."},
       update_version: "5.4.0"
     }
   end

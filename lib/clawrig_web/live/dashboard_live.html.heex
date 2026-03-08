@@ -557,6 +557,22 @@
               <strong>Update paused for safety.</strong>
               <p>{elem(@update_status, 1)}</p>
             </div>
+            <div
+              :if={is_tuple(@update_status) and elem(@update_status, 0) == :pending_reauth_post_update}
+              class="update-info"
+            >
+              <strong>Reconnect OpenAI to continue.</strong>
+              <p>{elem(@update_status, 1)}</p>
+              <p><.link navigate={~p"/account"} class="account-auth-link">Open Account Settings</.link></p>
+            </div>
+            <div
+              :if={is_tuple(@update_status) and elem(@update_status, 0) == :rolled_back_auth_required}
+              class="update-err"
+            >
+              <strong>Update rolled back.</strong>
+              <p>{elem(@update_status, 1)}</p>
+              <p><.link navigate={~p"/account"} class="account-auth-link">Reconnect OpenAI</.link></p>
+            </div>
             <p
               :if={is_tuple(@update_status) and elem(@update_status, 0) == :error}
               class="update-err"
