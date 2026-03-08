@@ -65,4 +65,24 @@ defmodule Clawrig.OpenAI.Credentials do
         {:error, "Failed to write auth-profiles.json: #{inspect(reason)}"}
     end
   end
+
+  @doc "Returns true when at least one OpenAI Codex OAuth profile is present."
+  def auth_configured? do
+    case File.read(auth_profiles_path()) do
+      {:ok, content} ->
+        case Jason.decode(content) do
+          {:ok, %{"profiles" => profiles}} when is_map(profiles) ->
+            Enum.any?(profiles, fn {_id, profile} ->
+              is_map(profile) and profile["provider"] == "openai-codex" and
+                is_binary(profile["refresh"]) and profile["refresh"] != ""
+            end)
+
+          _ ->
+            false
+        end
+
+      _ ->
+        false
+    end
+  end
 end

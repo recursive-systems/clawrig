@@ -15,6 +15,8 @@ defmodule Clawrig.Updater do
   require Logger
 
   alias Clawrig.System.Commands
+  alias Clawrig.OpenAI.Credentials, as: OpenAICredentials
+  alias Clawrig.Auth.CodexAuth
 
   @check_interval :timer.hours(24)
   @install_dir "/opt/clawrig"
@@ -114,7 +116,7 @@ defmodule Clawrig.Updater do
 
   @impl true
   def handle_call(:check_now, _from, state) do
-    result = do_check_and_update()
+    result = do_check_and_update(:manual)
     new_state = %{state | last_check: DateTime.utc_now(), last_result: result}
     {:reply, result, new_state}
   end
@@ -135,7 +137,7 @@ defmodule Clawrig.Updater do
   @impl true
   def handle_info(:scheduled_check, state) do
     if auto_update_enabled?() do
-      result = do_check_and_update()
+      result = do_check_and_update(:auto)
       schedule_check()
       new_state = %{state | last_check: DateTime.utc_now(), last_result: result}
       {:noreply, new_state}
@@ -163,8 +165,8 @@ defmodule Clawrig.Updater do
 
   defp reconcile_pending_update do
     case File.read(@pending_marker) do
-      {:ok, version} ->
-        version = String.trim(version)
+      {:ok, marker} ->
+        %{version: version, mode: mode} = parse_pending_marker(marker)
         Logger.info("[Updater] Found pending update marker for v#{version}, running health check")
 
         # Give the service a moment to stabilize after restart
@@ -172,10 +174,25 @@ defmodule Clawrig.Updater do
 
         case System.cmd("sudo", ["systemctl", "is-active", "clawrig"], stderr_to_stdout: true) do
           {"active\n", 0} ->
-            Logger.info("[Updater] Post-update health check passed for v#{version}")
-            File.rm(@pending_marker)
-            sudo_rm_rf(@prev_dir)
-            broadcast({:ok, :updated, version})
+            case post_update_auth_probe(version) do
+              :ok ->
+                Logger.info("[Updater] Post-update health check passed for v#{version}")
+                File.rm(@pending_marker)
+                sudo_rm_rf(@prev_dir)
+                broadcast({:ok, :updated, version})
+
+              {:error, :reauth_required} when mode == :auto ->
+                Logger.warning("[Updater] Post-update auth probe requires re-auth for auto update v#{version}; rolling back")
+                rollback()
+                File.rm(@pending_marker)
+                broadcast({:ok, :rolled_back_auth_required, version})
+
+              {:error, :reauth_required} ->
+                Logger.warning("[Updater] Post-update auth probe requires re-auth for manual update v#{version}")
+                File.rm(@pending_marker)
+                sudo_rm_rf(@prev_dir)
+                broadcast({:ok, :pending_reauth_post_update, version})
+            end
 
           {output, _} ->
             Logger.error("[Updater] Post-update health check failed: #{output} — rolling back")
@@ -194,7 +211,7 @@ defmodule Clawrig.Updater do
 
   # ── Check & Update ─────────────────────────────────────────────────
 
-  defp do_check_and_update do
+  defp do_check_and_update(mode) do
     broadcast(:checking)
 
     with {:ok, manifest} <- fetch_manifest(),
@@ -204,7 +221,7 @@ defmodule Clawrig.Updater do
       Logger.info("[Updater] New version #{parsed.version} available (local: #{local_version})")
 
       case maybe_defer_for_recovery_path(parsed.version, local_version) do
-        :ok -> apply_update(parsed)
+        :ok -> apply_update(parsed, mode)
         {:deferred, reason} ->
           broadcast({:ok, :pending_recovery_path, parsed.version, reason})
           {:ok, :pending_recovery_path, parsed.version}
@@ -265,7 +282,7 @@ defmodule Clawrig.Updater do
 
   defp find_manifest_in_assets(_), do: {:error, "release has no assets"}
 
-  defp apply_update(parsed) do
+  defp apply_update(parsed, mode) do
     broadcast({:ok, :downloading, parsed.version})
 
     with :ok <- download_tarball(parsed),
@@ -274,7 +291,7 @@ defmodule Clawrig.Updater do
          :ok <- extract_staging() do
       broadcast({:ok, :installing, parsed.version})
 
-      case swap_and_restart(parsed.version) do
+      case swap_and_restart(parsed.version, mode) do
         :ok ->
           # The process will be killed by systemctl restart.
           # Boot-time reconciliation in init/1 handles the health check.
@@ -388,7 +405,7 @@ defmodule Clawrig.Updater do
     end
   end
 
-  defp swap_and_restart(version) do
+  defp swap_and_restart(version, mode) do
     try do
       # Remove previous backup
       if File.exists?(@prev_dir), do: sudo_rm_rf(@prev_dir)
@@ -402,8 +419,8 @@ defmodule Clawrig.Updater do
       sudo_mv(@staging_dir, @install_dir)
       sudo_chown(@install_dir)
 
-      # Write pending marker so boot-time reconciliation can run the health check
-      File.write!(@pending_marker, version)
+      # Write pending marker so boot-time reconciliation can run the health + auth checks
+      File.write!(@pending_marker, Jason.encode!(%{version: version, mode: Atom.to_string(mode)}))
 
       # Restart the service — this will kill our process.
       # The new instance's init/1 handles health check via reconcile_pending_update/0.
@@ -471,6 +488,57 @@ defmodule Clawrig.Updater do
     case read_token() do
       nil -> [{"accept", "application/vnd.github+json"}]
       token -> [{"accept", "application/vnd.github+json"}, {"authorization", "Bearer #{token}"}]
+    end
+  end
+
+  defp parse_pending_marker(marker) do
+    case Jason.decode(marker) do
+      {:ok, %{"version" => version, "mode" => mode}} ->
+        %{version: version, mode: parse_update_mode(mode)}
+
+      _ ->
+        %{version: String.trim(marker), mode: :auto}
+    end
+  end
+
+  defp parse_update_mode("manual"), do: :manual
+  defp parse_update_mode(_), do: :auto
+
+  defp post_update_auth_probe(_version) do
+    cond do
+      not using_openai_codex?() ->
+        :ok
+
+      not OpenAICredentials.auth_configured?() ->
+        {:error, :reauth_required}
+
+      not CodexAuth.auth_exists?() ->
+        {:error, :reauth_required}
+
+      true ->
+        case Commands.impl().run_openclaw(["models", "status"]) do
+          {output, 0} ->
+            lowered = String.downcase(output || "")
+
+            if String.contains?(lowered, "unauthorized") or String.contains?(lowered, "expired") or
+                 String.contains?(lowered, "re-auth") or String.contains?(lowered, "reauth") do
+              {:error, :reauth_required}
+            else
+              :ok
+            end
+
+          _ ->
+            {:error, :reauth_required}
+        end
+    end
+  rescue
+    _ -> {:error, :reauth_required}
+  end
+
+  defp using_openai_codex? do
+    case Commands.impl().run_openclaw(["config", "get", "agents.defaults.model.primary"]) do
+      {output, 0} -> String.contains?(output || "", "openai-codex/")
+      _ -> true
     end
   end
 
