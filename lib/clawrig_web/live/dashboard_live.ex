@@ -6,6 +6,7 @@ defmodule ClawrigWeb.DashboardLive do
   alias Clawrig.PreviewState
   alias Clawrig.System.Commands
   alias Clawrig.Wizard.State
+  alias Clawrig.DashboardAuth
 
   @refresh_interval 10_000
   @openai_poll_timeout_count 180
@@ -55,6 +56,12 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:preview_scenario, nil)
       |> assign(:autoheal, %{"enabled" => true, "health" => "unknown", "last_run_at" => nil, "last_result" => "unknown", "last_action" => nil, "last_check" => nil})
       |> assign(:autoheal_log, [])
+      |> assign(:password_change_error, nil)
+      |> assign(:password_change_ok, nil)
+      |> assign(:password_change_strength, nil)
+      |> assign(:password_current_value, "")
+      |> assign(:password_new_value, "")
+      |> assign(:password_new_confirm_value, "")
 
     {:ok, socket}
   end
@@ -104,6 +111,80 @@ defmodule ClawrigWeb.DashboardLive do
 
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Auto-heal run failed: #{reason}")}
+    end
+  end
+
+  def handle_event("validate_change_dashboard_password", %{"current_password" => current, "new_password" => new_pw, "new_password_confirm" => confirm}, socket) do
+    current = current || ""
+    new_pw = new_pw || ""
+    confirm = confirm || ""
+
+    error =
+      cond do
+        confirm == "" -> nil
+        new_pw != confirm -> "New passwords do not match"
+        true -> nil
+      end
+
+    {:noreply,
+     assign(socket,
+       password_current_value: current,
+       password_new_value: new_pw,
+       password_new_confirm_value: confirm,
+       password_change_error: error,
+       password_change_ok: nil,
+       password_change_strength: DashboardAuth.password_strength(new_pw)
+     )}
+  end
+
+  def handle_event("change_dashboard_password", %{"current_password" => current, "new_password" => new_pw, "new_password_confirm" => confirm}, socket) do
+    cond do
+      String.trim(new_pw || "") == "" ->
+        {:noreply,
+         assign(socket,
+           password_change_error: "New password is required",
+           password_change_ok: nil,
+           password_change_strength: nil,
+           password_current_value: current || "",
+           password_new_value: new_pw || "",
+           password_new_confirm_value: confirm || ""
+         )}
+
+      new_pw != confirm ->
+        {:noreply,
+         assign(socket,
+           password_change_error: "New passwords do not match",
+           password_change_ok: nil,
+           password_change_strength: DashboardAuth.password_strength(new_pw || ""),
+           password_current_value: current || "",
+           password_new_value: new_pw || "",
+           password_new_confirm_value: confirm || ""
+         )}
+
+      true ->
+        case DashboardAuth.change_password(current || "", new_pw) do
+          :ok ->
+            {:noreply,
+             assign(socket,
+               password_change_error: nil,
+               password_change_ok: "Password updated",
+               password_change_strength: nil,
+               password_current_value: "",
+               password_new_value: "",
+               password_new_confirm_value: ""
+             )}
+
+          {:error, reason} ->
+            {:noreply,
+             assign(socket,
+               password_change_error: reason,
+               password_change_ok: nil,
+               password_change_strength: DashboardAuth.password_strength(new_pw || ""),
+               password_current_value: current || "",
+               password_new_value: new_pw || "",
+               password_new_confirm_value: confirm || ""
+             )}
+        end
     end
   end
 

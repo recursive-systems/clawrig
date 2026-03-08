@@ -541,6 +541,32 @@
       </div>
     </article>
 
+    <%!-- Security --%>
+    <article class={panel_class(@step, :security)}>
+      <div class="done-center">
+        <h2>Secure your dashboard</h2>
+        <p>Set a local password to protect ClawRig on your network.</p>
+
+        <form phx-change="validate_dashboard_password" phx-submit="set_dashboard_password" class="openai-input-group" style="max-width:420px;margin:0 auto;">
+          <label for="dashboard-password">Password</label>
+          <input id="dashboard-password" type="password" name="password" value={@dashboard_password_value} class="openai-input" autocomplete="new-password" />
+
+          <label for="dashboard-password-confirm" class="mt-md">Confirm password</label>
+          <input id="dashboard-password-confirm" type="password" name="password_confirm" value={@dashboard_password_confirm_value} class="openai-input" autocomplete="new-password" />
+
+          <.password_feedback
+            min_length={Clawrig.DashboardAuth.min_length()}
+            password={@dashboard_password_value}
+            strength={@dashboard_auth_strength}
+            error={@dashboard_auth_error}
+            success={if @dashboard_auth_done, do: "Password saved ✓", else: nil}
+          />
+
+          <button class="btn primary mt-md" type="submit">Save and continue</button>
+        </form>
+      </div>
+    </article>
+
     <%!-- Receipt --%>
     <article class={panel_class(@step, :receipt)}>
       <div class="done-center">

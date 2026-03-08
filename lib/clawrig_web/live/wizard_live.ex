@@ -4,8 +4,9 @@ defmodule ClawrigWeb.WizardLive do
 
   alias Clawrig.System.Commands
   alias Clawrig.Wizard.{State, Installer, Launcher, Telegram}
+  alias Clawrig.DashboardAuth
 
-  @steps [:preflight, :provider, :telegram, :receipt]
+  @steps [:preflight, :provider, :telegram, :security, :receipt]
   @openai_poll_timeout_count 180
 
   @impl true
@@ -46,6 +47,11 @@ defmodule ClawrigWeb.WizardLive do
      |> assign(:tg_status, nil)
      |> assign(:tg_error, nil)
      |> assign(:tg_polling, false)
+     |> assign(:dashboard_auth_done, state.dashboard_auth_done || DashboardAuth.configured?())
+     |> assign(:dashboard_auth_error, nil)
+     |> assign(:dashboard_auth_strength, nil)
+     |> assign(:dashboard_password_value, "")
+     |> assign(:dashboard_password_confirm_value, "")
      |> assign(:finishing, false)
      |> assign(:finish_message, nil)
      |> assign(:local_ip, state.local_ip)
@@ -238,6 +244,79 @@ defmodule ClawrigWeb.WizardLive do
 
   def handle_event("tg_skip", _params, socket) do
     {:noreply, socket}
+  end
+
+  # Security
+  def handle_event("validate_dashboard_password", %{"password" => password, "password_confirm" => confirm}, socket) do
+    password = String.trim(password || "")
+    confirm = String.trim(confirm || "")
+
+    error =
+      cond do
+        confirm == "" -> nil
+        password != confirm -> "Passwords do not match"
+        true -> nil
+      end
+
+    {:noreply,
+     assign(socket,
+       dashboard_password_value: password,
+       dashboard_password_confirm_value: confirm,
+       dashboard_auth_error: error,
+       dashboard_auth_strength: DashboardAuth.password_strength(password)
+     )}
+  end
+
+  def handle_event("set_dashboard_password", %{"password" => password, "password_confirm" => confirm}, socket) do
+    password = String.trim(password || "")
+    confirm = String.trim(confirm || "")
+
+    cond do
+      password == "" ->
+        {:noreply,
+         assign(socket,
+           dashboard_auth_error: "Password is required",
+           dashboard_auth_strength: nil,
+           dashboard_password_value: password,
+           dashboard_password_confirm_value: confirm
+         )}
+
+      password != confirm ->
+        {:noreply,
+         assign(socket,
+           dashboard_auth_error: "Passwords do not match",
+           dashboard_auth_strength: DashboardAuth.password_strength(password),
+           dashboard_password_value: password,
+           dashboard_password_confirm_value: confirm
+         )}
+
+      true ->
+        case DashboardAuth.set_password(password) do
+          :ok ->
+            State.merge(%{dashboard_auth_done: true, step: :receipt})
+
+            {:noreply,
+             socket
+             |> assign(
+               dashboard_auth_done: true,
+               dashboard_auth_error: nil,
+               dashboard_auth_strength: DashboardAuth.password_strength(password),
+               dashboard_password_value: "",
+               dashboard_password_confirm_value: "",
+               step: :receipt
+             )
+             |> detect_and_assign_ip()}
+
+          {:error, reason} ->
+            {:noreply,
+             assign(socket,
+               dashboard_auth_error: reason,
+               dashboard_auth_strength: DashboardAuth.password_strength(password),
+               dashboard_password_value: password,
+               dashboard_password_confirm_value: confirm
+             )}
+        end
+    end
   end
 
   # IP confirmation gate
@@ -551,42 +630,49 @@ defmodule ClawrigWeb.WizardLive do
   def handle_info(:do_finish, socket) do
     state = State.get()
 
-    # Apply runtime-only config (Telegram channel) and write audit trail
-    Launcher.finalize(state.mode, state.tg_token, state.tg_chat_id)
+    if not DashboardAuth.configured?() do
+      {:noreply,
+       socket
+       |> assign(:finishing, false)
+       |> put_flash(:error, "Please set your dashboard password before finishing setup.")}
+    else
+      # Apply runtime-only config (Telegram channel) and write audit trail
+      Launcher.finalize(state.mode, state.tg_token, state.tg_chat_id)
 
-    # Detect and store the best IP for dashboard use
-    ip = Commands.impl().detect_local_ip()
-    if ip, do: State.put(:local_ip, ip)
+      # Detect and store the best IP for dashboard use
+      ip = Commands.impl().detect_local_ip()
+      if ip, do: State.put(:local_ip, ip)
 
-    # Auto-detect network method if user went directly to /setup via LAN
-    if state.network_method == nil do
-      if Commands.impl().has_ethernet_ip() do
-        State.put(:network_method, :ethernet)
+      # Auto-detect network method if user went directly to /setup via LAN
+      if state.network_method == nil do
+        if Commands.impl().has_ethernet_ip() do
+          State.put(:network_method, :ethernet)
+        end
       end
+
+      {:ok, _receipt} = Launcher.write_receipt(State.get())
+
+      # Mark OOBE as complete — this unlocks the gateway watchdog
+      path = Application.get_env(:clawrig, :oobe_marker, "/var/lib/clawrig/.oobe-complete")
+      File.mkdir_p!(Path.dirname(path))
+      File.write!(path, "")
+
+      # Tear down hotspot if still running.
+      # WiFi flow: already torn down by safe_connect, this is a no-op.
+      # Ethernet flow: hotspot is still up and must be stopped.
+      Clawrig.Wifi.Manager.stop_hotspot()
+
+      # Best-effort gateway start (non-blocking).
+      # If this fails, the watchdog will pick it up within ~2 minutes.
+      Task.start(fn ->
+        Commands.impl().start_gateway()
+        # Give startup a brief head start, then send a clear readiness hint in Telegram.
+        Process.sleep(3000)
+        Telegram.send_setup_complete(state.tg_token, state.tg_chat_id)
+      end)
+
+      {:noreply, socket |> put_flash(:info, "Setup complete!") |> redirect(to: "/")}
     end
-
-    {:ok, _receipt} = Launcher.write_receipt(State.get())
-
-    # Mark OOBE as complete — this unlocks the gateway watchdog
-    path = Application.get_env(:clawrig, :oobe_marker, "/var/lib/clawrig/.oobe-complete")
-    File.mkdir_p!(Path.dirname(path))
-    File.write!(path, "")
-
-    # Tear down hotspot if still running.
-    # WiFi flow: already torn down by safe_connect, this is a no-op.
-    # Ethernet flow: hotspot is still up and must be stopped.
-    Clawrig.Wifi.Manager.stop_hotspot()
-
-    # Best-effort gateway start (non-blocking).
-    # If this fails, the watchdog will pick it up within ~2 minutes.
-    Task.start(fn ->
-      Commands.impl().start_gateway()
-      # Give startup a brief head start, then send a clear readiness hint in Telegram.
-      Process.sleep(3000)
-      Telegram.send_setup_complete(state.tg_token, state.tg_chat_id)
-    end)
-
-    {:noreply, socket |> put_flash(:info, "Setup complete!") |> redirect(to: "/")}
   end
 
   # Helpers
@@ -605,6 +691,7 @@ defmodule ClawrigWeb.WizardLive do
       preflight: "Connectivity",
       provider: "AI Provider",
       telegram: "Optional Telegram",
+      security: "Secure Dashboard",
       receipt: "Complete"
     }[step] || ""
   end
@@ -614,6 +701,7 @@ defmodule ClawrigWeb.WizardLive do
       :preflight -> assigns.preflight_done
       :provider -> assigns.provider_done
       :telegram -> true
+      :security -> assigns.dashboard_auth_done
       :receipt -> true
     end
   end

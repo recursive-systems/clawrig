@@ -22,6 +22,7 @@ defmodule Clawrig.Wizard.State do
     provider_auth_method: nil,
     openai_device_auth_id: nil,
     openai_user_code: nil,
+    dashboard_auth_done: false,
     auto_update_enabled: true
   }
 

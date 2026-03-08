@@ -13,6 +13,10 @@ config :clawrig,
        :node_identity_path,
        Path.join(System.tmp_dir!(), "clawrig-test-node-identity.json")
 
+config :clawrig,
+       :dashboard_auth_path,
+       Path.join(System.tmp_dir!(), "clawrig-test-dashboard-auth.json")
+
 config :logger, level: :warning
 
 config :phoenix, :plug_init_mode, :runtime

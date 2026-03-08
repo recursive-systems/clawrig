@@ -509,7 +509,6 @@ defmodule Clawrig.Node.Client do
 
   defp broadcast(status) do
     Phoenix.PubSub.broadcast(Clawrig.PubSub, "clawrig:node", {:node_status, status})
-    Phoenix.PubSub.broadcast(Clawrig.PubSub, "clawrig:node", {:node_status_detail, status_detail()})
   end
 
   defp clawrig_version do

@@ -568,6 +568,30 @@
         </div>
 
         <div class="system-action-group">
+          <h3>Dashboard Security</h3>
+          <form phx-change="validate_change_dashboard_password" phx-submit="change_dashboard_password" class="openai-input-group" style="max-width:420px;">
+            <label>Current password</label>
+            <input type="password" name="current_password" value={@password_current_value} class="openai-input" autocomplete="current-password" />
+            <label class="mt-md">New password</label>
+            <input type="password" name="new_password" value={@password_new_value} class="openai-input" autocomplete="new-password" />
+            <label class="mt-md">Confirm new password</label>
+            <input type="password" name="new_password_confirm" value={@password_new_confirm_value} class="openai-input" autocomplete="new-password" />
+            <.password_feedback
+              min_length={Clawrig.DashboardAuth.min_length()}
+              password={@password_new_value}
+              strength={@password_change_strength}
+              error={@password_change_error}
+              success={@password_change_ok}
+            />
+            <button class="btn subtle mt-sm" type="submit">Change Password</button>
+          </form>
+          <form method="post" action="/logout" class="mt-sm">
+            <input type="hidden" name="_csrf_token" value={Phoenix.Controller.get_csrf_token()} />
+            <button class="btn ghost" type="submit">Log out</button>
+          </form>
+        </div>
+
+        <div class="system-action-group">
           <h3>Auto-healing</h3>
 
           <div class="update-settings">

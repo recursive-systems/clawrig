@@ -73,4 +73,30 @@ defmodule ClawrigWeb.CoreComponents do
   def translate_errors(errors, field) when is_list(errors) do
     for {^field, {msg, opts}} <- errors, do: translate_error({msg, opts})
   end
+
+  attr :min_length, :integer, required: true
+  attr :password, :string, default: ""
+  attr :strength, :atom, default: nil
+  attr :error, :string, default: nil
+  attr :success, :string, default: nil
+
+  def password_feedback(assigns) do
+    password = assigns.password || ""
+
+    assigns =
+      assigns
+      |> assign(:touched, String.length(password) > 0)
+      |> assign(:too_short, String.length(password) < assigns.min_length)
+
+    ~H"""
+    <p :if={@touched} class={["openai-input-hint", @too_short && "error"]}>
+      Minimum {@min_length} characters.
+    </p>
+    <p :if={@touched and @strength == :weak and !@too_short} class="openai-input-hint error">
+      Weak password. Consider adding uppercase, numbers, and symbols.
+    </p>
+    <p :if={@error} class="openai-input-hint error">{@error}</p>
+    <p :if={@success} class="openai-input-hint">{@success}</p>
+    """
+  end
 end

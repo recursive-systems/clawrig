@@ -1,0 +1,35 @@
+<section class="dashboard">
+  <header class="shell-head">
+    <h1>
+      <img src={~p"/images/favicon.png"} alt="" class="shell-logo" />
+      <span class="shell-wordmark">Claw<span class="rig">Rig</span></span>
+    </h1>
+    <span class="version">Secure Login</span>
+  </header>
+
+  <section class="dash-content" aria-live="polite">
+    <.dash_panel title="Dashboard Login">
+      <div class="openai-sub active" style="max-width: 480px; margin: 0 auto;">
+        <p>Sign in to access your ClawRig dashboard.</p>
+
+        <form method="post" action={~p"/login"} class="openai-input-group mt-md">
+          <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+
+          <label for="login-password">Password</label>
+          <input
+            id="login-password"
+            name="password"
+            type="password"
+            class={["openai-input", @error && "error"]}
+            autocomplete="current-password"
+            autofocus
+          />
+
+          <p :if={@error} class="openai-input-hint error">{@error}</p>
+
+          <button class="btn primary mt-md" type="submit">Sign in</button>
+        </form>
+      </div>
+    </.dash_panel>
+  </section>
+</section>

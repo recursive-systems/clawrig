@@ -58,13 +58,20 @@ defmodule ClawrigWeb.Router do
   scope "/", ClawrigWeb do
     pipe_through :browser
 
+    get "/login", AuthController, :new
+    post "/login", AuthController, :create
+    post "/logout", AuthController, :delete
+
     live_session :wizard,
       on_mount: [{ClawrigWeb.Hooks.ModeGuard, :oobe_only}] do
       live "/setup", WizardLive, :index
     end
 
     live_session :dashboard,
-      on_mount: [{ClawrigWeb.Hooks.ModeGuard, :dashboard_only}] do
+      on_mount: [
+        {ClawrigWeb.Hooks.ModeGuard, :dashboard_only},
+        {ClawrigWeb.Hooks.AuthGuard, :dashboard_auth}
+      ] do
       live "/", DashboardLive, :index
       live "/wifi", DashboardLive, :wifi
       live "/account", DashboardLive, :account

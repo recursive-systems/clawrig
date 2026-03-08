@@ -31,6 +31,7 @@ config :clawrig, :state_path, "wizard-state.json"
 config :clawrig, :oobe_marker, ".oobe-complete"
 config :clawrig, :device_code_module, Clawrig.Wizard.MockDeviceCode
 config :clawrig, :node_identity_path, "priv/node-identity.json"
+config :clawrig, :dashboard_auth_path, "priv/dashboard-auth.json"
 
 config :logger, :default_formatter, format: "[$level] $message\n"
 
