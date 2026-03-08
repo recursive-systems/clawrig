@@ -101,7 +101,7 @@ defmodule Clawrig.PreviewState do
   defp scenario_overrides("update-pending-recovery") do
     %{
       update_status: {:pending_recovery_path,
-       "Update risk=guarded. Recovery path unavailable (need local network presence or healthy Tailscale)."},
+       "A new update (v5.4.0) is ready. To avoid interruptions, install it when you’re at home or connected through Tailscale."},
       update_version: "5.4.0"
     }
   end

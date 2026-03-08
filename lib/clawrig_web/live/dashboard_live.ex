@@ -891,8 +891,8 @@ defmodule ClawrigWeb.DashboardLive do
   defp normalize_update_status({:ok, :downloading, v}), do: {:downloading, v}
   defp normalize_update_status({:ok, :installing, v}), do: {:installing, v}
   defp normalize_update_status({:ok, :updated, v}), do: {:updated, v}
-  defp normalize_update_status({:ok, :pending_recovery_path, v}), do: {{:pending_recovery_path, "Action required before updating to v#{v}"}, v}
-  defp normalize_update_status({:ok, :pending_recovery_path, v, reason}), do: {{:pending_recovery_path, reason}, v}
+  defp normalize_update_status({:ok, :pending_recovery_path, v}), do: {{:pending_recovery_path, "A new update (v#{v}) is ready, but ClawRig is waiting to install it until your device is reachable."}, v}
+  defp normalize_update_status({:ok, :pending_recovery_path, v, _reason}), do: {{:pending_recovery_path, "A new update (v#{v}) is ready. To avoid interruptions, install it when you’re at home or connected through Tailscale."}, v}
   defp normalize_update_status({:error, reason}), do: {{:error, reason}, nil}
   defp normalize_update_status(_), do: {nil, nil}
 

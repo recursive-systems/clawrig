@@ -550,12 +550,13 @@
             <p :if={@update_status == :updated} class="update-ok">
               Updated to v{@update_version}. Restarting...
             </p>
-            <p
+            <div
               :if={is_tuple(@update_status) and elem(@update_status, 0) == :pending_recovery_path}
               class="update-info"
             >
-              {elem(@update_status, 1)}
-            </p>
+              <strong>Update paused for safety.</strong>
+              <p>{elem(@update_status, 1)}</p>
+            </div>
             <p
               :if={is_tuple(@update_status) and elem(@update_status, 0) == :error}
               class="update-err"
