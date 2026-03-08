@@ -52,9 +52,9 @@ OCJSON
 chown 1000:1000 /home/pi/.openclaw/openclaw.json
 
 # Pre-bake exec approvals with wildcard allowlist.
-# Specific path patterns (e.g. "/usr/local/bin/clawrig-info*") don't reliably
-# match through OpenClaw's gateway exec pipeline due to symlink resolution and
-# policy layers. A dedicated appliance like ClawRig can safely use a wildcard.
+# Specific path patterns have proven brittle through OpenClaw's gateway exec
+# pipeline due to path/symlink resolution + policy layers. A dedicated appliance
+# like ClawRig can safely use a wildcard.
 cat > /home/pi/.openclaw/exec-approvals.json << 'APPROVALS'
 {
   "version": 1,
