@@ -551,6 +551,12 @@
               Updated to v{@update_version}. Restarting...
             </p>
             <p
+              :if={is_tuple(@update_status) and elem(@update_status, 0) == :pending_recovery_path}
+              class="update-info"
+            >
+              {elem(@update_status, 1)}
+            </p>
+            <p
               :if={is_tuple(@update_status) and elem(@update_status, 0) == :error}
               class="update-err"
             >

@@ -11,7 +11,8 @@ defmodule Clawrig.PreviewState do
     "provider-disconnected",
     "node-connected",
     "node-blocked-gateway",
-    "node-handshake-failed"
+    "node-handshake-failed",
+    "update-pending-recovery"
   ]
 
   def enabled? do
@@ -94,6 +95,14 @@ defmodule Clawrig.PreviewState do
         reconnect_attempts: 7
       },
       node_device_id: "node_hs_1d7f5a3c8b2e"
+    }
+  end
+
+  defp scenario_overrides("update-pending-recovery") do
+    %{
+      update_status: {:pending_recovery_path,
+       "Update risk=guarded. Recovery path unavailable (need local network presence or healthy Tailscale)."},
+      update_version: "5.4.0"
     }
   end
 end

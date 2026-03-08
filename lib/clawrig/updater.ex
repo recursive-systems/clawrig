@@ -14,6 +14,8 @@ defmodule Clawrig.Updater do
   use GenServer
   require Logger
 
+  alias Clawrig.System.Commands
+
   @check_interval :timer.hours(24)
   @install_dir "/opt/clawrig"
   @staging_dir "/opt/clawrig-staging"
@@ -200,7 +202,13 @@ defmodule Clawrig.Updater do
          local_version <- read_local_version(),
          true <- version_newer?(parsed.version, local_version) do
       Logger.info("[Updater] New version #{parsed.version} available (local: #{local_version})")
-      apply_update(parsed)
+
+      case maybe_defer_for_recovery_path(parsed.version, local_version) do
+        :ok -> apply_update(parsed)
+        {:deferred, reason} ->
+          broadcast({:ok, :pending_recovery_path, parsed.version, reason})
+          {:ok, :pending_recovery_path, parsed.version}
+      end
     else
       false ->
         Logger.debug("[Updater] Already up to date")
@@ -464,5 +472,52 @@ defmodule Clawrig.Updater do
       nil -> [{"accept", "application/vnd.github+json"}]
       token -> [{"accept", "application/vnd.github+json"}, {"authorization", "Bearer #{token}"}]
     end
+  end
+
+  defp maybe_defer_for_recovery_path(remote_version, local_version) do
+    case classify_update_risk(remote_version, local_version) do
+      :safe ->
+        :ok
+
+      risk when risk in [:guarded, :breaking] ->
+        if recovery_path_available?() do
+          :ok
+        else
+          {:deferred,
+           "Update risk=#{risk}. Recovery path unavailable (need local network presence or healthy Tailscale)."}
+        end
+    end
+  end
+
+  defp classify_update_risk(remote, local) do
+    with {:ok, rv} <- Version.parse(remote),
+         {:ok, lv} <- Version.parse(local) do
+      cond do
+        rv.major > lv.major -> :breaking
+        rv.minor > lv.minor -> :guarded
+        true -> :safe
+      end
+    else
+      _ -> :guarded
+    end
+  end
+
+  defp recovery_path_available? do
+    tailscale_ok =
+      case Commands.impl().tailscale_status() do
+        %{running: true, ip: ip} when is_binary(ip) and ip != "" -> true
+        %{running: true} -> true
+        _ -> false
+      end
+
+    local_ok =
+      case Commands.impl().detect_local_ip() do
+        ip when is_binary(ip) and ip != "" -> true
+        _ -> false
+      end
+
+    tailscale_ok or local_ok
+  rescue
+    _ -> false
   end
 end
