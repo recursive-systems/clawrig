@@ -33,6 +33,7 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:resume_update_version, State.get(:update_resume_version))
       |> assign(:resume_update_reason, State.get(:update_resume_reason))
       |> assign(:resume_update_attempts, State.get(:update_retry_attempts) || 0)
+      |> assign(:update_history, State.get(:update_history) || [])
       |> assign(:auto_update_enabled, Clawrig.Updater.auto_update_enabled?())
       |> assign(:account_sub, :idle)
       |> assign(:account_error, nil)
@@ -651,7 +652,8 @@ defmodule ClawrigWeb.DashboardLive do
      socket
      |> assign(:update_status, update_status)
      |> assign(:update_version, update_version)
-     |> assign(:update_notice, update_reauth_notice(update_status))}
+     |> assign(:update_notice, update_reauth_notice(update_status))
+     |> assign(:update_history, State.get(:update_history) || [])}
   end
 
   def handle_info({:node_status, status}, socket) do

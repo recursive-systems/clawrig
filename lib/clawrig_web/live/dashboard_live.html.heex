@@ -614,6 +614,16 @@
               {elem(@update_status, 1)}
             </p>
           </div>
+
+          <div :if={@update_history != []} class="log-section mt-md">
+            <div class="dash-section-header">
+              <h3>Recent Update Events</h3>
+            </div>
+            <div class="log-output">
+              <pre><%= for entry <- @update_history do %>{entry["ts"]} | {entry["status"]}
+<% end %></pre>
+            </div>
+          </div>
         </div>
 
         <div class="system-action-group">

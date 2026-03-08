@@ -26,6 +26,7 @@ defmodule Clawrig.Wizard.State do
     update_resume_version: nil,
     update_resume_reason: nil,
     update_retry_attempts: 0,
+    update_history: [],
     auto_update_enabled: true
   }
 

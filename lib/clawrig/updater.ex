@@ -207,6 +207,7 @@ defmodule Clawrig.Updater do
   end
 
   defp broadcast(status) do
+    record_update_event(status)
     Phoenix.PubSub.broadcast(Clawrig.PubSub, "clawrig:updates", {:update_status, status})
   end
 
@@ -607,6 +608,31 @@ defmodule Clawrig.Updater do
 
   defp retry_allowed?(attempts) when is_integer(attempts), do: attempts < @max_retry_attempts
   defp retry_allowed?(_), do: false
+
+  defp record_update_event(status) do
+    entry = %{
+      "ts" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
+      "status" => render_update_status(status)
+    }
+
+    history =
+      State.get(:update_history)
+      |> case do
+        history when is_list(history) -> history
+        _ -> []
+      end
+
+    State.put(:update_history, [entry | history] |> Enum.take(12))
+  rescue
+    _ -> :ok
+  end
+
+  defp render_update_status(:checking), do: "checking"
+  defp render_update_status({:ok, state}), do: Atom.to_string(state)
+  defp render_update_status({:ok, state, version}), do: "#{Atom.to_string(state)}:#{version}"
+  defp render_update_status({:ok, state, version, _reason}), do: "#{Atom.to_string(state)}:#{version}"
+  defp render_update_status({:error, reason}), do: "error:#{reason}"
+  defp render_update_status(other), do: inspect(other)
 
   defp maybe_defer_for_recovery_path(remote_version, local_version) do
     case classify_update_risk(remote_version, local_version) do
