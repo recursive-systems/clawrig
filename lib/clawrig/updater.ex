@@ -46,6 +46,15 @@ defmodule Clawrig.Updater do
   @doc "Alias for `check_now/0` (backward compat with dashboard_live)."
   def check, do: check_now()
 
+  @doc "Parse a persisted pending-update marker for testability and diagnostics."
+  def parse_pending_marker_public(marker), do: parse_pending_marker(marker)
+
+  @doc "Classify upgrade risk for testability and diagnostics."
+  def classify_update_risk_public(remote, local), do: classify_update_risk(remote, local)
+
+  @doc "Run the post-update auth probe for testability and diagnostics."
+  def post_update_auth_probe_public(version), do: post_update_auth_probe(version)
+
   @doc "Enable or disable automatic update checks."
   def set_auto_update(enabled) when is_boolean(enabled) do
     GenServer.call(__MODULE__, {:set_auto_update, enabled})

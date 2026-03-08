@@ -45,6 +45,7 @@ defmodule Clawrig.System.MockCommands do
       ["plugins", "enable" | _] -> {"Plugin enabled\n", 0}
       ["gateway", "install"] -> {"Installed\n", 0}
       ["onboard", "--install-daemon"] -> {"Daemon installed\n", 0}
+      ["config", "get", "agents.defaults.model.primary"] -> {"openai-codex/gpt-5.3-codex\n", 0}
       _ -> {"ok\n", 0}
     end
   end
