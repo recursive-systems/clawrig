@@ -104,4 +104,35 @@ defmodule Clawrig.System.MockCommands do
   def tailscale_down, do: {:error, "Not available in dev mode"}
   @impl true
   def tailscale_install, do: {:error, "Not available in dev mode"}
+
+  @impl true
+  def autoheal_status do
+    %{
+      "enabled" => true,
+      "health" => "healthy",
+      "last_run_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
+      "last_result" => "ok",
+      "last_action" => "watchdog-check",
+      "last_check" => "gateway-status"
+    }
+  end
+
+  @impl true
+  def autoheal_set_enabled(_enabled), do: :ok
+
+  @impl true
+  def autoheal_run_now, do: :ok
+
+  @impl true
+  def autoheal_recent_log(_limit) do
+    [
+      %{
+        "ts" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
+        "check" => "gateway-rpc",
+        "action" => "restart-gateway",
+        "result" => "ok",
+        "detail" => "Mock watchdog restart completed"
+      }
+    ]
+  end
 end

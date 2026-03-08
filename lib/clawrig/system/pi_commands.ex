@@ -509,4 +509,59 @@ defmodule Clawrig.System.PiCommands do
         {:error, String.trim(err)}
     end
   end
+
+  @impl true
+  def autoheal_status do
+    Clawrig.Autoheal.state()
+  end
+
+  @impl true
+  def autoheal_set_enabled(enabled) do
+    result = Clawrig.Autoheal.set_enabled(enabled)
+
+    if result == :ok do
+      Clawrig.Autoheal.log_action(%{
+        "check" => "manual-toggle",
+        "action" => if(enabled, do: "enable", else: "disable"),
+        "result" => "ok",
+        "detail" => "Auto-healing toggled from dashboard"
+      })
+    end
+
+    result
+  end
+
+  @impl true
+  def autoheal_run_now do
+    service = "clawrig-gateway-watchdog.service"
+
+    case System.cmd("sudo", ["systemctl", "start", service], stderr_to_stdout: true) do
+      {_, 0} ->
+        Clawrig.Autoheal.log_action(%{
+          "check" => "manual-run",
+          "action" => "run-fix-now",
+          "result" => "ok",
+          "detail" => "Triggered #{service}"
+        })
+
+        :ok
+
+      {err, _} ->
+        reason = String.trim(err)
+
+        Clawrig.Autoheal.log_action(%{
+          "check" => "manual-run",
+          "action" => "run-fix-now",
+          "result" => "error",
+          "detail" => reason
+        })
+
+        {:error, reason}
+    end
+  end
+
+  @impl true
+  def autoheal_recent_log(limit) do
+    Clawrig.Autoheal.recent_logs(limit)
+  end
 end

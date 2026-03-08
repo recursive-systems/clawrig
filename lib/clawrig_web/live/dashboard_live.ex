@@ -52,6 +52,8 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:tailscale_dev_override, nil)
       |> assign(:dev_tailscale_bypass_enabled, dev_tailscale_bypass_enabled?())
       |> assign(:preview_scenario, nil)
+      |> assign(:autoheal, %{"enabled" => true, "health" => "unknown", "last_run_at" => nil, "last_result" => "unknown", "last_action" => nil, "last_check" => nil})
+      |> assign(:autoheal_log, [])
 
     {:ok, socket}
   end
@@ -79,6 +81,29 @@ defmodule ClawrigWeb.DashboardLive do
     end)
 
     {:noreply, put_flash(socket, :info, "Running repair...")}
+  end
+
+  def handle_event("toggle_autoheal", _params, socket) do
+    enabled = socket.assigns.autoheal["enabled"] != false
+
+    case Commands.impl().autoheal_set_enabled(!enabled) do
+      :ok ->
+        msg = if enabled, do: "Auto-healing disabled.", else: "Auto-healing enabled."
+        {:noreply, socket |> assign(:autoheal, Map.put(socket.assigns.autoheal, "enabled", !enabled)) |> put_flash(:info, msg)}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Could not update auto-healing: #{reason}")}
+    end
+  end
+
+  def handle_event("run_autoheal_now", _params, socket) do
+    case Commands.impl().autoheal_run_now() do
+      :ok ->
+        {:noreply, put_flash(socket, :info, "Auto-heal run triggered.")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Auto-heal run failed: #{reason}")}
+    end
   end
 
   def handle_event("reboot", _params, socket) do
@@ -397,6 +422,8 @@ defmodule ClawrigWeb.DashboardLive do
       Task.start(fn ->
         gateway = Commands.impl().gateway_status()
         internet = Commands.impl().check_internet()
+        autoheal = Commands.impl().autoheal_status()
+        autoheal_log = Commands.impl().autoheal_recent_log(12)
 
         wifi_ssid =
           try do
@@ -435,7 +462,7 @@ defmodule ClawrigWeb.DashboardLive do
         send(
           pid,
           {:status_result, gateway, internet, wifi_ssid, ethernet_connected, brave_mode,
-           brave_usage, tailscale}
+           brave_usage, tailscale, autoheal, autoheal_log}
         )
       end)
 
@@ -445,7 +472,7 @@ defmodule ClawrigWeb.DashboardLive do
 
   def handle_info(
         {:status_result, gateway, internet, wifi_ssid, ethernet_connected, brave_mode,
-         brave_usage, tailscale},
+         brave_usage, tailscale, autoheal, autoheal_log},
         socket
       ) do
     if socket.assigns[:preview_scenario] do
@@ -479,7 +506,9 @@ defmodule ClawrigWeb.DashboardLive do
        |> assign(:account_sub, account_sub)
        |> assign(:brave_mode, current_brave_mode)
        |> assign(:brave_usage, brave_usage)
-       |> assign(:tailscale, tailscale_effective)}
+       |> assign(:tailscale, tailscale_effective)
+       |> assign(:autoheal, autoheal)
+       |> assign(:autoheal_log, autoheal_log)}
     end
   end
 
@@ -836,6 +865,16 @@ defmodule ClawrigWeb.DashboardLive do
   def status_label(nil), do: "N/A"
   def status_label(other) when is_binary(other), do: other
   def status_label(_), do: "Unknown"
+
+  def autoheal_health_label(status) do
+    case status do
+      "healthy" -> "Healthy"
+      "degraded" -> "Degraded"
+      "unknown" -> "Unknown"
+      other when is_binary(other) -> String.capitalize(other)
+      _ -> "Unknown"
+    end
+  end
 
   def tab_class(live_action, tab) when live_action == tab, do: "dash-tab active"
   def tab_class(_live_action, _tab), do: "dash-tab"

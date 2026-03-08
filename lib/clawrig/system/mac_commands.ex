@@ -97,4 +97,12 @@ defmodule Clawrig.System.MacCommands do
   defdelegate tailscale_down, to: Clawrig.System.MockCommands
   @impl true
   defdelegate tailscale_install, to: Clawrig.System.MockCommands
+  @impl true
+  defdelegate autoheal_status, to: Clawrig.System.MockCommands
+  @impl true
+  defdelegate autoheal_set_enabled(enabled), to: Clawrig.System.MockCommands
+  @impl true
+  defdelegate autoheal_run_now, to: Clawrig.System.MockCommands
+  @impl true
+  defdelegate autoheal_recent_log(limit), to: Clawrig.System.MockCommands
 end

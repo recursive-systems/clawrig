@@ -25,6 +25,10 @@ defmodule Clawrig.System.Commands do
   @callback tailscale_up(auth_key :: String.t()) :: :ok | {:error, String.t()}
   @callback tailscale_down() :: :ok | {:error, String.t()}
   @callback tailscale_install() :: :ok | {:error, String.t()}
+  @callback autoheal_status() :: map()
+  @callback autoheal_set_enabled(enabled :: boolean()) :: :ok | {:error, String.t()}
+  @callback autoheal_run_now() :: :ok | {:error, String.t()}
+  @callback autoheal_recent_log(limit :: non_neg_integer()) :: [map()]
 
   def impl do
     Application.get_env(:clawrig, :system_commands, Clawrig.System.MockCommands)

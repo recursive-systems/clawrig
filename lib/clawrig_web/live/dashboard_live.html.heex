@@ -554,6 +554,71 @@
         </div>
 
         <div class="system-action-group">
+          <h3>Auto-healing</h3>
+
+          <div class="update-settings">
+            <label class="toggle-row">
+              <span>Enable auto-healing</span>
+              <button
+                class={["toggle-switch", @autoheal["enabled"] != false && "active"]}
+                phx-click="toggle_autoheal"
+                role="switch"
+                aria-checked={to_string(@autoheal["enabled"] != false)}
+              >
+                <span class="toggle-knob"></span>
+              </button>
+            </label>
+            <p class="setting-hint">
+              {if @autoheal["enabled"] != false,
+                do: "Gateway watchdog and daily repair are active.",
+                else: "Auto-healing is paused until re-enabled."}
+            </p>
+          </div>
+
+          <div class="status-grid mt-md">
+            <div class="status-item">
+              <span class="status-label">Health</span>
+              <span class={["status-value", if(@autoheal["health"] == "healthy", do: "ok", else: "warn")] }>
+                {autoheal_health_label(@autoheal["health"])}
+              </span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Last run</span>
+              <span class="status-value monospace">{@autoheal["last_run_at"] || "Never"}</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Last result</span>
+              <span class="status-value">{@autoheal["last_result"] || "unknown"}</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Last action</span>
+              <span class="status-value">{@autoheal["last_action"] || "none"}</span>
+            </div>
+          </div>
+
+          <div class="action-grid mt-md">
+            <button
+              class="btn subtle"
+              phx-click="run_autoheal_now"
+              data-confirm="Run auto-heal checks now?"
+            >
+              Run Fix Now
+            </button>
+          </div>
+
+          <div class="log-section mt-md">
+            <div class="dash-section-header">
+              <h3>Auto-heal History</h3>
+            </div>
+            <div :if={Enum.empty?(@autoheal_log)} class="setting-hint">No recent auto-heal events.</div>
+            <div :if={!Enum.empty?(@autoheal_log)} class="log-output">
+              <pre><%= for entry <- @autoheal_log do %>{entry["ts"] || ""} | {entry["check"] || "check"} | {entry["action"] || "action"} | {entry["result"] || "result"} | {entry["detail"] || ""}
+<% end %></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="system-action-group">
           <h3>Remote Access</h3>
           <%= if @tailscale == :loading do %>
             <p class="setting-hint">Checking Tailscale status...</p>

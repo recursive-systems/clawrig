@@ -28,7 +28,7 @@ defmodule ClawrigWeb.DashboardLiveTest do
   describe "dashboard account" do
     test "renders account section", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/account")
-      assert html =~ "OpenAI"
+      assert html =~ "AI Provider"
     end
   end
 
@@ -36,6 +36,8 @@ defmodule ClawrigWeb.DashboardLiveTest do
     test "renders system section", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/system")
       assert html =~ "System"
+      assert html =~ "Auto-healing"
+      assert html =~ "Run Fix Now"
     end
   end
 end
