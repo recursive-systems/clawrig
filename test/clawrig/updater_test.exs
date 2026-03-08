@@ -126,4 +126,42 @@ defmodule Clawrig.UpdaterTest do
       assert Updater.reconcile_outcome_public(:auto, false, :ok) == :health_failed
     end
   end
+
+  describe "simulate_reconcile_public/4" do
+    test "simulates auto update rollback path" do
+      assert Updater.simulate_reconcile_public(:auto, "5.4.0", true, {:error, :reauth_required}) == %{
+               status: :rolled_back_auth_required,
+               version: "5.4.0",
+               rollback: true,
+               resume_reason: :rolled_back_auth_required
+             }
+    end
+
+    test "simulates manual update pending reauth path" do
+      assert Updater.simulate_reconcile_public(:manual, "5.4.0", true, {:error, :reauth_required}) == %{
+               status: :pending_reauth_post_update,
+               version: "5.4.0",
+               rollback: false,
+               resume_reason: :pending_reauth_post_update
+             }
+    end
+
+    test "simulates clean update success" do
+      assert Updater.simulate_reconcile_public(:manual, "5.4.0", true, :ok) == %{
+               status: :updated,
+               version: "5.4.0",
+               rollback: false,
+               resume_reason: nil
+             }
+    end
+
+    test "simulates service health failure" do
+      assert Updater.simulate_reconcile_public(:manual, "5.4.0", false, {:error, :service_unhealthy}) == %{
+               status: :health_failed,
+               version: "5.4.0",
+               rollback: true,
+               resume_reason: nil
+             }
+    end
+  end
 end

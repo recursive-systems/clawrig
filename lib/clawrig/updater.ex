@@ -60,6 +60,33 @@ defmodule Clawrig.Updater do
     reconcile_outcome(mode, service_active?, auth_probe_result)
   end
 
+  @doc "Simulate boot-time reconciliation side effects for testability."
+  def simulate_reconcile_public(mode, version, service_active?, auth_probe_result) do
+    case reconcile_outcome(mode, service_active?, auth_probe_result) do
+      :updated ->
+        %{status: :updated, version: version, rollback: false, resume_reason: nil}
+
+      :rolled_back_auth_required ->
+        %{
+          status: :rolled_back_auth_required,
+          version: version,
+          rollback: true,
+          resume_reason: :rolled_back_auth_required
+        }
+
+      :pending_reauth_post_update ->
+        %{
+          status: :pending_reauth_post_update,
+          version: version,
+          rollback: false,
+          resume_reason: :pending_reauth_post_update
+        }
+
+      :health_failed ->
+        %{status: :health_failed, version: version, rollback: true, resume_reason: nil}
+    end
+  end
+
   @doc "Enable or disable automatic update checks."
   def set_auto_update(enabled) when is_boolean(enabled) do
     GenServer.call(__MODULE__, {:set_auto_update, enabled})
