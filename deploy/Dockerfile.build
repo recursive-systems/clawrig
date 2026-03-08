@@ -34,5 +34,11 @@ RUN mix assets.deploy
 RUN mix compile
 RUN mix release
 
+# Ensure the packaged release is readable after extraction even if the deploy
+# step runs `tar` as root on the Pi. Some release files (notably runtime.exs)
+# are created with restrictive permissions inside the container.
+RUN find _build/prod/rel/clawrig -type d -exec chmod a+rx {} +
+RUN find _build/prod/rel/clawrig -type f -exec chmod a+r {} +
+
 # Package as tarball
 RUN cd _build/prod/rel && tar czf /app/clawrig.tar.gz clawrig/
