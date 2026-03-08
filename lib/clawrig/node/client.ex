@@ -92,21 +92,33 @@ defmodule Clawrig.Node.Client do
 
   @impl true
   def handle_info(:connect_check, state) do
-    if ready_to_connect?() do
-      case connect_to_gateway(state) do
-        {:ok, new_state} ->
-          Logger.info("[Node] Connecting to Gateway at #{@gateway_host}:#{@gateway_port}")
-          broadcast(:connecting)
-          {:noreply, %{new_state | status: :connecting, backoff: @initial_backoff, reconnect_attempts: 0}}
+    case readiness_state() do
+      :ready ->
+        case connect_to_gateway(state) do
+          {:ok, new_state} ->
+            Logger.info("[Node] Connecting to Gateway at #{@gateway_host}:#{@gateway_port}")
+            broadcast(:connecting)
 
-        {:error, reason} ->
-          Logger.warning("[Node] Gateway connection failed: #{inspect(reason)}")
-          schedule_reconnect(state.backoff)
-          {:noreply, %{state | backoff: next_backoff(state.backoff), last_error: "connect failed: #{inspect(reason)}", reconnect_attempts: state.reconnect_attempts + 1, last_disconnected_at: now_iso()}}
-      end
-    else
-      schedule_connect_check()
-      {:noreply, state}
+            {:noreply,
+             %{new_state | status: :connecting, backoff: @initial_backoff, reconnect_attempts: 0}}
+
+          {:error, reason} ->
+            Logger.warning("[Node] Gateway connection failed: #{inspect(reason)}")
+            schedule_reconnect(state.backoff)
+
+            {:noreply,
+             %{
+               state
+               | backoff: next_backoff(state.backoff),
+                 last_error: "connect failed: #{inspect(reason)}",
+                 reconnect_attempts: state.reconnect_attempts + 1,
+                 last_disconnected_at: now_iso()
+             }}
+        end
+
+      {:blocked, reason} ->
+        schedule_connect_check()
+        {:noreply, %{state | last_error: reason}}
     end
   end
 
@@ -240,9 +252,9 @@ defmodule Clawrig.Node.Client do
           end
         end)
 
-      {:error, websocket, reason} ->
+      {:error, _websocket, reason} ->
         Logger.error("[Node] Decode error: #{inspect(reason)}")
-        {:error, %{state | websocket: websocket}}
+        {:error, "websocket decode failed: #{inspect(reason)}"}
     end
   end
 
@@ -430,8 +442,8 @@ defmodule Clawrig.Node.Client do
           {:error, conn, _reason} -> {:error, %{state | conn: conn, websocket: websocket}}
         end
 
-      {:error, websocket, _reason} ->
-        {:error, %{state | websocket: websocket}}
+      {:error, _websocket, reason} ->
+        {:error, "websocket encode failed: #{inspect(reason)}"}
     end
   end
 
@@ -459,8 +471,12 @@ defmodule Clawrig.Node.Client do
     }
   end
 
-  defp ready_to_connect? do
-    oobe_complete?() and gateway_running?()
+  defp readiness_state do
+    cond do
+      not oobe_complete?() -> {:blocked, "waiting for OOBE completion"}
+      not gateway_running?() -> {:blocked, "waiting for gateway to be running"}
+      true -> :ready
+    end
   end
 
   defp oobe_complete? do
