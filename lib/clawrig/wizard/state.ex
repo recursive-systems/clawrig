@@ -25,6 +25,7 @@ defmodule Clawrig.Wizard.State do
     dashboard_auth_done: false,
     update_resume_version: nil,
     update_resume_reason: nil,
+    update_retry_attempts: 0,
     auto_update_enabled: true
   }
 

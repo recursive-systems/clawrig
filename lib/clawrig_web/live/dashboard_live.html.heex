@@ -597,6 +597,7 @@
             >
               <strong>Ready to retry update.</strong>
               <p>{elem(@update_status, 1)}</p>
+              <p class="setting-hint">Retry attempts used: {@resume_update_attempts} / {Clawrig.Updater.max_retry_attempts()}</p>
               <button class="btn subtle btn-sm mt-sm" phx-click="retry_update_now">Retry Update Now</button>
             </div>
             <div

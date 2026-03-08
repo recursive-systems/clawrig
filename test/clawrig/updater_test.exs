@@ -107,6 +107,18 @@ defmodule Clawrig.UpdaterTest do
     end
   end
 
+  describe "retry_allowed_public?/1" do
+    test "allows retries below limit" do
+      assert Updater.retry_allowed_public?(0)
+      assert Updater.retry_allowed_public?(1)
+    end
+
+    test "blocks retries at or above limit" do
+      refute Updater.retry_allowed_public?(Updater.max_retry_attempts())
+      refute Updater.retry_allowed_public?(Updater.max_retry_attempts() + 1)
+    end
+  end
+
   describe "reconcile_outcome_public/3" do
     test "auto update with auth required rolls back" do
       assert Updater.reconcile_outcome_public(:auto, true, {:error, :reauth_required}) ==

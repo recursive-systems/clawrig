@@ -32,6 +32,7 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:update_notice, nil)
       |> assign(:resume_update_version, State.get(:update_resume_version))
       |> assign(:resume_update_reason, State.get(:update_resume_reason))
+      |> assign(:resume_update_attempts, State.get(:update_retry_attempts) || 0)
       |> assign(:auto_update_enabled, Clawrig.Updater.auto_update_enabled?())
       |> assign(:account_sub, :idle)
       |> assign(:account_error, nil)
@@ -318,14 +319,33 @@ defmodule ClawrigWeb.DashboardLive do
   end
 
   def handle_event("retry_update_now", _params, socket) do
-    State.merge(%{update_resume_version: nil, update_resume_reason: nil})
-    send(self(), :check_update)
+    attempts = State.get(:update_retry_attempts) || 0
 
-    {:noreply,
-     socket
-     |> assign(:resume_update_version, nil)
-     |> assign(:resume_update_reason, nil)
-     |> assign(:update_status, :checking)}
+    if Clawrig.Updater.retry_allowed_public?(attempts) do
+      State.merge(%{
+        update_resume_version: nil,
+        update_resume_reason: nil,
+        update_retry_attempts: attempts + 1
+      })
+
+      send(self(), :check_update)
+
+      {:noreply,
+       socket
+       |> assign(:resume_update_version, nil)
+       |> assign(:resume_update_reason, nil)
+       |> assign(:resume_update_attempts, attempts + 1)
+       |> assign(:update_status, :checking)}
+    else
+      {:noreply,
+       socket
+       |> assign(
+         :update_status,
+         {:error,
+          "ClawRig has already retried this update multiple times. Please investigate before retrying again."}
+       )
+       |> put_flash(:error, "Update retry limit reached. Please investigate before retrying again.")}
+    end
   end
 
   def handle_event("view_logs", _params, socket) do
@@ -925,11 +945,13 @@ defmodule ClawrigWeb.DashboardLive do
   defp after_provider_reconnect(socket) do
     case {State.get(:update_resume_version), State.get(:update_resume_reason)} do
       {version, :rolled_back_auth_required} when is_binary(version) ->
+        attempts = State.get(:update_retry_attempts) || 0
         State.merge(%{update_resume_version: nil, update_resume_reason: nil})
 
         socket
         |> assign(:resume_update_version, version)
         |> assign(:resume_update_reason, :rolled_back_auth_required)
+        |> assign(:resume_update_attempts, attempts)
         |> assign(:update_status, {:ready_to_retry_update, "OpenAI reconnected. You can retry update v#{version} now."})
         |> assign(:update_version, version)
         |> assign(:update_notice, nil)
@@ -940,6 +962,7 @@ defmodule ClawrigWeb.DashboardLive do
         socket
         |> assign(:resume_update_version, nil)
         |> assign(:resume_update_reason, nil)
+        |> assign(:resume_update_attempts, 0)
         |> assign(:update_status, {:ready_to_resume_ai, "OpenAI reconnected. AI features are ready again after update v#{version}."})
         |> assign(:update_version, version)
         |> assign(:update_notice, nil)

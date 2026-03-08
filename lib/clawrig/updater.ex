@@ -31,6 +31,7 @@ defmodule Clawrig.Updater do
   @api_base "https://api.github.com"
 
   @required_manifest_fields ~w(version tarball signature checksum released_at)
+  @max_retry_attempts 2
 
   # ── Public API ──────────────────────────────────────────────────────
 
@@ -86,6 +87,12 @@ defmodule Clawrig.Updater do
         %{status: :health_failed, version: version, rollback: true, resume_reason: nil}
     end
   end
+
+  @doc "Returns the maximum number of guided retry attempts before manual investigation is required."
+  def max_retry_attempts, do: @max_retry_attempts
+
+  @doc "Returns whether a retry is still allowed for the given persisted attempt count."
+  def retry_allowed_public?(attempts), do: retry_allowed?(attempts)
 
   @doc "Enable or disable automatic update checks."
   def set_auto_update(enabled) when is_boolean(enabled) do
@@ -227,20 +234,21 @@ defmodule Clawrig.Updater do
             Logger.info("[Updater] Post-update health check passed for v#{version}")
             File.rm(@pending_marker)
             sudo_rm_rf(@prev_dir)
+            State.merge(%{update_resume_version: nil, update_resume_reason: nil, update_retry_attempts: 0})
             broadcast({:ok, :updated, version})
 
           :rolled_back_auth_required ->
             Logger.warning("[Updater] Post-update auth probe requires re-auth for auto update v#{version}; rolling back")
             rollback()
             File.rm(@pending_marker)
-            State.merge(%{update_resume_version: version, update_resume_reason: :rolled_back_auth_required})
+            State.merge(%{update_resume_version: version, update_resume_reason: :rolled_back_auth_required, update_retry_attempts: 0})
             broadcast({:ok, :rolled_back_auth_required, version})
 
           :pending_reauth_post_update ->
             Logger.warning("[Updater] Post-update auth probe requires re-auth for manual update v#{version}")
             File.rm(@pending_marker)
             sudo_rm_rf(@prev_dir)
-            State.merge(%{update_resume_version: version, update_resume_reason: :pending_reauth_post_update})
+            State.merge(%{update_resume_version: version, update_resume_reason: :pending_reauth_post_update, update_retry_attempts: 0})
             broadcast({:ok, :pending_reauth_post_update, version})
 
           :health_failed ->
@@ -596,6 +604,9 @@ defmodule Clawrig.Updater do
   defp reconcile_outcome(:auto, true, {:error, :reauth_required}), do: :rolled_back_auth_required
   defp reconcile_outcome(:manual, true, {:error, :reauth_required}), do: :pending_reauth_post_update
   defp reconcile_outcome(_mode, true, _), do: :health_failed
+
+  defp retry_allowed?(attempts) when is_integer(attempts), do: attempts < @max_retry_attempts
+  defp retry_allowed?(_), do: false
 
   defp maybe_defer_for_recovery_path(remote_version, local_version) do
     case classify_update_risk(remote_version, local_version) do
