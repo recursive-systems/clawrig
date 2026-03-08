@@ -30,6 +30,8 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:update_status, nil)
       |> assign(:update_version, nil)
       |> assign(:update_notice, nil)
+      |> assign(:resume_update_version, State.get(:update_resume_version))
+      |> assign(:resume_update_reason, State.get(:update_resume_reason))
       |> assign(:auto_update_enabled, Clawrig.Updater.auto_update_enabled?())
       |> assign(:account_sub, :idle)
       |> assign(:account_error, nil)
@@ -313,6 +315,17 @@ defmodule ClawrigWeb.DashboardLive do
     new_value = !socket.assigns.auto_update_enabled
     Clawrig.Updater.set_auto_update(new_value)
     {:noreply, assign(socket, :auto_update_enabled, new_value)}
+  end
+
+  def handle_event("retry_update_now", _params, socket) do
+    State.merge(%{update_resume_version: nil, update_resume_reason: nil})
+    send(self(), :check_update)
+
+    {:noreply,
+     socket
+     |> assign(:resume_update_version, nil)
+     |> assign(:resume_update_reason, nil)
+     |> assign(:update_status, :checking)}
   end
 
   def handle_event("view_logs", _params, socket) do
@@ -841,6 +854,7 @@ defmodule ClawrigWeb.DashboardLive do
        account_provider_type: "openai-compatible",
        account_error: nil
      )
+     |> after_provider_reconnect()
      |> put_flash(:info, "Provider connected. Gateway restarting...")}
   end
 
@@ -875,6 +889,7 @@ defmodule ClawrigWeb.DashboardLive do
        openai_user_code: nil,
        openai_device_auth_id: nil
      )
+     |> after_provider_reconnect()
      |> put_flash(:info, "OpenAI account connected. Gateway restarting...")}
   end
 
@@ -906,6 +921,33 @@ defmodule ClawrigWeb.DashboardLive do
   defp update_reauth_notice({:pending_reauth_post_update, message}), do: {:pending_reauth_post_update, message}
   defp update_reauth_notice({:rolled_back_auth_required, message}), do: {:rolled_back_auth_required, message}
   defp update_reauth_notice(_), do: nil
+
+  defp after_provider_reconnect(socket) do
+    case {State.get(:update_resume_version), State.get(:update_resume_reason)} do
+      {version, :rolled_back_auth_required} when is_binary(version) ->
+        State.merge(%{update_resume_version: nil, update_resume_reason: nil})
+
+        socket
+        |> assign(:resume_update_version, version)
+        |> assign(:resume_update_reason, :rolled_back_auth_required)
+        |> assign(:update_status, {:ready_to_retry_update, "OpenAI reconnected. You can retry update v#{version} now."})
+        |> assign(:update_version, version)
+        |> assign(:update_notice, nil)
+
+      {version, :pending_reauth_post_update} when is_binary(version) ->
+        State.merge(%{update_resume_version: nil, update_resume_reason: nil})
+
+        socket
+        |> assign(:resume_update_version, nil)
+        |> assign(:resume_update_reason, nil)
+        |> assign(:update_status, {:ready_to_resume_ai, "OpenAI reconnected. AI features are ready again after update v#{version}."})
+        |> assign(:update_version, version)
+        |> assign(:update_notice, nil)
+
+      _ ->
+        socket
+    end
+  end
 
   defp device_code_impl do
     Application.get_env(:clawrig, :device_code_module, Clawrig.Wizard.DeviceCode)

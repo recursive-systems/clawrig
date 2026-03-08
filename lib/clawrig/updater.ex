@@ -17,6 +17,7 @@ defmodule Clawrig.Updater do
   alias Clawrig.System.Commands
   alias Clawrig.OpenAI.Credentials, as: OpenAICredentials
   alias Clawrig.Auth.CodexAuth
+  alias Clawrig.Wizard.State
 
   @check_interval :timer.hours(24)
   @install_dir "/opt/clawrig"
@@ -185,12 +186,14 @@ defmodule Clawrig.Updater do
                 Logger.warning("[Updater] Post-update auth probe requires re-auth for auto update v#{version}; rolling back")
                 rollback()
                 File.rm(@pending_marker)
+                State.merge(%{update_resume_version: version, update_resume_reason: :rolled_back_auth_required})
                 broadcast({:ok, :rolled_back_auth_required, version})
 
               {:error, :reauth_required} ->
                 Logger.warning("[Updater] Post-update auth probe requires re-auth for manual update v#{version}")
                 File.rm(@pending_marker)
                 sudo_rm_rf(@prev_dir)
+                State.merge(%{update_resume_version: version, update_resume_reason: :pending_reauth_post_update})
                 broadcast({:ok, :pending_reauth_post_update, version})
             end
 

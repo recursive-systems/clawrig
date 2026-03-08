@@ -14,7 +14,9 @@ defmodule Clawrig.PreviewState do
     "node-handshake-failed",
     "update-pending-recovery",
     "update-pending-reauth",
-    "update-rolled-back-auth"
+    "update-rolled-back-auth",
+    "update-ready-retry",
+    "update-ready-ai"
   ]
 
   def enabled? do
@@ -122,6 +124,22 @@ defmodule Clawrig.PreviewState do
     %{
       update_status: {:rolled_back_auth_required,
        "Automatic update to v5.4.0 was rolled back to avoid interrupting service. Reconnect OpenAI, then try again."},
+      update_version: "5.4.0"
+    }
+  end
+
+  defp scenario_overrides("update-ready-retry") do
+    %{
+      update_status: {:ready_to_retry_update,
+       "OpenAI reconnected. You can retry update v5.4.0 now."},
+      update_version: "5.4.0"
+    }
+  end
+
+  defp scenario_overrides("update-ready-ai") do
+    %{
+      update_status: {:ready_to_resume_ai,
+       "OpenAI reconnected. AI features are ready again after update v5.4.0."},
       update_version: "5.4.0"
     }
   end

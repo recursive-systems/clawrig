@@ -591,6 +591,21 @@
               <p>{elem(@update_status, 1)}</p>
               <p><.link navigate={~p"/account"} class="account-auth-link">Reconnect OpenAI</.link></p>
             </div>
+            <div
+              :if={is_tuple(@update_status) and elem(@update_status, 0) == :ready_to_retry_update}
+              class="update-ok"
+            >
+              <strong>Ready to retry update.</strong>
+              <p>{elem(@update_status, 1)}</p>
+              <button class="btn subtle btn-sm mt-sm" phx-click="retry_update_now">Retry Update Now</button>
+            </div>
+            <div
+              :if={is_tuple(@update_status) and elem(@update_status, 0) == :ready_to_resume_ai}
+              class="update-ok"
+            >
+              <strong>AI features are restored.</strong>
+              <p>{elem(@update_status, 1)}</p>
+            </div>
             <p
               :if={is_tuple(@update_status) and elem(@update_status, 0) == :error}
               class="update-err"
