@@ -29,6 +29,7 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:logs, nil)
       |> assign(:update_status, nil)
       |> assign(:update_version, nil)
+      |> assign(:update_notice, nil)
       |> assign(:auto_update_enabled, Clawrig.Updater.auto_update_enabled?())
       |> assign(:account_sub, :idle)
       |> assign(:account_error, nil)
@@ -69,7 +70,8 @@ defmodule ClawrigWeb.DashboardLive do
   @impl true
   def handle_params(params, _uri, socket) do
     preview_overrides = PreviewState.apply_dashboard(params)
-    {:noreply, assign(socket, preview_overrides)}
+    update_notice = update_reauth_notice(preview_overrides[:update_status])
+    {:noreply, socket |> assign(preview_overrides) |> assign(:update_notice, update_notice)}
   end
 
   # ---------- Events ----------
@@ -615,7 +617,8 @@ defmodule ClawrigWeb.DashboardLive do
     {:noreply,
      socket
      |> assign(:update_status, update_status)
-     |> assign(:update_version, update_version)}
+     |> assign(:update_version, update_version)
+     |> assign(:update_notice, update_reauth_notice(update_status))}
   end
 
   def handle_info({:node_status, status}, socket) do
@@ -899,6 +902,10 @@ defmodule ClawrigWeb.DashboardLive do
   defp normalize_update_status({:ok, :rolled_back_auth_required, v, _reason}), do: {{:rolled_back_auth_required, "Automatic update to v#{v} was rolled back to avoid interrupting service. Reconnect OpenAI, then try again."}, v}
   defp normalize_update_status({:error, reason}), do: {{:error, reason}, nil}
   defp normalize_update_status(_), do: {nil, nil}
+
+  defp update_reauth_notice({:pending_reauth_post_update, message}), do: {:pending_reauth_post_update, message}
+  defp update_reauth_notice({:rolled_back_auth_required, message}), do: {:rolled_back_auth_required, message}
+  defp update_reauth_notice(_), do: nil
 
   defp device_code_impl do
     Application.get_env(:clawrig, :device_code_module, Clawrig.Wizard.DeviceCode)

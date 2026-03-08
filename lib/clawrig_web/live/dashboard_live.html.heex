@@ -139,6 +139,24 @@
 
     <%!-- Account --%>
     <.dash_panel :if={@live_action == :account} title="AI Provider" back>
+      <div :if={@update_notice && elem(@update_notice, 0) == :pending_reauth_post_update} class="account-section">
+        <div class="account-status account-connected" style="border-color: rgba(59,130,246,0.35);">
+          <span>
+            <strong>Reconnect OpenAI to finish the update.</strong>
+            {" "}{elem(@update_notice, 1)}
+          </span>
+        </div>
+      </div>
+
+      <div :if={@update_notice && elem(@update_notice, 0) == :rolled_back_auth_required} class="account-section">
+        <div class="account-status" style="border-color: rgba(245,158,11,0.35); color: #f8fafc;">
+          <span>
+            <strong>Reconnect OpenAI before retrying the update.</strong>
+            {" "}{elem(@update_notice, 1)}
+          </span>
+        </div>
+      </div>
+
       <%!-- Connected --%>
       <div :if={@account_sub == :idle and @openai_status == :connected} class="account-section">
         <div class="account-status account-connected">

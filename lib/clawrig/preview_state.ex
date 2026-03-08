@@ -112,7 +112,9 @@ defmodule Clawrig.PreviewState do
     %{
       update_status: {:pending_reauth_post_update,
        "Update v5.4.0 finished, but OpenAI needs to be reconnected before AI features can continue. Open the Account tab to reconnect."},
-      update_version: "5.4.0"
+      update_version: "5.4.0",
+      account_sub: :choose,
+      account_provider_type: "openai"
     }
   end
 
