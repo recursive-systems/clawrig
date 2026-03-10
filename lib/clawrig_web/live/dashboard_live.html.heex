@@ -165,7 +165,10 @@
 
     <%!-- Account --%>
     <.dash_panel :if={@live_action == :account} title="AI Provider" back>
-      <div :if={@update_notice && elem(@update_notice, 0) == :pending_reauth_post_update} class="account-section">
+      <div
+        :if={@update_notice && elem(@update_notice, 0) == :pending_reauth_post_update}
+        class="account-section"
+      >
         <div class="account-status account-connected" style="border-color: rgba(59,130,246,0.35);">
           <span>
             <strong>Reconnect OpenAI to finish the update.</strong>
@@ -174,7 +177,10 @@
         </div>
       </div>
 
-      <div :if={@update_notice && elem(@update_notice, 0) == :rolled_back_auth_required} class="account-section">
+      <div
+        :if={@update_notice && elem(@update_notice, 0) == :rolled_back_auth_required}
+        class="account-section"
+      >
         <div class="account-status" style="border-color: rgba(245,158,11,0.35); color: #f8fafc;">
           <span>
             <strong>Reconnect OpenAI before retrying the update.</strong>
@@ -622,20 +628,31 @@
               <p>{elem(@update_status, 1)}</p>
             </div>
             <div
-              :if={is_tuple(@update_status) and elem(@update_status, 0) == :pending_reauth_post_update}
+              :if={
+                is_tuple(@update_status) and
+                  elem(@update_status, 0) == :pending_reauth_post_update
+              }
               class="update-info"
             >
               <strong>Reconnect OpenAI to continue.</strong>
               <p>{elem(@update_status, 1)}</p>
-              <p><.link navigate={~p"/account"} class="account-auth-link">Open Account Settings</.link></p>
+              <p>
+                <.link navigate={~p"/account"} class="account-auth-link">
+                  Open Account Settings
+                </.link>
+              </p>
             </div>
             <div
-              :if={is_tuple(@update_status) and elem(@update_status, 0) == :rolled_back_auth_required}
+              :if={
+                is_tuple(@update_status) and elem(@update_status, 0) == :rolled_back_auth_required
+              }
               class="update-err"
             >
               <strong>Update rolled back.</strong>
               <p>{elem(@update_status, 1)}</p>
-              <p><.link navigate={~p"/account"} class="account-auth-link">Reconnect OpenAI</.link></p>
+              <p>
+                <.link navigate={~p"/account"} class="account-auth-link">Reconnect OpenAI</.link>
+              </p>
             </div>
             <div
               :if={is_tuple(@update_status) and elem(@update_status, 0) == :ready_to_retry_update}
@@ -643,8 +660,12 @@
             >
               <strong>Ready to retry update.</strong>
               <p>{elem(@update_status, 1)}</p>
-              <p class="setting-hint">Retry attempts used: {@resume_update_attempts} / {Clawrig.Updater.max_retry_attempts()}</p>
-              <button class="btn subtle btn-sm mt-sm" phx-click="retry_update_now">Retry Update Now</button>
+              <p class="setting-hint">
+                Retry attempts used: {@resume_update_attempts} / {Clawrig.Updater.max_retry_attempts()}
+              </p>
+              <button class="btn subtle btn-sm mt-sm" phx-click="retry_update_now">
+                Retry Update Now
+              </button>
             </div>
             <div
               :if={is_tuple(@update_status) and elem(@update_status, 0) == :ready_to_resume_ai}

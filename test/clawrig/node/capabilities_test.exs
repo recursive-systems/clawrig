@@ -21,7 +21,9 @@ defmodule Clawrig.Node.CapabilitiesTest do
     end
 
     test "network.internet.check returns boolean" do
-      assert {:ok, %{"connected" => connected}} = Capabilities.invoke("network.internet.check", %{})
+      assert {:ok, %{"connected" => connected}} =
+               Capabilities.invoke("network.internet.check", %{})
+
       assert is_boolean(connected)
     end
 

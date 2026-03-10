@@ -387,7 +387,10 @@ defmodule ClawrigWeb.DashboardLive do
          {:error,
           "ClawRig has already retried this update multiple times. Please investigate before retrying again."}
        )
-       |> put_flash(:error, "Update retry limit reached. Please investigate before retrying again.")}
+       |> put_flash(
+         :error,
+         "Update retry limit reached. Please investigate before retrying again."
+       )}
     end
   end
 
@@ -973,17 +976,51 @@ defmodule ClawrigWeb.DashboardLive do
   defp normalize_update_status({:ok, :downloading, v}), do: {:downloading, v}
   defp normalize_update_status({:ok, :installing, v}), do: {:installing, v}
   defp normalize_update_status({:ok, :updated, v}), do: {:updated, v}
-  defp normalize_update_status({:ok, :pending_recovery_path, v}), do: {{:pending_recovery_path, "A new update (v#{v}) is ready, but ClawRig is waiting to install it until your device is reachable."}, v}
-  defp normalize_update_status({:ok, :pending_recovery_path, v, _reason}), do: {{:pending_recovery_path, "A new update (v#{v}) is ready. To avoid interruptions, install it when you’re at home or connected through Tailscale."}, v}
-  defp normalize_update_status({:ok, :pending_reauth_post_update, v}), do: {{:pending_reauth_post_update, "Update v#{v} was installed, but OpenAI needs to be reconnected before AI features can continue."}, v}
-  defp normalize_update_status({:ok, :pending_reauth_post_update, v, _reason}), do: {{:pending_reauth_post_update, "Update v#{v} finished, but OpenAI needs to be reconnected before AI features can continue. Open the Account tab to reconnect."}, v}
-  defp normalize_update_status({:ok, :rolled_back_auth_required, v}), do: {{:rolled_back_auth_required, "Automatic update to v#{v} was rolled back because reconnecting OpenAI is required."}, v}
-  defp normalize_update_status({:ok, :rolled_back_auth_required, v, _reason}), do: {{:rolled_back_auth_required, "Automatic update to v#{v} was rolled back to avoid interrupting service. Reconnect OpenAI, then try again."}, v}
+
+  defp normalize_update_status({:ok, :pending_recovery_path, v}),
+    do:
+      {{:pending_recovery_path,
+        "A new update (v#{v}) is ready, but ClawRig is waiting to install it until your device is reachable."},
+       v}
+
+  defp normalize_update_status({:ok, :pending_recovery_path, v, _reason}),
+    do:
+      {{:pending_recovery_path,
+        "A new update (v#{v}) is ready. To avoid interruptions, install it when you’re at home or connected through Tailscale."},
+       v}
+
+  defp normalize_update_status({:ok, :pending_reauth_post_update, v}),
+    do:
+      {{:pending_reauth_post_update,
+        "Update v#{v} was installed, but OpenAI needs to be reconnected before AI features can continue."},
+       v}
+
+  defp normalize_update_status({:ok, :pending_reauth_post_update, v, _reason}),
+    do:
+      {{:pending_reauth_post_update,
+        "Update v#{v} finished, but OpenAI needs to be reconnected before AI features can continue. Open the Account tab to reconnect."},
+       v}
+
+  defp normalize_update_status({:ok, :rolled_back_auth_required, v}),
+    do:
+      {{:rolled_back_auth_required,
+        "Automatic update to v#{v} was rolled back because reconnecting OpenAI is required."}, v}
+
+  defp normalize_update_status({:ok, :rolled_back_auth_required, v, _reason}),
+    do:
+      {{:rolled_back_auth_required,
+        "Automatic update to v#{v} was rolled back to avoid interrupting service. Reconnect OpenAI, then try again."},
+       v}
+
   defp normalize_update_status({:error, reason}), do: {{:error, reason}, nil}
   defp normalize_update_status(_), do: {nil, nil}
 
-  defp update_reauth_notice({:pending_reauth_post_update, message}), do: {:pending_reauth_post_update, message}
-  defp update_reauth_notice({:rolled_back_auth_required, message}), do: {:rolled_back_auth_required, message}
+  defp update_reauth_notice({:pending_reauth_post_update, message}),
+    do: {:pending_reauth_post_update, message}
+
+  defp update_reauth_notice({:rolled_back_auth_required, message}),
+    do: {:rolled_back_auth_required, message}
+
   defp update_reauth_notice(_), do: nil
 
   defp after_provider_reconnect(socket) do
@@ -996,7 +1033,10 @@ defmodule ClawrigWeb.DashboardLive do
         |> assign(:resume_update_version, version)
         |> assign(:resume_update_reason, :rolled_back_auth_required)
         |> assign(:resume_update_attempts, attempts)
-        |> assign(:update_status, {:ready_to_retry_update, "OpenAI reconnected. You can retry update v#{version} now."})
+        |> assign(
+          :update_status,
+          {:ready_to_retry_update, "OpenAI reconnected. You can retry update v#{version} now."}
+        )
         |> assign(:update_version, version)
         |> assign(:update_notice, nil)
 
@@ -1007,7 +1047,11 @@ defmodule ClawrigWeb.DashboardLive do
         |> assign(:resume_update_version, nil)
         |> assign(:resume_update_reason, nil)
         |> assign(:resume_update_attempts, 0)
-        |> assign(:update_status, {:ready_to_resume_ai, "OpenAI reconnected. AI features are ready again after update v#{version}."})
+        |> assign(
+          :update_status,
+          {:ready_to_resume_ai,
+           "OpenAI reconnected. AI features are ready again after update v#{version}."}
+        )
         |> assign(:update_version, version)
         |> assign(:update_notice, nil)
 

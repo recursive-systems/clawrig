@@ -50,7 +50,14 @@ defmodule Clawrig.Node.ProtocolTest do
 
   describe "decode/1" do
     test "decodes request frame" do
-      json = Jason.encode!(%{"type" => "req", "id" => 5, "method" => "node.invoke", "params" => %{"command" => "test"}})
+      json =
+        Jason.encode!(%{
+          "type" => "req",
+          "id" => 5,
+          "method" => "node.invoke",
+          "params" => %{"command" => "test"}
+        })
+
       assert {:req, 5, "node.invoke", %{"command" => "test"}} = Protocol.decode(json)
     end
 
@@ -60,12 +67,25 @@ defmodule Clawrig.Node.ProtocolTest do
     end
 
     test "decodes error response" do
-      json = Jason.encode!(%{"type" => "res", "id" => 1, "ok" => false, "error" => %{"reason" => "bad"}})
+      json =
+        Jason.encode!(%{
+          "type" => "res",
+          "id" => 1,
+          "ok" => false,
+          "error" => %{"reason" => "bad"}
+        })
+
       assert {:res, 1, false, %{"reason" => "bad"}} = Protocol.decode(json)
     end
 
     test "decodes event frame" do
-      json = Jason.encode!(%{"type" => "event", "event" => "connect.challenge", "payload" => %{"nonce" => "x"}})
+      json =
+        Jason.encode!(%{
+          "type" => "event",
+          "event" => "connect.challenge",
+          "payload" => %{"nonce" => "x"}
+        })
+
       assert {:event, "connect.challenge", %{"nonce" => "x"}} = Protocol.decode(json)
     end
 

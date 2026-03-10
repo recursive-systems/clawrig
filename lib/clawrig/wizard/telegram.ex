@@ -42,13 +42,14 @@ defmodule Clawrig.Wizard.Telegram do
         |> Enum.find_value(fn update ->
           update_id = update["update_id"]
 
-          if is_integer(since_update_id) and is_integer(update_id) and update_id <= since_update_id do
+          if is_integer(since_update_id) and is_integer(update_id) and
+               update_id <= since_update_id do
             nil
           else
             msg = update["message"]
             text = (msg && msg["text"] && String.trim(msg["text"])) || ""
 
-            if msg && msg["chat"]["type"] == "private" and text == "/start" do
+            if (msg && msg["chat"]["type"] == "private") and text == "/start" do
               chat_id = to_string(msg["chat"]["id"])
               first_name = msg["chat"]["first_name"] || "there"
               {chat_id, first_name, update_id}

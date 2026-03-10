@@ -8,7 +8,7 @@
     <p>
       Mode: <strong id="status-mode">{@status.mode}</strong>
     </p>
-    <p id="status-connecting" :if={@status.connecting}>
+    <p :if={@status.connecting} id="status-connecting">
       <span class="wifi-status-badge pending">
         <span class="wifi-status-dot"></span> Connecting...
       </span>
@@ -22,8 +22,8 @@
     <p :if={!@status.connected_ssid} id="status-disconnected">
       Not connected to any network.
     </p>
-    <p id="status-ip" :if={false}>IP: <strong></strong></p>
-    <p id="status-error" :if={false}></p>
+    <p :if={false} id="status-ip">IP: <strong></strong></p>
+    <p :if={false} id="status-error"></p>
   </div>
 
   <a href="/portal" class="wifi-btn-subtle">Back to Wi-Fi setup</a>

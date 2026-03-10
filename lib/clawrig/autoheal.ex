@@ -38,7 +38,8 @@ defmodule Clawrig.Autoheal do
       Map.merge(current, %{
         "enabled" => enabled,
         "last_action" => if(enabled, do: "enabled", else: "disabled"),
-        "last_run_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
+        "last_run_at" =>
+          DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
         "last_result" => "ok"
       })
     )
@@ -62,6 +63,7 @@ defmodule Clawrig.Autoheal do
         }
 
         update_status(payload)
+
         log_action(%{
           "check" => "manual-run",
           "action" => "no-op",
@@ -93,6 +95,7 @@ defmodule Clawrig.Autoheal do
         }
 
         update_status(payload)
+
         log_action(%{
           "check" => "manual-run",
           "action" => "restart-gateway",
@@ -106,7 +109,10 @@ defmodule Clawrig.Autoheal do
 
   def log_action(entry) when is_map(entry) do
     payload =
-      Map.merge(%{"ts" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()}, entry)
+      Map.merge(
+        %{"ts" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()},
+        entry
+      )
 
     with :ok <- ensure_parent(log_path()),
          encoded <- Jason.encode!(payload) do

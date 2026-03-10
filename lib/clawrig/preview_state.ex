@@ -66,7 +66,8 @@ defmodule Clawrig.PreviewState do
       node_detail: %{
         status: :connected,
         last_error: nil,
-        last_connected_at: DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
+        last_connected_at:
+          DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
         last_disconnected_at: nil,
         reconnect_attempts: 0
       },
@@ -81,7 +82,8 @@ defmodule Clawrig.PreviewState do
         status: :disconnected,
         last_error: "waiting for gateway to be running",
         last_connected_at: nil,
-        last_disconnected_at: DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
+        last_disconnected_at:
+          DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
         reconnect_attempts: 4
       },
       node_device_id: "node_blocked_4b92d1a8e7c3"
@@ -93,9 +95,11 @@ defmodule Clawrig.PreviewState do
       node_status: :disconnected,
       node_detail: %{
         status: :disconnected,
-        last_error: "rejected: %{\"type\" => \"hello-error\", \"reason\" => \"invalid signature\"}",
+        last_error:
+          "rejected: %{\"type\" => \"hello-error\", \"reason\" => \"invalid signature\"}",
         last_connected_at: nil,
-        last_disconnected_at: DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
+        last_disconnected_at:
+          DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
         reconnect_attempts: 7
       },
       node_device_id: "node_hs_1d7f5a3c8b2e"
@@ -104,16 +108,18 @@ defmodule Clawrig.PreviewState do
 
   defp scenario_overrides("update-pending-recovery") do
     %{
-      update_status: {:pending_recovery_path,
-       "A new update (v5.4.0) is ready. To avoid interruptions, install it when you’re at home or connected through Tailscale."},
+      update_status:
+        {:pending_recovery_path,
+         "A new update (v5.4.0) is ready. To avoid interruptions, install it when you’re at home or connected through Tailscale."},
       update_version: "5.4.0"
     }
   end
 
   defp scenario_overrides("update-pending-reauth") do
     %{
-      update_status: {:pending_reauth_post_update,
-       "Update v5.4.0 finished, but OpenAI needs to be reconnected before AI features can continue. Open the Account tab to reconnect."},
+      update_status:
+        {:pending_reauth_post_update,
+         "Update v5.4.0 finished, but OpenAI needs to be reconnected before AI features can continue. Open the Account tab to reconnect."},
       update_version: "5.4.0",
       account_sub: :choose,
       account_provider_type: "openai"
@@ -122,24 +128,26 @@ defmodule Clawrig.PreviewState do
 
   defp scenario_overrides("update-rolled-back-auth") do
     %{
-      update_status: {:rolled_back_auth_required,
-       "Automatic update to v5.4.0 was rolled back to avoid interrupting service. Reconnect OpenAI, then try again."},
+      update_status:
+        {:rolled_back_auth_required,
+         "Automatic update to v5.4.0 was rolled back to avoid interrupting service. Reconnect OpenAI, then try again."},
       update_version: "5.4.0"
     }
   end
 
   defp scenario_overrides("update-ready-retry") do
     %{
-      update_status: {:ready_to_retry_update,
-       "OpenAI reconnected. You can retry update v5.4.0 now."},
+      update_status:
+        {:ready_to_retry_update, "OpenAI reconnected. You can retry update v5.4.0 now."},
       update_version: "5.4.0"
     }
   end
 
   defp scenario_overrides("update-ready-ai") do
     %{
-      update_status: {:ready_to_resume_ai,
-       "OpenAI reconnected. AI features are ready again after update v5.4.0."},
+      update_status:
+        {:ready_to_resume_ai,
+         "OpenAI reconnected. AI features are ready again after update v5.4.0."},
       update_version: "5.4.0"
     }
   end

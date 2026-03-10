@@ -74,13 +74,14 @@ defmodule Clawrig.Node.Client do
   end
 
   def handle_call(:status_detail, _from, state) do
-    {:reply, %{
-      status: state.status,
-      last_error: state.last_error,
-      last_connected_at: state.last_connected_at,
-      last_disconnected_at: state.last_disconnected_at,
-      reconnect_attempts: state.reconnect_attempts
-    }, state}
+    {:reply,
+     %{
+       status: state.status,
+       last_error: state.last_error,
+       last_connected_at: state.last_connected_at,
+       last_disconnected_at: state.last_disconnected_at,
+       reconnect_attempts: state.reconnect_attempts
+     }, state}
   end
 
   def handle_call(:device_id, _from, state) do
@@ -388,7 +389,16 @@ defmodule Clawrig.Node.Client do
     broadcast(:connected)
     schedule_heartbeat(tick_interval)
 
-    {:ok, %{state | status: :connected, device_token: device_token, tick_interval: tick_interval, last_error: nil, last_connected_at: now_iso(), reconnect_attempts: 0}}
+    {:ok,
+     %{
+       state
+       | status: :connected,
+         device_token: device_token,
+         tick_interval: tick_interval,
+         last_error: nil,
+         last_connected_at: now_iso(),
+         reconnect_attempts: 0
+     }}
   end
 
   defp handle_ok_response(_id, _payload, state), do: {:ok, state}
@@ -517,7 +527,6 @@ defmodule Clawrig.Node.Client do
       _ -> "0.0.0-dev"
     end
   end
-
 
   defp now_iso do
     DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()

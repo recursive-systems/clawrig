@@ -71,8 +71,15 @@ defmodule Clawrig.UpdaterTest do
 
   describe "post_update_auth_probe_public/1" do
     setup do
-      auth_path = Path.join(System.tmp_dir!(), "clawrig-test-auth-profiles-probe-#{System.unique_integer([:positive])}.json")
-      home = Path.join(System.tmp_dir!(), "clawrig-test-home-#{System.unique_integer([:positive])}")
+      auth_path =
+        Path.join(
+          System.tmp_dir!(),
+          "clawrig-test-auth-profiles-probe-#{System.unique_integer([:positive])}.json"
+        )
+
+      home =
+        Path.join(System.tmp_dir!(), "clawrig-test-home-#{System.unique_integer([:positive])}")
+
       File.mkdir_p!(Path.join(home, ".codex"))
 
       old_home = System.get_env("HOME")
@@ -93,15 +100,27 @@ defmodule Clawrig.UpdaterTest do
       assert Updater.post_update_auth_probe_public("5.4.0") == {:error, :reauth_required}
     end
 
-    test "returns ok when auth files exist and model status succeeds", %{auth_path: auth_path, home: home} do
-      File.write!(auth_path, Jason.encode!(%{
-        "version" => 1,
-        "profiles" => %{
-          "openai-codex:default" => %{"provider" => "openai-codex", "refresh" => "refresh-token"}
-        }
-      }))
+    test "returns ok when auth files exist and model status succeeds", %{
+      auth_path: auth_path,
+      home: home
+    } do
+      File.write!(
+        auth_path,
+        Jason.encode!(%{
+          "version" => 1,
+          "profiles" => %{
+            "openai-codex:default" => %{
+              "provider" => "openai-codex",
+              "refresh" => "refresh-token"
+            }
+          }
+        })
+      )
 
-      File.write!(Path.join([home, ".codex", "auth.json"]), Jason.encode!(%{"auth_mode" => "chatgpt"}))
+      File.write!(
+        Path.join([home, ".codex", "auth.json"]),
+        Jason.encode!(%{"auth_mode" => "chatgpt"})
+      )
 
       assert Updater.post_update_auth_probe_public("5.4.0") == :ok
     end
@@ -141,21 +160,23 @@ defmodule Clawrig.UpdaterTest do
 
   describe "simulate_reconcile_public/4" do
     test "simulates auto update rollback path" do
-      assert Updater.simulate_reconcile_public(:auto, "5.4.0", true, {:error, :reauth_required}) == %{
-               status: :rolled_back_auth_required,
-               version: "5.4.0",
-               rollback: true,
-               resume_reason: :rolled_back_auth_required
-             }
+      assert Updater.simulate_reconcile_public(:auto, "5.4.0", true, {:error, :reauth_required}) ==
+               %{
+                 status: :rolled_back_auth_required,
+                 version: "5.4.0",
+                 rollback: true,
+                 resume_reason: :rolled_back_auth_required
+               }
     end
 
     test "simulates manual update pending reauth path" do
-      assert Updater.simulate_reconcile_public(:manual, "5.4.0", true, {:error, :reauth_required}) == %{
-               status: :pending_reauth_post_update,
-               version: "5.4.0",
-               rollback: false,
-               resume_reason: :pending_reauth_post_update
-             }
+      assert Updater.simulate_reconcile_public(:manual, "5.4.0", true, {:error, :reauth_required}) ==
+               %{
+                 status: :pending_reauth_post_update,
+                 version: "5.4.0",
+                 rollback: false,
+                 resume_reason: :pending_reauth_post_update
+               }
     end
 
     test "simulates clean update success" do
@@ -168,7 +189,12 @@ defmodule Clawrig.UpdaterTest do
     end
 
     test "simulates service health failure" do
-      assert Updater.simulate_reconcile_public(:manual, "5.4.0", false, {:error, :service_unhealthy}) == %{
+      assert Updater.simulate_reconcile_public(
+               :manual,
+               "5.4.0",
+               false,
+               {:error, :service_unhealthy}
+             ) == %{
                status: :health_failed,
                version: "5.4.0",
                rollback: true,

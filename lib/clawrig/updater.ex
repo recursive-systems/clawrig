@@ -228,28 +228,55 @@ defmodule Clawrig.Updater do
             _ -> false
           end
 
-        auth_probe_result = if service_active?, do: post_update_auth_probe(version), else: {:error, :service_unhealthy}
+        auth_probe_result =
+          if service_active?,
+            do: post_update_auth_probe(version),
+            else: {:error, :service_unhealthy}
 
         case reconcile_outcome(mode, service_active?, auth_probe_result) do
           :updated ->
             Logger.info("[Updater] Post-update health check passed for v#{version}")
             File.rm(@pending_marker)
             sudo_rm_rf(@prev_dir)
-            State.merge(%{update_resume_version: nil, update_resume_reason: nil, update_retry_attempts: 0})
+
+            State.merge(%{
+              update_resume_version: nil,
+              update_resume_reason: nil,
+              update_retry_attempts: 0
+            })
+
             broadcast({:ok, :updated, version})
 
           :rolled_back_auth_required ->
-            Logger.warning("[Updater] Post-update auth probe requires re-auth for auto update v#{version}; rolling back")
+            Logger.warning(
+              "[Updater] Post-update auth probe requires re-auth for auto update v#{version}; rolling back"
+            )
+
             rollback()
             File.rm(@pending_marker)
-            State.merge(%{update_resume_version: version, update_resume_reason: :rolled_back_auth_required, update_retry_attempts: 0})
+
+            State.merge(%{
+              update_resume_version: version,
+              update_resume_reason: :rolled_back_auth_required,
+              update_retry_attempts: 0
+            })
+
             broadcast({:ok, :rolled_back_auth_required, version})
 
           :pending_reauth_post_update ->
-            Logger.warning("[Updater] Post-update auth probe requires re-auth for manual update v#{version}")
+            Logger.warning(
+              "[Updater] Post-update auth probe requires re-auth for manual update v#{version}"
+            )
+
             File.rm(@pending_marker)
             sudo_rm_rf(@prev_dir)
-            State.merge(%{update_resume_version: version, update_resume_reason: :pending_reauth_post_update, update_retry_attempts: 0})
+
+            State.merge(%{
+              update_resume_version: version,
+              update_resume_reason: :pending_reauth_post_update,
+              update_retry_attempts: 0
+            })
+
             broadcast({:ok, :pending_reauth_post_update, version})
 
           :health_failed ->
@@ -279,7 +306,9 @@ defmodule Clawrig.Updater do
       Logger.info("[Updater] New version #{parsed.version} available (local: #{local_version})")
 
       case maybe_defer_for_recovery_path(parsed.version, local_version) do
-        :ok -> apply_update(parsed, mode)
+        :ok ->
+          apply_update(parsed, mode)
+
         {:deferred, reason} ->
           broadcast({:ok, :pending_recovery_path, parsed.version, reason})
           {:ok, :pending_recovery_path, parsed.version}
@@ -603,7 +632,10 @@ defmodule Clawrig.Updater do
   defp reconcile_outcome(_mode, false, _auth_probe_result), do: :health_failed
   defp reconcile_outcome(_mode, true, :ok), do: :updated
   defp reconcile_outcome(:auto, true, {:error, :reauth_required}), do: :rolled_back_auth_required
-  defp reconcile_outcome(:manual, true, {:error, :reauth_required}), do: :pending_reauth_post_update
+
+  defp reconcile_outcome(:manual, true, {:error, :reauth_required}),
+    do: :pending_reauth_post_update
+
   defp reconcile_outcome(_mode, true, _), do: :health_failed
 
   defp retry_allowed?(attempts) when is_integer(attempts), do: attempts < @max_retry_attempts
@@ -630,7 +662,10 @@ defmodule Clawrig.Updater do
   defp render_update_status(:checking), do: "checking"
   defp render_update_status({:ok, state}), do: Atom.to_string(state)
   defp render_update_status({:ok, state, version}), do: "#{Atom.to_string(state)}:#{version}"
-  defp render_update_status({:ok, state, version, _reason}), do: "#{Atom.to_string(state)}:#{version}"
+
+  defp render_update_status({:ok, state, version, _reason}),
+    do: "#{Atom.to_string(state)}:#{version}"
+
   defp render_update_status({:error, reason}), do: "error:#{reason}"
   defp render_update_status(other), do: inspect(other)
 
