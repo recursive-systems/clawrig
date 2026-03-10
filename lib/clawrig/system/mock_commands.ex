@@ -65,6 +65,22 @@ defmodule Clawrig.System.MockCommands do
     :ok
   end
 
+  # Backward-compat helper retained for existing tests.
+  def check_openclaw do
+    case run_openclaw(["--version"]) do
+      {version, 0} -> {:ok, String.trim(version)}
+      {err, _} -> {:error, String.trim(err)}
+    end
+  end
+
+  # Backward-compat helper retained for existing tests.
+  def install_openclaw do
+    case run_openclaw(["gateway", "install"]) do
+      {_msg, 0} -> check_openclaw()
+      {err, _} -> {:error, String.trim(err)}
+    end
+  end
+
   @impl true
   def detect_local_ip do
     "192.168.1.42"

@@ -32,4 +32,17 @@ config :logger, :default_formatter,
 
 config :phoenix, :json_library, Jason
 
+config :clawrig,
+  fleet_enabled: false,
+  fleet_transport: Clawrig.Fleet.HttpTransport,
+  fleet_endpoint: nil,
+  fleet_device_token: nil,
+  fleet_org_slug: "default-org",
+  fleet_org_name: "Default Organization",
+  fleet_site_code: "default-site",
+  fleet_site_name: "Default Site",
+  fleet_interval_ms: 60_000,
+  fleet_startup_delay_ms: 5_000,
+  fleet_require_oobe: true
+
 import_config "#{config_env()}.exs"

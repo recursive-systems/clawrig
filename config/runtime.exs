@@ -32,6 +32,48 @@ if config_env() == :prod do
 
   host = System.get_env("PHX_HOST", default_host)
 
+  fleet_interval_ms =
+    case Integer.parse(System.get_env("CLAWRIG_FLEET_INTERVAL_MS", "60000")) do
+      {value, _} -> value
+      :error -> 60_000
+    end
+
+  config :clawrig,
+         :fleet_enabled,
+         System.get_env("CLAWRIG_FLEET_ENABLED", "false") == "true"
+
+  config :clawrig,
+         :fleet_endpoint,
+         System.get_env("CLAWRIG_FLEET_ENDPOINT")
+
+  config :clawrig,
+         :fleet_device_token,
+         System.get_env("CLAWRIG_FLEET_DEVICE_TOKEN")
+
+  config :clawrig,
+         :fleet_org_slug,
+         System.get_env("CLAWRIG_FLEET_ORG_SLUG", "default-org")
+
+  config :clawrig,
+         :fleet_org_name,
+         System.get_env("CLAWRIG_FLEET_ORG_NAME", "Default Organization")
+
+  config :clawrig,
+         :fleet_site_code,
+         System.get_env("CLAWRIG_FLEET_SITE_CODE", "default-site")
+
+  config :clawrig,
+         :fleet_site_name,
+         System.get_env("CLAWRIG_FLEET_SITE_NAME", "Default Site")
+
+  config :clawrig,
+         :fleet_interval_ms,
+         fleet_interval_ms
+
+  config :clawrig,
+         :fleet_require_oobe,
+         System.get_env("CLAWRIG_FLEET_REQUIRE_OOBE", "true") == "true"
+
   config :clawrig, ClawrigWeb.Endpoint,
     url: [host: host, port: 80, scheme: "http"],
     http: [

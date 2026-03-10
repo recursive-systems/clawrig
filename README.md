@@ -69,6 +69,25 @@ The Playwright harness starts ClawRig on a separate local port with mock system
 commands, preview states, dev auth bypass, and isolated temp state files so you
 can exercise portal, setup, and dashboard flows end-to-end.
 
+## Fleet Telemetry
+
+ClawRig includes a generic fleet heartbeat sender (disabled by default) so
+open-source ClawRig can target any backend with a compatible payload.
+
+Enable sender in production via environment:
+
+- `CLAWRIG_FLEET_ENABLED=true`
+- `CLAWRIG_FLEET_ENDPOINT=https://<fleet-backend>/api/v1/heartbeats`
+- `CLAWRIG_FLEET_DEVICE_TOKEN=<device-token>`
+- `CLAWRIG_FLEET_ORG_SLUG=<org-slug>`
+- `CLAWRIG_FLEET_SITE_CODE=<site-code>`
+
+Optional:
+
+- `CLAWRIG_FLEET_INTERVAL_MS=60000`
+- `CLAWRIG_FLEET_REQUIRE_OOBE=true`
+- `CLAWRIG_FLEET_ORG_NAME`, `CLAWRIG_FLEET_SITE_NAME`
+
 ## Configuration
 
 | Environment variable | Description | Default |
