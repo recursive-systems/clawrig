@@ -33,9 +33,8 @@ defmodule ClawrigWeb.WifiController do
   end
 
   def connect(conn, %{"ssid" => ssid, "password" => password}) do
-    # Don't connect yet — show confirmation page with the mDNS URL so the
-    # user can note it down. The actual connection happens when they click Finish,
-    # which tears down the hotspot (and this captive portal page with it).
+    # Don't connect yet: show confirmation page with mDNS URL so user can note it down.
+    # The actual connection happens when they click Finish, which tears down hotspot.
     eth_ip = if Commands.impl().has_ethernet_ip(), do: Commands.impl().detect_local_ip()
 
     conn
@@ -77,10 +76,34 @@ defmodule ClawrigWeb.WifiController do
 
   def status_json(conn, _params) do
     status = Manager.status()
-    ip = Clawrig.Wizard.State.get(:local_ip)
+    state_ip = Clawrig.Wizard.State.get(:local_ip)
+
+    ip =
+      cond do
+        state_ip ->
+          state_ip
+
+        status.mode == :station ->
+          Commands.impl().detect_local_ip()
+
+        true ->
+          nil
+      end
+
+    if ip && ip != state_ip do
+      Clawrig.Wizard.State.put(:local_ip, ip)
+    end
+
+    payload = %{
+      mode: status.mode,
+      connecting: status.connecting,
+      connected_ssid: status.connected_ssid,
+      last_error: status.last_error,
+      ip: ip
+    }
 
     conn
     |> put_resp_content_type("application/json")
-    |> send_resp(200, Jason.encode!(%{mode: status.mode, ip: ip}))
+    |> send_resp(200, Jason.encode!(payload))
   end
 end

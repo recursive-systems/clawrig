@@ -8,8 +8,13 @@
     <p>
       Mode: <strong id="status-mode">{@status.mode}</strong>
     </p>
+    <p id="status-connecting" :if={@status.connecting}>
+      <span class="wifi-status-badge pending">
+        <span class="wifi-status-dot"></span> Connecting...
+      </span>
+    </p>
     <p :if={@status.connected_ssid} id="status-connected">
-      Connected to: <strong>{@status.connected_ssid}</strong>
+      Connected to: <strong id="status-ssid">{@status.connected_ssid}</strong>
       <span class="wifi-status-badge online">
         <span class="wifi-status-dot"></span> Online
       </span>
@@ -17,6 +22,8 @@
     <p :if={!@status.connected_ssid} id="status-disconnected">
       Not connected to any network.
     </p>
+    <p id="status-ip" :if={false}>IP: <strong></strong></p>
+    <p id="status-error" :if={false}></p>
   </div>
 
   <a href="/portal" class="wifi-btn-subtle">Back to Wi-Fi setup</a>
@@ -24,15 +31,56 @@
 
 <script>
   (function() {
+    function setVisible(el, visible) {
+      if (!el) return;
+      el.style.display = visible ? "" : "none";
+    }
+
     function poll() {
-      fetch('/portal/status.json')
+      fetch('/portal/status.json', { cache: 'no-store' })
         .then(function(r) { return r.json(); })
         .then(function(d) {
-          var el = document.getElementById('status-mode');
-          if (el) el.textContent = d.mode;
+          var modeEl = document.getElementById('status-mode');
+          var connectingEl = document.getElementById('status-connecting');
+          var connectedEl = document.getElementById('status-connected');
+          var disconnectedEl = document.getElementById('status-disconnected');
+          var ssidEl = document.getElementById('status-ssid');
+          var ipEl = document.getElementById('status-ip');
+          var ipStrong = ipEl ? ipEl.querySelector('strong') : null;
+          var errorEl = document.getElementById('status-error');
+
+          if (modeEl) modeEl.textContent = d.mode || 'unknown';
+
+          setVisible(connectingEl, !!d.connecting);
+          setVisible(connectedEl, !!d.connected_ssid);
+          setVisible(disconnectedEl, !d.connected_ssid && !d.connecting);
+
+          if (ssidEl && d.connected_ssid) {
+            ssidEl.textContent = d.connected_ssid;
+          }
+
+          if (ipEl && ipStrong) {
+            if (d.ip) {
+              ipStrong.textContent = d.ip;
+              setVisible(ipEl, true);
+            } else {
+              setVisible(ipEl, false);
+            }
+          }
+
+          if (errorEl) {
+            if (d.last_error) {
+              errorEl.textContent = 'Last error: ' + d.last_error;
+              setVisible(errorEl, true);
+            } else {
+              setVisible(errorEl, false);
+            }
+          }
         })
         .catch(function() {});
     }
+
     setInterval(poll, 5000);
+    poll();
   })();
 </script>

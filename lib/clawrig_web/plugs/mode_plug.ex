@@ -37,6 +37,8 @@ defmodule ClawrigWeb.Plugs.ModePlug do
       mode == :ap
     rescue
       _ -> false
+    catch
+      :exit, _ -> false
     end
   end
 end

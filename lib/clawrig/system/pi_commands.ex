@@ -1,6 +1,9 @@
 defmodule Clawrig.System.PiCommands do
   @behaviour Clawrig.System.Commands
 
+  @connect_attempts 12
+  @ssid_retry_sleep_ms 2_500
+
   @impl true
   def scan_networks do
     case System.cmd(
@@ -38,29 +41,40 @@ defmodule Clawrig.System.PiCommands do
 
   @impl true
   def connect_wifi(ssid, password) do
-    # Delete any stale connection profile for this SSID first
-    System.cmd("nmcli", ["connection", "delete", ssid], stderr_to_stdout: true)
+    # Delete any stale connection profile for this SSID first.
+    _ = System.cmd("nmcli", ["connection", "delete", ssid], stderr_to_stdout: true)
+
+    connect_wifi_with_retry(ssid, password, @connect_attempts)
+  end
+
+  defp connect_wifi_with_retry(ssid, password, attempts_left) do
+    # Give NetworkManager a fresh scan after leaving hotspot mode.
+    _ = System.cmd("nmcli", ["device", "wifi", "rescan"], stderr_to_stdout: true)
 
     case System.cmd("nmcli", ["device", "wifi", "connect", ssid, "password", password],
            stderr_to_stdout: true
          ) do
       {_, 0} ->
-        ip = detect_local_ip()
-        {:ok, ip}
+        {:ok, wait_for_local_ip()}
 
       {err, _} ->
-        if String.contains?(err, "key-mgmt") do
-          # WPA3/mixed networks need explicit SAE key management
-          connect_wifi_sae(ssid, password)
-        else
-          {:error, err}
+        cond do
+          String.contains?(err, "key-mgmt") ->
+            connect_wifi_key_mgmt_with_retry(ssid, password, attempts_left)
+
+          String.contains?(err, "No network with SSID") and attempts_left > 1 ->
+            Process.sleep(@ssid_retry_sleep_ms)
+            connect_wifi_with_retry(ssid, password, attempts_left - 1)
+
+          true ->
+            {:error, err}
         end
     end
   end
 
-  defp connect_wifi_sae(ssid, password) do
-    # Clean up any partial profile from the failed attempt
-    System.cmd("nmcli", ["connection", "delete", ssid], stderr_to_stdout: true)
+  defp connect_wifi_with_key_mgmt(ssid, password, key_mgmt) do
+    # Clean up any partial profile from the failed attempt.
+    _ = System.cmd("nmcli", ["connection", "delete", ssid], stderr_to_stdout: true)
 
     case System.cmd(
            "nmcli",
@@ -76,7 +90,7 @@ defmodule Clawrig.System.PiCommands do
              "ssid",
              ssid,
              "wifi-sec.key-mgmt",
-             "sae",
+             key_mgmt,
              "wifi-sec.psk",
              password
            ],
@@ -85,16 +99,59 @@ defmodule Clawrig.System.PiCommands do
       {_, 0} ->
         case System.cmd("nmcli", ["connection", "up", ssid], stderr_to_stdout: true) do
           {_, 0} ->
-            ip = detect_local_ip()
-            {:ok, ip}
+            {:ok, wait_for_local_ip()}
 
           {err, _} ->
-            System.cmd("nmcli", ["connection", "delete", ssid], stderr_to_stdout: true)
+            _ = System.cmd("nmcli", ["connection", "delete", ssid], stderr_to_stdout: true)
             {:error, err}
         end
 
       {err, _} ->
         {:error, err}
+    end
+  end
+
+  # Some mixed WPA2/WPA3 networks report key-mgmt errors unless key-mgmt is explicit.
+  # Try WPA-PSK first (common mixed-mode), then SAE (WPA3-only).
+  defp connect_wifi_key_mgmt_with_retry(ssid, password, attempts_left) do
+    attempts = ["wpa-psk", "sae"]
+
+    result =
+      Enum.reduce_while(attempts, {:error, "key-mgmt fallback failed"}, fn key_mgmt, _acc ->
+        case connect_wifi_with_key_mgmt(ssid, password, key_mgmt) do
+          {:ok, ip} -> {:halt, {:ok, ip}}
+          {:error, err} -> {:cont, {:error, err}}
+        end
+      end)
+
+    case result do
+      {:ok, ip} ->
+        {:ok, ip}
+
+      {:error, err} ->
+        if attempts_left > 1 and is_binary(err) and String.contains?(err, "No network with SSID") do
+          Process.sleep(@ssid_retry_sleep_ms)
+          connect_wifi_key_mgmt_with_retry(ssid, password, attempts_left - 1)
+        else
+          {:error, err}
+        end
+    end
+  end
+
+  defp wait_for_local_ip do
+    wait_for_local_ip(20)
+  end
+
+  defp wait_for_local_ip(0), do: nil
+
+  defp wait_for_local_ip(attempts_left) do
+    case detect_local_ip() do
+      nil ->
+        Process.sleep(500)
+        wait_for_local_ip(attempts_left - 1)
+
+      ip ->
+        ip
     end
   end
 

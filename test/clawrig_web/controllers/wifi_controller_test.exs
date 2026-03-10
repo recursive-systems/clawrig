@@ -1,6 +1,15 @@
 defmodule ClawrigWeb.WifiControllerTest do
   use ClawrigWeb.ConnCase
 
+  alias Clawrig.Wizard.State
+  alias Clawrig.Wifi.Manager
+
+  setup do
+    State.reset()
+    _ = Manager.stop_hotspot()
+    :ok
+  end
+
   test "GET /portal renders network list", %{conn: conn} do
     conn = get(conn, "/portal")
     assert html_response(conn, 200) =~ "Wi-Fi Setup"
@@ -34,5 +43,20 @@ defmodule ClawrigWeb.WifiControllerTest do
   test "GET /portal/status renders status", %{conn: conn} do
     conn = get(conn, "/portal/status")
     assert html_response(conn, 200) =~ "Network Status"
+  end
+
+  test "GET /portal/status.json returns mode and handoff fields", %{conn: conn} do
+    State.put(:local_ip, "192.168.1.77")
+
+    conn = get(conn, "/portal/status.json")
+    assert response(conn, 200)
+
+    payload = Jason.decode!(response(conn, 200))
+
+    assert Map.has_key?(payload, "mode")
+    assert Map.has_key?(payload, "connecting")
+    assert Map.has_key?(payload, "connected_ssid")
+    assert Map.has_key?(payload, "last_error")
+    assert payload["ip"] == "192.168.1.77"
   end
 end
