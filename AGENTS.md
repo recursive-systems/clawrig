@@ -69,6 +69,7 @@ custom classes must fully style the input
 ## Test guidelines
 
 - **Always use `start_supervised!/1`** to start processes in tests as it guarantees cleanup between tests
+- **Never** use `System.put_env/2` or `System.delete_env/1` in `async: true` tests — these mutate process-global state and cause flaky race conditions. Instead, make the module read from `Application.get_env(:clawrig, :some_key, default)` and set that key in test setup. Already configurable: `:auth_profiles_path`, `:codex_auth_path`
 - **Avoid** `Process.sleep/1` and `Process.alive?/1` in tests
   - Instead of sleeping to wait for a process to finish, **always** use `Process.monitor/1` and assert on the DOWN message:
 
@@ -410,3 +411,56 @@ And **never** do this:
 <!-- phoenix:liveview-end -->
 
 <!-- usage-rules-end -->
+
+## Pi device validation
+
+When validating a ClawRig release on a real Raspberry Pi, follow this workflow. Scripts live in `projects/clawrig/scripts/`.
+
+### Prerequisites (human-only)
+
+These steps require human action before an agent can proceed:
+
+1. **1Password auth** — run `op signin` or ensure a service account token is set. Verify with `op whoami`.
+2. **Env file** — copy `scripts/clawrig-pi-test.env.template` to `~/.config/clawrig-test/pi-test.env` and fill in values (or use `op://` references).
+3. **Physical device** — ensure the Pi is powered on and connected to the network via Ethernet.
+4. **Mode B approval** — if a full first-run reset is needed, the human must explicitly set `PI_VALIDATION_MODE=B` and `PI_MODE_B_APPROVED=1`. **Never** perform destructive resets without these being set.
+
+### Agent-executable flow
+
+```bash
+# 1. Discover the Pi on the local network
+bash projects/clawrig/scripts/pi-discover.sh --env
+# outputs: TEST_PI_HOST=<ip>
+
+# 2. Resolve env file (auto-discovers Pi if --discover is set)
+bash projects/clawrig/scripts/pi-test-env-resolve.sh --discover --output /tmp/clawrig-test-session.env
+
+# 3. Build ARM64 release
+CLAWRIG_VERSION=<version> bash projects/clawrig/clawrig/deploy/build-release.sh
+
+# 4. Deploy to Pi (read env vars from resolved file)
+eval "$(grep '^TEST_PI' /tmp/clawrig-test-session.env)"
+sshpass -p "$TEST_PI_PASS" scp -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+  projects/clawrig/clawrig/deploy/bundle/* "$TEST_PI_USER@$TEST_PI_HOST:~/clawrig-deploy/"
+sshpass -p "$TEST_PI_PASS" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+  "$TEST_PI_USER@$TEST_PI_HOST" "cd ~/clawrig-deploy && sudo bash pi-setup.sh"
+
+# 5. Restart and verify version
+sshpass -p "$TEST_PI_PASS" ssh "$TEST_PI_USER@$TEST_PI_HOST" \
+  "sudo systemctl restart clawrig && sleep 3 && cat /opt/clawrig/VERSION"
+
+# 6. Run Mode A validation (non-destructive)
+sshpass -p "$TEST_PI_PASS" ssh "$TEST_PI_USER@$TEST_PI_HOST" "bash -s" \
+  < projects/clawrig/scripts/pi-verify.sh \
+  | bash projects/clawrig/scripts/pi-record-result.sh \
+    --version <version> --mode A --device <hostname> --device-ip <ip>
+```
+
+### Key rules
+
+- **Always use explicit timeouts** on SSH and curl commands: `-o ConnectTimeout=10`, `--connect-timeout 10`
+- **Never run Mode B without `PI_MODE_B_APPROVED=1`** — ask the human first
+- **Record results** using `pi-record-result.sh` — writes JSON to `.trajectories/`
+- **Device discovery** — mDNS hostnames go stale after identity reassignment. Always use `pi-discover.sh` or verify by IP if `.local` names don't resolve.
+- **Env vars don't persist** between shell commands. Read from `/tmp/clawrig-test-session.env` in each command using `eval "$(grep '^TEST_PI' /tmp/clawrig-test-session.env)"` or pass `--env-file`.
+- The acceptance matrix is at `projects/clawrig/docs/pi-acceptance.json` — use it to map OOBE test IDs to commands.

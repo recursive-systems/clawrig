@@ -798,7 +798,7 @@ defmodule ClawrigWeb.WizardLive do
   end
 
   defp preview_enabled? do
-    System.get_env("CLAWRIG_ENABLE_PREVIEW_STATES", "false") == "true"
+    Clawrig.PreviewState.enabled?()
   end
 
   defp dev_auth_bypass_enabled? do

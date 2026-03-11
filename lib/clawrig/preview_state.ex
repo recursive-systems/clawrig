@@ -20,7 +20,11 @@ defmodule Clawrig.PreviewState do
   ]
 
   def enabled? do
-    System.get_env("CLAWRIG_ENABLE_PREVIEW_STATES", "false") == "true"
+    Application.get_env(
+      :clawrig,
+      :enable_preview_states,
+      System.get_env("CLAWRIG_ENABLE_PREVIEW_STATES", "false") == "true"
+    )
   end
 
   def allowed_scenarios, do: @allowed_scenarios

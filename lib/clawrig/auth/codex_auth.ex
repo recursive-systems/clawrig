@@ -58,7 +58,10 @@ defmodule Clawrig.Auth.CodexAuth do
   end
 
   defp auth_path do
-    home = System.get_env("HOME", "/home/pi")
-    Path.join([home, @codex_home_dir, @auth_filename])
+    Application.get_env(
+      :clawrig,
+      :codex_auth_path,
+      Path.join([System.get_env("HOME", "/home/pi"), @codex_home_dir, @auth_filename])
+    )
   end
 end

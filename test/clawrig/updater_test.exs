@@ -71,29 +71,22 @@ defmodule Clawrig.UpdaterTest do
 
   describe "post_update_auth_probe_public/1" do
     setup do
-      auth_path =
-        Path.join(
-          System.tmp_dir!(),
-          "clawrig-test-auth-profiles-probe-#{System.unique_integer([:positive])}.json"
-        )
+      tmp = Path.join(System.tmp_dir!(), "clawrig-test-probe-#{System.unique_integer([:positive])}")
+      File.mkdir_p!(tmp)
 
-      home =
-        Path.join(System.tmp_dir!(), "clawrig-test-home-#{System.unique_integer([:positive])}")
+      auth_profiles_path = Path.join(tmp, "auth-profiles.json")
+      codex_auth_path = Path.join(tmp, "auth.json")
 
-      File.mkdir_p!(Path.join(home, ".codex"))
-
-      old_home = System.get_env("HOME")
-      System.put_env("HOME", home)
-      Application.put_env(:clawrig, :auth_profiles_path, auth_path)
+      Application.put_env(:clawrig, :auth_profiles_path, auth_profiles_path)
+      Application.put_env(:clawrig, :codex_auth_path, codex_auth_path)
 
       on_exit(fn ->
-        if old_home, do: System.put_env("HOME", old_home), else: System.delete_env("HOME")
         Application.delete_env(:clawrig, :auth_profiles_path)
-        File.rm_rf(home)
-        File.rm(auth_path)
+        Application.delete_env(:clawrig, :codex_auth_path)
+        File.rm_rf(tmp)
       end)
 
-      %{auth_path: auth_path, home: home}
+      %{auth_profiles_path: auth_profiles_path, codex_auth_path: codex_auth_path}
     end
 
     test "returns reauth required when no auth files exist" do
@@ -101,11 +94,11 @@ defmodule Clawrig.UpdaterTest do
     end
 
     test "returns ok when auth files exist and model status succeeds", %{
-      auth_path: auth_path,
-      home: home
+      auth_profiles_path: auth_profiles_path,
+      codex_auth_path: codex_auth_path
     } do
       File.write!(
-        auth_path,
+        auth_profiles_path,
         Jason.encode!(%{
           "version" => 1,
           "profiles" => %{
@@ -118,7 +111,7 @@ defmodule Clawrig.UpdaterTest do
       )
 
       File.write!(
-        Path.join([home, ".codex", "auth.json"]),
+        codex_auth_path,
         Jason.encode!(%{"auth_mode" => "chatgpt"})
       )
 

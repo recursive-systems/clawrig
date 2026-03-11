@@ -18,8 +18,7 @@ defmodule ClawrigWeb.Hooks.ModeGuard do
   end
 
   defp preview_oobe_bypass?(params) when is_map(params) do
-    System.get_env("CLAWRIG_ENABLE_PREVIEW_STATES", "false") == "true" and
-      params["preview_setup"] == "1"
+    Clawrig.PreviewState.enabled?() and params["preview_setup"] == "1"
   end
 
   defp preview_oobe_bypass?(_), do: false

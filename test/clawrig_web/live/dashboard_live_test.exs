@@ -4,11 +4,11 @@ defmodule ClawrigWeb.DashboardLiveTest do
 
   setup do
     Application.put_env(:clawrig, :oobe_complete, true)
-    System.put_env("CLAWRIG_ENABLE_PREVIEW_STATES", "true")
+    Application.put_env(:clawrig, :enable_preview_states, true)
 
     on_exit(fn ->
       Application.delete_env(:clawrig, :oobe_complete)
-      System.delete_env("CLAWRIG_ENABLE_PREVIEW_STATES")
+      Application.delete_env(:clawrig, :enable_preview_states)
     end)
 
     :ok
