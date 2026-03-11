@@ -17,6 +17,13 @@ if config_env() == :prod do
          :node_identity_path,
          System.get_env("CLAWRIG_NODE_IDENTITY_PATH", "/var/lib/clawrig/node-identity.json")
 
+  config :clawrig,
+         :gateway_operator_store_path,
+         System.get_env(
+           "CLAWRIG_GATEWAY_OPERATOR_STORE_PATH",
+           "/var/lib/clawrig/gateway-operator.json"
+         )
+
   secret_key_base =
     System.get_env("SECRET_KEY_BASE") ||
       raise """

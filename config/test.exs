@@ -8,6 +8,7 @@ config :clawrig, ClawrigWeb.Endpoint,
 config :clawrig, :system_commands, Clawrig.System.MockCommands
 config :clawrig, :state_path, Path.join(System.tmp_dir!(), "clawrig-test-wizard-state.json")
 config :clawrig, :oobe_complete, false
+config :clawrig, :gateway_operator_client, Clawrig.Gateway.MockOperatorClient
 
 config :clawrig,
        :node_identity_path,
@@ -16,6 +17,10 @@ config :clawrig,
 config :clawrig,
        :dashboard_auth_path,
        Path.join(System.tmp_dir!(), "clawrig-test-dashboard-auth.json")
+
+config :clawrig,
+       :gateway_operator_store_path,
+       Path.join(System.tmp_dir!(), "clawrig-test-gateway-operator.json")
 
 config :logger, level: :warning
 

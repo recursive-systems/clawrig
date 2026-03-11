@@ -16,6 +16,7 @@ defmodule Clawrig.Application do
         Clawrig.Wizard.State,
         Clawrig.Updater,
         Clawrig.Diagnostics.Agent,
+        gateway_operator_child(),
         Clawrig.Node.Client,
         Clawrig.Fleet.Sender,
         ClawrigWeb.Endpoint
@@ -46,6 +47,10 @@ defmodule Clawrig.Application do
     else
       []
     end
+  end
+
+  defp gateway_operator_child do
+    Application.get_env(:clawrig, :gateway_operator_client, Clawrig.Gateway.OperatorClient)
   end
 
   defp start_hotspot_with_retry(0) do

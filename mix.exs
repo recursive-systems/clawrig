@@ -59,6 +59,7 @@ defmodule Clawrig.MixProject do
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
+      {:mdex, "~> 0.11.6"},
       {:jason, "~> 1.2"},
       {:bandit, "~> 1.5"},
       {:req, "~> 0.5"},

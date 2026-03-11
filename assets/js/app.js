@@ -4,6 +4,10 @@ import {LiveSocket} from "phoenix_live_view"
 
 // QR Code generator
 import "../vendor/qr.js"
+import HighlightModule from "../vendor/highlight.min.js"
+
+const hljs = HighlightModule?.default || HighlightModule
+window.hljs ||= hljs
 
 const Hooks = {}
 
@@ -89,6 +93,101 @@ Hooks.PageFocus = {
   },
   destroyed() {
     document.removeEventListener("visibilitychange", this._onVisible)
+  }
+}
+
+Hooks.ChatScroll = {
+  mounted() {
+    this.anchor = document.getElementById("chat-scroll-anchor")
+    this.button = document.getElementById("chat-scroll-button")
+    this.autoFollow = true
+    this.syncButton()
+    this.scrollToBottom("auto")
+
+    this.onScroll = () => {
+      this.autoFollow = this.isNearBottom()
+      this.syncButton()
+    }
+
+    this.onJump = () => {
+      this.autoFollow = true
+      this.syncButton()
+      this.scrollToBottom("smooth")
+    }
+
+    this.onWheel = (event) => {
+      if (event.deltaY < 0) {
+        this.autoFollow = false
+        this.syncButton()
+      }
+    }
+
+    this.el.addEventListener("scroll", this.onScroll)
+    this.el.addEventListener("wheel", this.onWheel, {passive: true})
+    this.button?.addEventListener("click", this.onJump)
+  },
+  updated() {
+    if (this.autoFollow) {
+      this.scrollToBottom("auto")
+    } else {
+      this.syncButton()
+    }
+  },
+  destroyed() {
+    this.el.removeEventListener("scroll", this.onScroll)
+    this.el.removeEventListener("wheel", this.onWheel)
+    this.button?.removeEventListener("click", this.onJump)
+  },
+  isNearBottom() {
+    return this.el.scrollHeight - this.el.scrollTop - this.el.clientHeight <= 72
+  },
+  syncButton() {
+    const visible = !this.autoFollow && !this.isNearBottom()
+    if (this.anchor) this.anchor.classList.toggle("visible", visible)
+  },
+  scrollToBottom(behavior) {
+    requestAnimationFrame(() => {
+      this.el.scrollTo({top: this.el.scrollHeight, behavior})
+      this.syncButton()
+    })
+  }
+}
+
+Hooks.ChatComposer = {
+  mounted() {
+    this.resize()
+    this.onInput = () => this.resize()
+    this.onKeydown = (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault()
+        this.el.form?.requestSubmit()
+      }
+    }
+
+    this.el.addEventListener("input", this.onInput)
+    this.el.addEventListener("keydown", this.onKeydown)
+  },
+  updated() {
+    this.resize()
+  },
+  destroyed() {
+    this.el.removeEventListener("input", this.onInput)
+    this.el.removeEventListener("keydown", this.onKeydown)
+  },
+  resize() {
+    this.el.style.height = "auto"
+    this.el.style.height = `${Math.min(this.el.scrollHeight, 160)}px`
+  }
+}
+
+Hooks.HighlightCode = {
+  mounted() { this.highlight() },
+  updated() { this.highlight() },
+  highlight() {
+    if (!hljs) return
+    this.el.querySelectorAll("pre code").forEach((block) => {
+      if (!block.dataset.highlighted) hljs.highlightElement(block)
+    })
   }
 }
 

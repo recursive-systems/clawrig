@@ -11,6 +11,8 @@ state_path = System.get_env("CLAWRIG_STATE_PATH", "wizard-state.json")
 oobe_marker = System.get_env("CLAWRIG_OOBE_MARKER", ".oobe-complete")
 node_identity_path = System.get_env("CLAWRIG_NODE_IDENTITY_PATH", "priv/node-identity.json")
 dashboard_auth_path = System.get_env("CLAWRIG_DASHBOARD_AUTH_PATH", "priv/dashboard-auth.json")
+gateway_operator_store_path =
+  System.get_env("CLAWRIG_GATEWAY_OPERATOR_STORE_PATH", "priv/gateway-operator.json")
 
 # NOTE: If localhost:4090 hits Docker instead of Phoenix, use 127.0.0.1:4090 directly.
 # Docker Desktop's gvproxy may claim port 4090 on IPv6.
@@ -44,6 +46,7 @@ config :clawrig, :oobe_marker, oobe_marker
 config :clawrig, :device_code_module, Clawrig.Wizard.MockDeviceCode
 config :clawrig, :node_identity_path, node_identity_path
 config :clawrig, :dashboard_auth_path, dashboard_auth_path
+config :clawrig, :gateway_operator_store_path, gateway_operator_store_path
 
 config :logger, :default_formatter, format: "[$level] $message\n"
 

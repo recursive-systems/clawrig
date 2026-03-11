@@ -78,6 +78,7 @@ defmodule ClawrigWeb.Router do
       live "/telegram", DashboardLive, :telegram
       live "/integrations", DashboardLive, :integrations
       live "/system", DashboardLive, :system
+      live "/chat", ChatLive, :index
     end
   end
 

@@ -43,6 +43,8 @@ config :clawrig,
   fleet_site_name: "Default Site",
   fleet_interval_ms: 60_000,
   fleet_startup_delay_ms: 5_000,
-  fleet_require_oobe: true
+  fleet_require_oobe: true,
+  gateway_chat_session_key: "agent:main:main",
+  gateway_operator_client: Clawrig.Gateway.OperatorClient
 
 import_config "#{config_env()}.exs"

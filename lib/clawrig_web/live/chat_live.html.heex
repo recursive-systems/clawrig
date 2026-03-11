@@ -1,0 +1,172 @@
+<section class="dashboard chat-shell">
+  <header class="shell-head">
+    <h1>
+      <img src={~p"/images/favicon.png"} alt="" class="shell-logo" />
+      <span class="shell-wordmark">Claw<span class="rig">Rig</span></span>
+    </h1>
+    <span class="version">v{@version}</span>
+  </header>
+
+  <nav class="dash-nav" role="tablist">
+    <.link navigate={~p"/"} class={nav_class(false)}>Dashboard</.link>
+    <.link navigate={~p"/wifi"} class={nav_class(false)}>Wi-Fi</.link>
+    <.link navigate={~p"/account"} class={nav_class(false)}>Provider</.link>
+    <.link navigate={~p"/telegram"} class={nav_class(false)}>Telegram</.link>
+    <.link navigate={~p"/integrations"} class={nav_class(false)}>Integrations</.link>
+    <.link navigate={~p"/system"} class={nav_class(false)}>System</.link>
+    <.link navigate={~p"/chat"} class={nav_class(true)} aria-current="page">Chat</.link>
+  </nav>
+
+  <section class="dash-content chat-content" aria-live="polite">
+    <section class="dash-panel chat-panel">
+      <div class="dash-panel-header">
+        <div class="dash-panel-title-row">
+          <h2>Chat</h2>
+          <span class={["chat-status-chip", "status-#{@operator_status}"]}>
+            <span class="chat-status-dot"></span>
+            {operator_label(@operator_status)}
+          </span>
+        </div>
+        <p class="chat-panel-note">Main agent conversation through the local Gateway.</p>
+      </div>
+
+      <div :if={@chat_error} class="chat-error-banner">{@chat_error}</div>
+
+      <div
+        :if={@operator_status in [:unpaired, :unavailable]}
+        class="chat-blocked-state"
+      >
+        <h3>
+          {if @operator_status == :unpaired,
+            do: "Gateway pairing required",
+            else: "Gateway unavailable"}
+        </h3>
+        <p>
+          {blocked_copy(@operator_status, @operator_detail)}
+        </p>
+        <button
+          :if={@operator_status == :unpaired}
+          class="btn primary"
+          phx-click="chat_pair"
+          disabled={@pairing_busy}
+        >
+          {if @pairing_busy, do: "Connecting...", else: "Connect Chat to Gateway"}
+        </button>
+      </div>
+
+      <div :if={@operator_status not in [:unpaired, :unavailable]} class="chat-container">
+        <div id="chat-messages" class="chat-messages" phx-hook="ChatScroll" phx-update="stream">
+          <div id="chat-empty" class={["chat-empty", map_size(@message_lookup) != 0 && "chat-empty-hidden"]}>
+            <div class="chat-empty-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+            </div>
+            <p>Ask the agent about device health, logs, or what to do next.</p>
+          </div>
+
+          <article
+            :for={{dom_id, item} <- @streams.messages}
+            id={dom_id}
+            class={[
+              "chat-item",
+              "chat-item-#{item.kind}",
+              item.kind == :message && "chat-role-#{item.role}",
+              item.kind == :approval && "chat-approval-#{item.status}",
+              item.status == "streaming" && "chat-item-streaming"
+            ]}
+          >
+            <%= if item.kind == :approval do %>
+              <div class="chat-item-head">
+                <span class="chat-item-label">Approval</span>
+                <span class={["chat-item-state", "state-#{item.status}"]}>{item.status}</span>
+              </div>
+              <strong>{item.title}</strong>
+              <p>{item.detail}</p>
+              <div :if={item.status == "pending"} class="chat-approval-actions">
+                <button
+                  class="btn primary btn-sm"
+                  phx-click="approval_decide"
+                  phx-value-approval_id={item.id}
+                  phx-value-decision="approve"
+                >
+                  Approve
+                </button>
+                <button
+                  class="btn subtle btn-sm"
+                  phx-click="approval_decide"
+                  phx-value-approval_id={item.id}
+                  phx-value-decision="deny"
+                >
+                  Deny
+                </button>
+              </div>
+            <% else %>
+              <div class="chat-item-head">
+                <span class={["chat-role-dot", "dot-#{item.role}"]}></span>
+                <span class="chat-item-label">{role_label(item.role)}</span>
+              </div>
+              <div
+                id={"chat-render-#{item.id}"}
+                class="chat-item-body"
+                phx-hook={if(item.rendered_html, do: "HighlightCode", else: nil)}
+              >
+                <%= if item.rendered_html do %>
+                  {item.rendered_html}
+                <% else %>
+                  {item.content}
+                <% end %>
+              </div>
+            <% end %>
+          </article>
+        </div>
+
+        <div id="chat-scroll-anchor" class="chat-scroll-anchor">
+          <button id="chat-scroll-button" type="button" class="chat-scroll-pill" aria-label="Scroll to latest">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+            <span>New messages</span>
+          </button>
+        </div>
+
+        <.form for={%{}} as={:chat} phx-submit="chat_submit" class="chat-composer">
+          <div class={["chat-input-wrap", @run_state == :streaming && "chat-input-streaming"]}>
+            <textarea
+              id="chat-input"
+              name="text"
+              class="chat-input"
+              placeholder="Message the agent..."
+              phx-hook="ChatComposer"
+              disabled={@run_state == :aborting}
+              rows="1"
+            ></textarea>
+            <button
+              :if={@run_state != :streaming}
+              type="submit"
+              class="chat-send-btn"
+              disabled={@operator_status != :connected}
+              aria-label="Send message"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="19" x2="12" y2="5"></line>
+                <polyline points="5 12 12 5 19 12"></polyline>
+              </svg>
+            </button>
+            <button
+              :if={@run_state == :streaming}
+              type="button"
+              class="chat-stop-btn"
+              phx-click="chat_abort"
+              aria-label="Stop generation"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+              </svg>
+            </button>
+          </div>
+        </.form>
+      </div>
+    </section>
+  </section>
+</section>
