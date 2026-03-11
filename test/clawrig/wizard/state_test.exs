@@ -16,6 +16,11 @@ defmodule Clawrig.Wizard.StateTest do
     assert state.preflight_done == false
   end
 
+  test "get returns state with schema_version" do
+    state = State.get()
+    assert state.schema_version == 1
+  end
+
   test "put updates a single key" do
     State.put(:mode, :new)
     assert State.get(:mode) == :new

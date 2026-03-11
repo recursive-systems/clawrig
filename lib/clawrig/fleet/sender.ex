@@ -42,11 +42,13 @@ defmodule Clawrig.Fleet.Sender do
         transport = transport_module()
 
         case transport.send_heartbeat(payload) do
-          :ok ->
-            if state.failures > 0 do
-              Logger.info("[Fleet] heartbeat delivery recovered")
-            end
+          {:ok, directives} when is_list(directives) ->
+            Clawrig.Fleet.DirectiveProcessor.process(directives)
+            if state.failures > 0, do: Logger.info("[Fleet] heartbeat delivery recovered")
+            %{state | failures: 0}
 
+          {:ok, :no_directives} ->
+            if state.failures > 0, do: Logger.info("[Fleet] heartbeat delivery recovered")
             %{state | failures: 0}
 
           {:error, reason} ->

@@ -33,8 +33,23 @@ CHECKSUM=$(sha256sum "$TARBALL" | awk '{print $1}')
 SIGNATURE=$(openssl pkeyutl -sign -inkey "$KEY_PEM" -rawin -in "$TARBALL" | base64 -w0)
 RELEASED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
+HARDWARE_COMPAT="${HARDWARE_COMPAT:-[\"rpi4\", \"rpi5\"]}"
+MIN_OPENCLAW_VERSION="${MIN_OPENCLAW_VERSION:-}"
+MIN_GATEWAY_PROTOCOL="${MIN_GATEWAY_PROTOCOL:-}"
+
 MANIFEST_DIR=$(dirname "$TARBALL")
 MANIFEST_PATH="$MANIFEST_DIR/manifest.json"
+
+# Build optional fields (only included when env vars are set)
+OPTIONAL_FIELDS=""
+if [ -n "$MIN_OPENCLAW_VERSION" ]; then
+  OPTIONAL_FIELDS="${OPTIONAL_FIELDS}
+  \"min_openclaw_version\": \"$MIN_OPENCLAW_VERSION\","
+fi
+if [ -n "$MIN_GATEWAY_PROTOCOL" ]; then
+  OPTIONAL_FIELDS="${OPTIONAL_FIELDS}
+  \"min_gateway_protocol\": $MIN_GATEWAY_PROTOCOL,"
+fi
 
 cat > "$MANIFEST_PATH" <<EOF
 {
@@ -42,7 +57,8 @@ cat > "$MANIFEST_PATH" <<EOF
   "tarball": "$TARBALL_NAME",
   "signature": "$SIGNATURE",
   "checksum": "$CHECKSUM",
-  "released_at": "$RELEASED_AT"
+  "released_at": "$RELEASED_AT",${OPTIONAL_FIELDS}
+  "hardware_compat": $HARDWARE_COMPAT
 }
 EOF
 

@@ -2,10 +2,17 @@
 Description=ClawRig Management Service
 After=network.target
 Wants=network.target
+StartLimitBurst=5
+StartLimitIntervalSec=300
+StartLimitAction=reboot-force
 
 [Service]
-Type=exec
+Type=notify
+NotifyAccess=main
+WatchdogSec=30
+TimeoutStartSec=120
 WorkingDirectory=/opt/clawrig
+ExecStartPre=+/opt/clawrig/bin/clawrig-boot-guard.sh
 ExecStart=/opt/clawrig/bin/clawrig start
 EnvironmentFile=/etc/clawrig.env
 Environment=PHX_SERVER=true

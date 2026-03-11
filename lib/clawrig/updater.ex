@@ -17,6 +17,7 @@ defmodule Clawrig.Updater do
   alias Clawrig.System.Commands
   alias Clawrig.OpenAI.Credentials, as: OpenAICredentials
   alias Clawrig.Auth.CodexAuth
+  alias Clawrig.Fleet
   alias Clawrig.Wizard.State
 
   @check_interval :timer.hours(24)
@@ -27,6 +28,7 @@ defmodule Clawrig.Updater do
   @pubkey_path "/etc/clawrig/update-pubkey"
   @token_path "/etc/clawrig/github-token"
   @pending_marker "/var/lib/clawrig/.update-pending"
+  @boot_counter_path "/var/lib/clawrig/.boot-attempts"
   @repo "recursive-systems/clawrig"
   @api_base "https://api.github.com"
 
@@ -120,7 +122,11 @@ defmodule Clawrig.Updater do
         tarball: manifest["tarball"],
         signature: manifest["signature"],
         checksum: manifest["checksum"],
-        released_at: manifest["released_at"]
+        released_at: manifest["released_at"],
+        hardware_compat: manifest["hardware_compat"],
+        min_openclaw_version: manifest["min_openclaw_version"],
+        min_gateway_protocol: manifest["min_gateway_protocol"],
+        release_assets: manifest["_release_assets"]
       }
 
       {:ok, parsed}
@@ -147,7 +153,15 @@ defmodule Clawrig.Updater do
 
   @impl true
   def init(_opts) do
-    state = %{last_check: nil, last_result: nil}
+    channel =
+      case State.get(:update_channel) do
+        "stable" -> :stable
+        "beta" -> :beta
+        "rc" -> :rc
+        _ -> :stable
+      end
+
+    state = %{last_check: nil, last_result: nil, etag: nil, channel: channel}
 
     # Boot-time reconciliation: check if an update was in progress when we restarted
     reconcile_pending_update()
@@ -165,7 +179,7 @@ defmodule Clawrig.Updater do
 
   @impl true
   def handle_call(:check_now, _from, state) do
-    result = do_check_and_update(:manual)
+    {result, state} = do_check_and_update(:manual, state)
     new_state = %{state | last_check: DateTime.utc_now(), last_result: result}
     {:reply, result, new_state}
   end
@@ -186,7 +200,7 @@ defmodule Clawrig.Updater do
   @impl true
   def handle_info(:scheduled_check, state) do
     if auto_update_enabled?() do
-      result = do_check_and_update(:auto)
+      {result, state} = do_check_and_update(:auto, state)
       schedule_check()
       new_state = %{state | last_check: DateTime.utc_now(), last_result: result}
       {:noreply, new_state}
@@ -237,6 +251,7 @@ defmodule Clawrig.Updater do
           :updated ->
             Logger.info("[Updater] Post-update health check passed for v#{version}")
             File.rm(@pending_marker)
+            write_boot_counter(0)
             sudo_rm_rf(@prev_dir)
 
             State.merge(%{
@@ -269,6 +284,7 @@ defmodule Clawrig.Updater do
             )
 
             File.rm(@pending_marker)
+            write_boot_counter(0)
             sudo_rm_rf(@prev_dir)
 
             State.merge(%{
@@ -296,43 +312,70 @@ defmodule Clawrig.Updater do
 
   # ── Check & Update ─────────────────────────────────────────────────
 
-  defp do_check_and_update(mode) do
+  defp do_check_and_update(mode, state) do
+    if Fleet.Config.get("pause_updates", false) do
+      Logger.info("[Updater] Updates paused by fleet config")
+      broadcast({:ok, :paused})
+      {{:ok, :paused}, state}
+    else
+      do_check_and_update_impl(mode, state)
+    end
+  end
+
+  defp do_check_and_update_impl(mode, state) do
     broadcast(:checking)
 
-    with {:ok, manifest} <- fetch_manifest(),
+    with {:ok, manifest, new_state} <- fetch_manifest(state),
          {:ok, parsed} <- parse_manifest(manifest),
+         :ok <- check_hardware_compat(parsed),
+         :ok <- check_openclaw_compat(parsed),
+         :ok <- check_gateway_compat(parsed),
          local_version <- read_local_version(),
          true <- version_newer?(parsed.version, local_version) do
       Logger.info("[Updater] New version #{parsed.version} available (local: #{local_version})")
 
       case maybe_defer_for_recovery_path(parsed.version, local_version) do
         :ok ->
-          apply_update(parsed, mode)
+          {apply_update(parsed, mode), new_state}
 
         {:deferred, reason} ->
           broadcast({:ok, :pending_recovery_path, parsed.version, reason})
-          {:ok, :pending_recovery_path, parsed.version}
+          {{:ok, :pending_recovery_path, parsed.version}, new_state}
       end
     else
+      :not_modified ->
+        Logger.debug("[Updater] Not modified (ETag match)")
+        broadcast({:ok, :up_to_date})
+        {{:ok, :up_to_date}, state}
+
       false ->
         Logger.debug("[Updater] Already up to date")
         broadcast({:ok, :up_to_date})
-        {:ok, :up_to_date}
+        {{:ok, :up_to_date}, state}
 
       {:error, reason} = err ->
         Logger.warning("[Updater] Check failed: #{inspect(reason)}")
         broadcast(err)
-        err
+        {err, state}
     end
   end
 
-  defp fetch_manifest do
-    url = "#{@api_base}/repos/#{@repo}/releases/latest"
-    headers = auth_headers()
+  defp fetch_manifest(state) do
+    {url, channel} = release_url_for_channel(state.channel)
+    headers = auth_headers() ++ etag_headers(state.etag)
 
     case Req.get(url, headers: headers) do
-      {:ok, %Req.Response{status: 200, body: body}} ->
-        find_manifest_in_assets(body)
+      {:ok, %Req.Response{status: 304}} ->
+        :not_modified
+
+      {:ok, %Req.Response{status: 200, body: body, headers: resp_headers}} ->
+        new_etag = get_etag(resp_headers)
+        new_state = %{state | etag: new_etag}
+
+        case extract_manifest(body, channel) do
+          {:ok, manifest} -> {:ok, manifest, new_state}
+          {:error, _} = err -> err
+        end
 
       {:ok, %Req.Response{status: status}} ->
         {:error, "GitHub API returned #{status}"}
@@ -342,7 +385,63 @@ defmodule Clawrig.Updater do
     end
   end
 
-  defp find_manifest_in_assets(%{"assets" => assets}) when is_list(assets) do
+  defp release_url_for_channel(:stable) do
+    {"#{@api_base}/repos/#{@repo}/releases/latest", :stable}
+  end
+
+  defp release_url_for_channel(channel) do
+    {"#{@api_base}/repos/#{@repo}/releases?per_page=30", channel}
+  end
+
+  defp etag_headers(nil), do: []
+  defp etag_headers(etag), do: [{"if-none-match", etag}]
+
+  defp get_etag(headers) when is_map(headers) do
+    case Map.get(headers, "etag") do
+      [etag | _] -> etag
+      _ -> nil
+    end
+  end
+
+  defp get_etag(_), do: nil
+
+  defp extract_manifest(release, :stable) when is_map(release) do
+    find_manifest_in_assets(release)
+  end
+
+  defp extract_manifest(releases, channel) when is_list(releases) and is_atom(channel) do
+    prefix = Atom.to_string(channel)
+
+    latest =
+      releases
+      |> Enum.filter(fn r ->
+        tag = String.trim_leading(r["tag_name"] || "", "v")
+
+        case Version.parse(tag) do
+          {:ok, v} -> v.pre != [] and match?([^prefix | _], v.pre)
+          _ -> false
+        end
+      end)
+      |> Enum.sort_by(
+        fn r ->
+          case r["tag_name"] |> String.trim_leading("v") |> Version.parse() do
+            {:ok, v} -> v
+            :error -> Version.parse!("0.0.0")
+          end
+        end,
+        {:desc, Version}
+      )
+      |> List.first()
+
+    case latest do
+      nil -> {:error, :no_release_for_channel}
+      release -> find_manifest_in_assets(release)
+    end
+  end
+
+  defp extract_manifest(_, _), do: {:error, "unexpected response format"}
+
+  defp find_manifest_in_assets(%{"assets" => assets} = release) when is_list(assets) do
     manifest_asset =
       Enum.find(assets, fn a -> a["name"] == "manifest.json" end)
 
@@ -353,10 +452,13 @@ defmodule Clawrig.Updater do
       %{"browser_download_url" => url} ->
         case Req.get(url, headers: auth_headers()) do
           {:ok, %Req.Response{status: 200, body: body}} when is_map(body) ->
-            {:ok, body}
+            {:ok, Map.put(body, "_release_assets", release["assets"])}
 
           {:ok, %Req.Response{status: 200, body: body}} when is_binary(body) ->
-            Jason.decode(body)
+            case Jason.decode(body) do
+              {:ok, decoded} -> {:ok, Map.put(decoded, "_release_assets", release["assets"])}
+              error -> error
+            end
 
           {:ok, %Req.Response{status: status}} ->
             {:error, "manifest download returned #{status}"}
@@ -398,29 +500,24 @@ defmodule Clawrig.Updater do
   end
 
   defp download_tarball(parsed) do
-    url = "#{@api_base}/repos/#{@repo}/releases/latest"
-    headers = auth_headers()
+    assets = parsed[:release_assets] || []
 
-    with {:ok, %Req.Response{status: 200, body: release}} <- Req.get(url, headers: headers) do
-      asset =
-        (release["assets"] || [])
-        |> Enum.find(fn a -> a["name"] == parsed.tarball end)
+    asset = Enum.find(assets, fn a -> a["name"] == parsed.tarball end)
 
-      case asset do
-        nil ->
-          {:error, "tarball asset #{parsed.tarball} not found"}
+    case asset do
+      nil ->
+        {:error, "tarball asset #{parsed.tarball} not found in release"}
 
-        %{"browser_download_url" => dl_url} ->
-          sudo_mkdir_p(@staging_dir)
-          sudo_chown(@staging_dir)
-          dest = Path.join(@staging_dir, parsed.tarball)
+      %{"browser_download_url" => dl_url} ->
+        sudo_mkdir_p(@staging_dir)
+        sudo_chown(@staging_dir)
+        dest = Path.join(@staging_dir, parsed.tarball)
 
-          case Req.get(dl_url, headers: auth_headers(), into: File.stream!(dest)) do
-            {:ok, %Req.Response{status: 200}} -> :ok
-            {:ok, %Req.Response{status: s}} -> {:error, "tarball download returned #{s}"}
-            {:error, reason} -> {:error, "tarball download failed: #{inspect(reason)}"}
-          end
-      end
+        case Req.get(dl_url, headers: auth_headers(), into: File.stream!(dest)) do
+          {:ok, %Req.Response{status: 200}} -> :ok
+          {:ok, %Req.Response{status: s}} -> {:error, "tarball download returned #{s}"}
+          {:error, reason} -> {:error, "tarball download failed: #{inspect(reason)}"}
+        end
     end
   end
 
@@ -463,8 +560,7 @@ defmodule Clawrig.Updater do
         end
 
       {:error, :enoent} ->
-        Logger.warning("[Updater] No pubkey at #{@pubkey_path} — skipping signature verification")
-        :ok
+        {:error, "no signing pubkey at #{@pubkey_path} — refusing unsigned update"}
 
       {:error, reason} ->
         {:error, "cannot read pubkey: #{inspect(reason)}"}
@@ -536,6 +632,93 @@ defmodule Clawrig.Updater do
   defp cleanup_staging do
     if File.exists?(@staging_dir), do: sudo_rm_rf(@staging_dir)
   end
+
+  # ── Hardware compatibility ─────────────────────────────────────────
+
+  defp check_hardware_compat(%{hardware_compat: compat}) when is_list(compat) do
+    case Clawrig.Hardware.compat_code() do
+      {:ok, device_code} ->
+        if device_code in compat do
+          :ok
+        else
+          {:error,
+           "hardware incompatible: device=#{device_code}, manifest allows #{inspect(compat)}"}
+        end
+
+      {:error, {:unknown_model, model}} ->
+        {:error, "unknown hardware model: #{model} — refusing update"}
+
+      {:error, {:read_failed, :enoent}} ->
+        # No device tree (dev machine, CI) — allow update
+        :ok
+
+      {:error, reason} ->
+        {:error, "cannot detect hardware: #{inspect(reason)}"}
+    end
+  end
+
+  defp check_hardware_compat(_), do: :ok
+
+  # ── OpenClaw version compatibility ───────────────────────────────
+
+  defp check_openclaw_compat(%{min_openclaw_version: min_ver}) when is_binary(min_ver) do
+    case detect_openclaw_version() do
+      nil ->
+        Logger.warning("[Updater] Cannot detect OpenClaw version — allowing update")
+        :ok
+
+      current ->
+        case Version.compare(current, min_ver) do
+          :lt ->
+            {:error, "update requires OpenClaw >= #{min_ver}, device has #{current}"}
+
+          _ ->
+            :ok
+        end
+    end
+  end
+
+  defp check_openclaw_compat(_), do: :ok
+
+  defp detect_openclaw_version do
+    case Commands.impl().run_openclaw(["--version"]) do
+      {output, 0} ->
+        output
+        |> String.trim()
+        |> String.split("\n")
+        |> List.first()
+        |> parse_version_string()
+
+      _ ->
+        nil
+    end
+  end
+
+  defp parse_version_string(nil), do: nil
+
+  defp parse_version_string(str) do
+    normalized = str |> String.trim() |> String.replace(~r/^(openclaw\s+)?v?/, "")
+
+    case Version.parse(normalized) do
+      {:ok, _} -> normalized
+      :error -> nil
+    end
+  end
+
+  # ── Gateway protocol compatibility ──────────────────────────────
+
+  @gateway_protocol_version 3
+
+  defp check_gateway_compat(%{min_gateway_protocol: min_proto}) when is_integer(min_proto) do
+    if @gateway_protocol_version >= min_proto do
+      :ok
+    else
+      {:error,
+       "update requires gateway protocol >= #{min_proto}, device supports v#{@gateway_protocol_version}"}
+    end
+  end
+
+  defp check_gateway_compat(_), do: :ok
 
   # ── Sudo helpers ───────────────────────────────────────────────────
 
@@ -619,7 +802,9 @@ defmodule Clawrig.Updater do
         end
     end
   rescue
-    _ -> {:error, :reauth_required}
+    e ->
+      Logger.error("[Updater] Auth probe crashed: #{Exception.message(e)} — treating as reauth_required")
+      {:error, :reauth_required}
   end
 
   defp using_openai_codex? do
@@ -656,7 +841,9 @@ defmodule Clawrig.Updater do
 
     State.put(:update_history, [entry | history] |> Enum.take(12))
   rescue
-    _ -> :ok
+    e ->
+      Logger.warning("[Updater] Failed to record update event: #{Exception.message(e)}")
+      :ok
   end
 
   defp render_update_status(:checking), do: "checking"
@@ -697,6 +884,28 @@ defmodule Clawrig.Updater do
     end
   end
 
+  @doc "Read the current boot attempt counter (for fleet telemetry)."
+  def read_boot_attempts do
+    case File.read(@boot_counter_path) do
+      {:ok, content} ->
+        case Integer.parse(String.trim(content)) do
+          {n, ""} -> n
+          _ -> 0
+        end
+
+      {:error, _} ->
+        0
+    end
+  end
+
+  defp write_boot_counter(value) do
+    tmp = "#{@boot_counter_path}.tmp"
+    File.write!(tmp, Integer.to_string(value))
+    File.rename!(tmp, @boot_counter_path)
+  rescue
+    e -> Logger.warning("[Updater] Failed to write boot counter: #{Exception.message(e)}")
+  end
+
   defp recovery_path_available? do
     tailscale_ok =
       case Commands.impl().tailscale_status() do
@@ -713,6 +922,8 @@ defmodule Clawrig.Updater do
 
     tailscale_ok or local_ok
   rescue
-    _ -> false
+    e ->
+      Logger.warning("[Updater] Recovery path check crashed: #{Exception.message(e)}")
+      false
   end
 end

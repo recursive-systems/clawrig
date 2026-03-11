@@ -2,6 +2,7 @@ defmodule Clawrig.Wizard.State do
   use GenServer
 
   @default_state %{
+    schema_version: 1,
     phase: :wifi_provisioning,
     step: :preflight,
     mode: :new,
@@ -27,7 +28,8 @@ defmodule Clawrig.Wizard.State do
     update_resume_reason: nil,
     update_retry_attempts: 0,
     update_history: [],
-    auto_update_enabled: true
+    auto_update_enabled: true,
+    update_channel: "stable"
   }
 
   def start_link(_opts) do
@@ -110,8 +112,7 @@ defmodule Clawrig.Wizard.State do
   defp stringify_keys(v), do: v
 
   defp atomize_state(data) when is_map(data) do
-    # Migrate old field names from pre-multi-provider state files
-    data = migrate_legacy_fields(data)
+    data = data |> migrate_schema() |> migrate_legacy_fields()
 
     Map.new(@default_state, fn {k, default} ->
       str_key = to_string(k)
@@ -132,6 +133,13 @@ defmodule Clawrig.Wizard.State do
     end)
   rescue
     ArgumentError -> nil
+  end
+
+  defp migrate_schema(%{"schema_version" => v} = data) when v >= 1, do: data
+
+  defp migrate_schema(data) do
+    # v0 -> v1: stamp schema version (no field changes needed)
+    Map.put(data, "schema_version", 1)
   end
 
   defp migrate_step_value("openai"), do: "provider"

@@ -130,6 +130,28 @@ jobs:
           bash deploy/sign-release.sh deploy/bundle/clawrig.tar.gz "$CLAWRIG_VERSION" /tmp/signing-key.pem
           rm -f /tmp/signing-key.pem
 
+      - name: Check signing key expiry
+        run: |
+          echo "${{ secrets.OTA_SIGNING_KEY }}" | base64 -d > /tmp/signing-key.pem
+          # If the key is an X.509 cert, check expiry; if raw PEM key, skip
+          if openssl x509 -noout -in /tmp/signing-key.pem 2>/dev/null; then
+            EXPIRY=$(openssl x509 -enddate -noout -in /tmp/signing-key.pem | cut -d= -f2)
+            EXPIRY_EPOCH=$(date -d "$EXPIRY" +%s)
+            NOW_EPOCH=$(date +%s)
+            DAYS_LEFT=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
+            echo "Signing certificate expires in $DAYS_LEFT days ($EXPIRY)"
+            if [ "$DAYS_LEFT" -lt 90 ]; then
+              echo "::error::Signing certificate expires in $DAYS_LEFT days (< 90). Rotate the key!"
+              exit 1
+            fi
+            if [ "$DAYS_LEFT" -lt 180 ]; then
+              echo "::warning::Signing certificate expires in $DAYS_LEFT days. Plan key rotation."
+            fi
+          else
+            echo "Signing key is a raw PEM key (no X.509 cert). Skipping expiry check."
+          fi
+          rm -f /tmp/signing-key.pem
+
       - name: Prepare release assets
         run: |
           TAG="v${CLAWRIG_VERSION}"

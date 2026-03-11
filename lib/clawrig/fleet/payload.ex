@@ -36,8 +36,10 @@ defmodule Clawrig.Fleet.Payload do
         "mem_used_pct" => mem_used_pct(),
         "disk_used_pct" => disk_used_pct()
       },
+      "update_telemetry" => build_update_telemetry(),
       "health_summary" => infer_health(gateway_status, internet_ok),
-      "observed_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+      "observed_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
+      "directive_acks" => Clawrig.Fleet.Ack.drain()
     }
   end
 
@@ -135,6 +137,59 @@ defmodule Clawrig.Fleet.Payload do
     case Float.parse(value) do
       {num, _} -> Float.round(num, 1)
       :error -> nil
+    end
+  end
+
+  defp build_update_telemetry do
+    state = Clawrig.Wizard.State.get()
+    update_history = Map.get(state, :update_history, [])
+
+    %{
+      "last_update_result" => last_update_result(update_history),
+      "rollback_count" => count_rollbacks(update_history),
+      "boot_attempts" => Clawrig.Updater.read_boot_attempts(),
+      "update_channel" => Map.get(state, :update_channel, "stable") |> to_string(),
+      "pending_update_version" => read_pending_version()
+    }
+  end
+
+  defp last_update_result([]), do: nil
+
+  defp last_update_result([latest | _]) when is_map(latest) do
+    %{
+      "status" => Map.get(latest, :status) || Map.get(latest, "status"),
+      "version" => Map.get(latest, :version) || Map.get(latest, "version"),
+      "at" => Map.get(latest, :at) || Map.get(latest, "at")
+    }
+  end
+
+  defp last_update_result(_), do: nil
+
+  defp count_rollbacks(history) when is_list(history) do
+    Enum.count(history, fn entry ->
+      status = Map.get(entry, :status) || Map.get(entry, "status")
+
+      status in [
+        :rolled_back_auth_required,
+        :health_failed,
+        "rolled_back_auth_required",
+        "health_failed"
+      ]
+    end)
+  end
+
+  defp count_rollbacks(_), do: 0
+
+  defp read_pending_version do
+    case File.read("/var/lib/clawrig/.update-pending") do
+      {:ok, content} ->
+        case Jason.decode(content) do
+          {:ok, %{"version" => v}} -> v
+          _ -> String.trim(content)
+        end
+
+      {:error, _} ->
+        nil
     end
   end
 

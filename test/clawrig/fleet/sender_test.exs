@@ -10,7 +10,7 @@ defmodule Clawrig.Fleet.SenderTest do
         send(pid, {:fleet_heartbeat, payload})
       end
 
-      :ok
+      {:ok, :no_directives}
     end
   end
 

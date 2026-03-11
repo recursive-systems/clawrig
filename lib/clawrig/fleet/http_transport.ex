@@ -24,8 +24,11 @@ defmodule Clawrig.Fleet.HttpTransport do
                receive_timeout: 8_000,
                retry: false
              ) do
+          {:ok, %{status: status, body: %{"directives" => directives}}} when status in 200..299 ->
+            {:ok, directives}
+
           {:ok, %{status: status}} when status in 200..299 ->
-            :ok
+            {:ok, :no_directives}
 
           {:ok, %{status: status, body: body}} ->
             {:error, {:unexpected_status, status, body}}

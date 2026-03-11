@@ -63,7 +63,8 @@ defmodule Clawrig.MixProject do
       {:jason, "~> 1.2"},
       {:bandit, "~> 1.5"},
       {:req, "~> 0.5"},
-      {:mint_web_socket, "~> 1.0"}
+      {:mint_web_socket, "~> 1.0"},
+      {:systemd, "~> 0.6"}
     ]
   end
 

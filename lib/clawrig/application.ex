@@ -18,8 +18,11 @@ defmodule Clawrig.Application do
         Clawrig.Diagnostics.Agent,
         gateway_operator_child(),
         Clawrig.Node.Client,
+        Clawrig.Fleet.Ack,
         Clawrig.Fleet.Sender,
-        ClawrigWeb.Endpoint
+        ClawrigWeb.Endpoint,
+        # Notify systemd after all services are up
+        :systemd.ready()
       ] ++ hotspot_task()
 
     opts = [strategy: :one_for_one, name: Clawrig.Supervisor]

@@ -23,6 +23,79 @@ defmodule Clawrig.UpdaterTest do
     end
   end
 
+  describe "parse_manifest/1 with hardware_compat" do
+    test "includes hardware_compat when present" do
+      manifest = %{
+        "version" => "0.2.0",
+        "tarball" => "clawrig.tar.gz",
+        "signature" => "base64sig",
+        "checksum" => "abc123",
+        "released_at" => "2026-03-02T12:00:00Z",
+        "hardware_compat" => ["rpi4", "rpi5"]
+      }
+
+      assert {:ok, parsed} = Updater.parse_manifest(manifest)
+      assert parsed.hardware_compat == ["rpi4", "rpi5"]
+    end
+
+    test "hardware_compat is nil when absent" do
+      manifest = %{
+        "version" => "0.2.0",
+        "tarball" => "clawrig.tar.gz",
+        "signature" => "base64sig",
+        "checksum" => "abc123",
+        "released_at" => "2026-03-02T12:00:00Z"
+      }
+
+      assert {:ok, parsed} = Updater.parse_manifest(manifest)
+      assert parsed.hardware_compat == nil
+    end
+  end
+
+  describe "parse_manifest/1 with compatibility fields" do
+    test "includes min_openclaw_version when present" do
+      manifest = %{
+        "version" => "0.2.0",
+        "tarball" => "clawrig.tar.gz",
+        "signature" => "base64sig",
+        "checksum" => "abc123",
+        "released_at" => "2026-03-02T12:00:00Z",
+        "min_openclaw_version" => "1.5.0"
+      }
+
+      assert {:ok, parsed} = Updater.parse_manifest(manifest)
+      assert parsed.min_openclaw_version == "1.5.0"
+    end
+
+    test "includes min_gateway_protocol when present" do
+      manifest = %{
+        "version" => "0.2.0",
+        "tarball" => "clawrig.tar.gz",
+        "signature" => "base64sig",
+        "checksum" => "abc123",
+        "released_at" => "2026-03-02T12:00:00Z",
+        "min_gateway_protocol" => 3
+      }
+
+      assert {:ok, parsed} = Updater.parse_manifest(manifest)
+      assert parsed.min_gateway_protocol == 3
+    end
+
+    test "compatibility fields are nil when absent" do
+      manifest = %{
+        "version" => "0.2.0",
+        "tarball" => "clawrig.tar.gz",
+        "signature" => "base64sig",
+        "checksum" => "abc123",
+        "released_at" => "2026-03-02T12:00:00Z"
+      }
+
+      assert {:ok, parsed} = Updater.parse_manifest(manifest)
+      assert parsed.min_openclaw_version == nil
+      assert parsed.min_gateway_protocol == nil
+    end
+  end
+
   describe "version_newer?/2" do
     test "detects newer version" do
       assert Updater.version_newer?("0.2.0", "0.1.0")
