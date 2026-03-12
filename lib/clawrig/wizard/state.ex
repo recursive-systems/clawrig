@@ -30,6 +30,7 @@ defmodule Clawrig.Wizard.State do
     update_retry_attempts: 0,
     update_history: [],
     auto_update_enabled: true,
+    diagnostics_dry_run: true,
     update_channel: "stable"
   }
 
@@ -92,7 +93,10 @@ defmodule Clawrig.Wizard.State do
       |> stringify_keys()
       |> Jason.encode!(pretty: true)
 
-    File.write!(path, json)
+    # Atomic write: write to tmp then rename to prevent corruption on power loss
+    tmp = "#{path}.tmp"
+    File.write!(tmp, json)
+    File.rename!(tmp, path)
   end
 
   defp load_from_disk do

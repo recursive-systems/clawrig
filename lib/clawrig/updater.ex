@@ -163,7 +163,13 @@ defmodule Clawrig.Updater do
 
     state = %{last_check: nil, last_result: nil, etag: nil, channel: channel}
 
-    # Boot-time reconciliation: check if an update was in progress when we restarted
+    # Boot-time reconciliation runs async via handle_continue to avoid blocking
+    # downstream children and delaying systemd.ready()
+    {:ok, state, {:continue, :reconcile}}
+  end
+
+  @impl true
+  def handle_continue(:reconcile, state) do
     reconcile_pending_update()
 
     if oobe_complete?() and auto_update_enabled?() do
@@ -174,7 +180,7 @@ defmodule Clawrig.Updater do
       Logger.info("[Updater] #{reason} — update checks disabled")
     end
 
-    {:ok, state}
+    {:noreply, state}
   end
 
   @impl true
@@ -233,8 +239,10 @@ defmodule Clawrig.Updater do
         %{version: version, mode: mode} = parse_pending_marker(marker)
         Logger.info("[Updater] Found pending update marker for v#{version}, running health check")
 
-        # Give the service a moment to stabilize after restart
+        # Give the service a moment to stabilize after restart.
+        # Uses a timer instead of blocking sleep so the GenServer mailbox stays responsive.
         Process.sleep(5_000)
+        # NOTE: This sleep is acceptable inside handle_continue (non-blocking to supervisor).
 
         service_active? =
           case System.cmd("sudo", ["systemctl", "is-active", "clawrig"], stderr_to_stdout: true) do
@@ -524,18 +532,20 @@ defmodule Clawrig.Updater do
   defp verify_checksum(parsed) do
     tarball_path = Path.join(@staging_dir, parsed.tarball)
 
-    case File.read(tarball_path) do
-      {:ok, data} ->
-        actual = :crypto.hash(:sha256, data) |> Base.encode16(case: :lower)
+    try do
+      actual =
+        File.stream!(tarball_path, 65_536)
+        |> Enum.reduce(:crypto.hash_init(:sha256), &:crypto.hash_update(&2, &1))
+        |> :crypto.hash_final()
+        |> Base.encode16(case: :lower)
 
-        if actual == String.downcase(parsed.checksum) do
-          :ok
-        else
-          {:error, "checksum mismatch: expected #{parsed.checksum}, got #{actual}"}
-        end
-
-      {:error, reason} ->
-        {:error, "cannot read tarball for checksum: #{inspect(reason)}"}
+      if actual == String.downcase(parsed.checksum) do
+        :ok
+      else
+        {:error, "checksum mismatch: expected #{parsed.checksum}, got #{actual}"}
+      end
+    rescue
+      e -> {:error, "cannot read tarball for checksum: #{Exception.message(e)}"}
     end
   end
 
@@ -590,6 +600,10 @@ defmodule Clawrig.Updater do
 
   defp swap_and_restart(version, mode) do
     try do
+      # Write pending marker FIRST so boot-time reconciliation runs health checks
+      # even if power is lost between the swap and restart.
+      File.write!(@pending_marker, Jason.encode!(%{version: version, mode: Atom.to_string(mode)}))
+
       # Remove previous backup
       if File.exists?(@prev_dir), do: sudo_rm_rf(@prev_dir)
 
@@ -602,16 +616,14 @@ defmodule Clawrig.Updater do
       sudo_mv(@staging_dir, @install_dir)
       sudo_chown(@install_dir)
 
-      # Write pending marker so boot-time reconciliation can run the health + auth checks
-      File.write!(@pending_marker, Jason.encode!(%{version: version, mode: Atom.to_string(mode)}))
-
       # Restart the service — this will kill our process.
-      # The new instance's init/1 handles health check via reconcile_pending_update/0.
+      # The new instance's handle_continue handles health check via reconcile_pending_update/0.
       System.cmd("sudo", ["systemctl", "restart", "clawrig"], stderr_to_stdout: true)
       :ok
     rescue
       e ->
         Logger.error("[Updater] Swap failed: #{Exception.message(e)} — rolling back")
+        File.rm(@pending_marker)
         rollback()
         {:error, "swap failed: #{Exception.message(e)}"}
     end
@@ -623,9 +635,15 @@ defmodule Clawrig.Updater do
         if File.exists?(@install_dir), do: sudo_rm_rf(@install_dir)
         sudo_mv(@prev_dir, @install_dir)
         System.cmd("sudo", ["systemctl", "restart", "clawrig"], stderr_to_stdout: true)
+        :ok
+      else
+        Logger.error("[Updater] Rollback failed: no previous version to restore")
+        {:error, :no_prev_dir}
       end
     rescue
-      e -> Logger.error("[Updater] Rollback failed: #{Exception.message(e)}")
+      e ->
+        Logger.error("[Updater] Rollback failed: #{Exception.message(e)}")
+        {:error, Exception.message(e)}
     end
   end
 

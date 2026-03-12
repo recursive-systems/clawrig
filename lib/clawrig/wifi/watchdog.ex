@@ -25,11 +25,27 @@ defmodule Clawrig.Wifi.Watchdog do
 
   @impl true
   def init(_) do
-    if enabled?() do
+    Phoenix.PubSub.subscribe(Clawrig.PubSub, "clawrig:oobe")
+
+    active = enabled?()
+
+    if active do
       schedule_check()
-      {:ok, %{failures: 0}}
+    end
+
+    {:ok, %{failures: 0, active: active}}
+  end
+
+  @impl true
+  def handle_info(:oobe_complete, %{active: true} = state), do: {:noreply, state}
+
+  def handle_info(:oobe_complete, state) do
+    if not enabled_without_oobe?() do
+      {:noreply, state}
     else
-      {:ok, %{failures: 0}}
+      Logger.info("[WifiWatchdog] OOBE complete — activating watchdog")
+      schedule_check()
+      {:noreply, %{state | active: true}}
     end
   end
 
@@ -115,6 +131,10 @@ defmodule Clawrig.Wifi.Watchdog do
 
   defp enabled? do
     Application.get_env(:clawrig, :env) == :prod and oobe_complete?()
+  end
+
+  defp enabled_without_oobe? do
+    Application.get_env(:clawrig, :env) == :prod
   end
 
   defp oobe_complete? do

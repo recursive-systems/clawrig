@@ -20,6 +20,7 @@ defmodule Clawrig.Application do
         Clawrig.Node.Client,
         Clawrig.Fleet.Ack,
         Clawrig.Fleet.Sender,
+        Clawrig.RateLimiter,
         ClawrigWeb.Endpoint,
         # Notify systemd after all services are up
         :systemd.ready()

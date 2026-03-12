@@ -198,15 +198,32 @@ defmodule Clawrig.Wifi.Manager do
       _ = Task.Supervisor.terminate_child(Clawrig.TaskSupervisor, state.connect_task_pid)
     end
 
-    _ = Commands.impl().start_hotspot()
+    {mode, error} =
+      case Commands.impl().start_hotspot() do
+        :ok ->
+          {:ap, "connect_timeout"}
+
+        {:error, reason} ->
+          Logger.error("Hotspot restart failed after timeout: #{inspect(reason)}, retrying...")
+          Process.sleep(2_000)
+
+          case Commands.impl().start_hotspot() do
+            :ok ->
+              {:ap, "connect_timeout"}
+
+            {:error, reason2} ->
+              Logger.error("Hotspot retry also failed: #{inspect(reason2)}")
+              {:idle, "connect_timeout_no_hotspot"}
+          end
+      end
 
     {:noreply,
      %{
        state
-       | mode: :ap,
+       | mode: mode,
          connecting: false,
          connected_ssid: nil,
-         last_error: "connect_timeout",
+         last_error: error,
          connect_attempt_ref: nil,
          connect_task_pid: nil,
          connect_timer_ref: nil

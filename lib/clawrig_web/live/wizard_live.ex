@@ -655,7 +655,13 @@ defmodule ClawrigWeb.WizardLive do
        |> put_flash(:error, "Please set your dashboard password before finishing setup.")}
     else
       # Apply runtime-only config (Telegram channel) and write audit trail
-      Launcher.finalize(state.mode, state.tg_token, state.tg_chat_id)
+      case Launcher.finalize(state.mode, state.tg_token, state.tg_chat_id) do
+        {:error, reason} ->
+          Logger.warning("[Wizard] Launcher.finalize failed: #{inspect(reason)}")
+
+        _ ->
+          :ok
+      end
 
       # Detect and store the best IP for dashboard use
       ip = Commands.impl().detect_local_ip()
@@ -674,6 +680,8 @@ defmodule ClawrigWeb.WizardLive do
       path = Application.get_env(:clawrig, :oobe_marker, "/var/lib/clawrig/.oobe-complete")
       File.mkdir_p!(Path.dirname(path))
       File.write!(path, "")
+
+      Phoenix.PubSub.broadcast(Clawrig.PubSub, "clawrig:oobe", :oobe_complete)
 
       # Tear down hotspot if still running.
       # WiFi flow: already torn down by safe_connect, this is a no-op.

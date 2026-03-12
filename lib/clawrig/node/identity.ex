@@ -92,6 +92,7 @@ defmodule Clawrig.Node.Identity do
 
     File.mkdir_p!(Path.dirname(path))
     File.write!(path, json)
+    File.chmod!(path, 0o600)
 
     {:ok, %{public_key: pub, private_key: priv}}
   rescue

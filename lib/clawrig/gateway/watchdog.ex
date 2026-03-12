@@ -25,11 +25,27 @@ defmodule Clawrig.Gateway.Watchdog do
 
   @impl true
   def init(_) do
-    if enabled?() do
+    Phoenix.PubSub.subscribe(Clawrig.PubSub, "clawrig:oobe")
+
+    active = enabled?()
+
+    if active do
       Process.send_after(self(), :check, @initial_delay)
-      {:ok, %{failures: 0}}
+    end
+
+    {:ok, %{failures: 0, active: active}}
+  end
+
+  @impl true
+  def handle_info(:oobe_complete, %{active: true} = state), do: {:noreply, state}
+
+  def handle_info(:oobe_complete, state) do
+    if not enabled_without_oobe?() do
+      {:noreply, state}
     else
-      {:ok, %{failures: 0}}
+      Logger.info("[GatewayWatchdog] OOBE complete — activating watchdog")
+      Process.send_after(self(), :check, @initial_delay)
+      {:noreply, %{state | active: true}}
     end
   end
 
@@ -55,8 +71,10 @@ defmodule Clawrig.Gateway.Watchdog do
       )
 
       if failures >= @failure_threshold do
-        restart_gateway()
-        %{state | failures: 0}
+        case restart_gateway() do
+          :ok -> %{state | failures: 0}
+          _ -> %{state | failures: failures}
+        end
       else
         %{state | failures: failures}
       end
@@ -79,10 +97,28 @@ defmodule Clawrig.Gateway.Watchdog do
 
     env = [{"XDG_RUNTIME_DIR", "/run/user/#{get_uid()}"}]
 
-    System.cmd("systemctl", ["--user", "restart", "openclaw-gateway.service"],
-      stderr_to_stdout: true,
-      env: env
-    )
+    case System.cmd("systemctl", ["--user", "restart", "openclaw-gateway.service"],
+           stderr_to_stdout: true,
+           env: env
+         ) do
+      {_, 0} ->
+        Process.sleep(3_000)
+
+        if port_listening?() do
+          Logger.info("[GatewayWatchdog] Gateway restart confirmed (port #{@gateway_port} listening)")
+          :ok
+        else
+          Logger.warning(
+            "[GatewayWatchdog] Gateway restarted but port #{@gateway_port} still not listening"
+          )
+
+          :port_not_ready
+        end
+
+      {output, code} ->
+        Logger.error("[GatewayWatchdog] Gateway restart failed (exit #{code}): #{output}")
+        :restart_failed
+    end
   end
 
   defp get_uid do
@@ -94,6 +130,10 @@ defmodule Clawrig.Gateway.Watchdog do
 
   defp enabled? do
     Application.get_env(:clawrig, :env) == :prod and oobe_complete?()
+  end
+
+  defp enabled_without_oobe? do
+    Application.get_env(:clawrig, :env) == :prod
   end
 
   defp oobe_complete? do

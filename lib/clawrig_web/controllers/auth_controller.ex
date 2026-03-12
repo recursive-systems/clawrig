@@ -14,15 +14,29 @@ defmodule ClawrigWeb.AuthController do
   end
 
   def create(conn, %{"password" => password}) do
-    if DashboardAuth.verify_password(password) do
-      conn
-      |> put_session(:dashboard_auth, true)
-      |> configure_session(renew: true)
-      |> redirect(to: "/")
-    else
-      conn
-      |> put_session(:auth_error, "Invalid password")
-      |> redirect(to: "/login")
+    ip = conn.remote_ip |> :inet.ntoa() |> to_string()
+
+    case Clawrig.RateLimiter.check(ip) do
+      :blocked ->
+        conn
+        |> put_session(:auth_error, "Too many login attempts. Please wait a minute and try again.")
+        |> redirect(to: "/login")
+
+      :ok ->
+        if DashboardAuth.verify_password(password) do
+          Clawrig.RateLimiter.reset(ip)
+
+          conn
+          |> put_session(:dashboard_auth, true)
+          |> configure_session(renew: true)
+          |> redirect(to: "/")
+        else
+          Clawrig.RateLimiter.record_failure(ip)
+
+          conn
+          |> put_session(:auth_error, "Invalid password")
+          |> redirect(to: "/login")
+        end
     end
   end
 
