@@ -29,13 +29,6 @@
       data-run={to_string(!@preflight_done)}
     >
       <div class="check-center">
-        <div class="setup-journey-card">
-          <strong>Phone-led setup, one saved state.</strong>
-          <p>
-            Start here, then switch to another device later if that feels easier.
-            ClawRig keeps your progress and lets you resume without starting over.
-          </p>
-        </div>
         <div class="check-list">
           <div class="check-item">
             <div class="check-icon-wrap">
@@ -171,19 +164,7 @@
               &rarr; Security &rarr; enable <strong>"Device code authorization for Codex"</strong>.
             </div>
 
-            <div class="setup-handoff-card">
-              <strong>Prefer a bigger screen for sign-in?</strong>
-              <p>
-                Keep this page open. You can continue this same setup on another device with one of these links:
-              </p>
-              <div class="setup-addresses">
-                <code :if={@local_ip}>http://{@local_ip}/setup</code>
-                <code>{@mdns_url}/setup</code>
-              </div>
-              <p class="setup-handoff-hint">
-                Computer is recommended for ChatGPT sign-in. Phone is fine for the rest of setup.
-              </p>
-            </div>
+
 
             <div :if={@openai_user_code} class="device-code-display">
               <span class="device-code-value" id="device-code-text">
@@ -572,21 +553,18 @@
               class="tg-qr"
               id="tg-qr-bot"
               phx-hook="QRCode"
-              data-url={"https://t.me/#{@tg_bot_username}"}
+              data-url={Clawrig.Wizard.Telegram.deep_link(@tg_bot_username, @tg_nonce)}
             >
             </div>
             <p class="tg-qr-label">
               Use your <strong>phone camera</strong> to open <strong>@{@tg_bot_username}</strong>
             </p>
             <p class="helper">
-              If scan fails, open Telegram on your phone, search <strong>@{@tg_bot_username}</strong>, then send <strong>/start</strong>.
+              If scanning doesn't work, open Telegram on your phone and search <strong>@{@tg_bot_username}</strong>.
             </p>
           </div>
           <p class="tg-lead">
-            Scan the QR code or search for your bot in Telegram. Send <strong>/start</strong>, then tap <strong>Check now</strong>.
-          </p>
-          <p class="helper">
-            Heads up: this step links your chat, but OpenClaw replies start after you finish the remaining setup steps.
+            Send <strong>/start</strong>, then tap <strong>Check now</strong>.
           </p>
           <div class="tg-polling">
             <div class="tg-polling-dot"></div>
@@ -626,11 +604,8 @@
       <div class="done-center">
         <h2>Secure your dashboard</h2>
         <p>
-          Set a local password so anyone on your network cannot open your dashboard without permission.
+          Set a local password so others on your network can't open your dashboard without permission.
         </p>
-        <div class="setup-inline-note">
-          This password only protects the dashboard. Your setup progress is already saved.
-        </div>
 
         <form
           phx-change="validate_dashboard_password"
