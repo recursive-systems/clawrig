@@ -430,7 +430,153 @@
 
     <%!-- Telegram --%>
     <.dash_panel :if={@live_action == :telegram} title="Telegram" back>
-      <p class="coming-soon">Telegram configuration is coming in a future update.</p>
+      <%= if @tg_sub == :connected do %>
+        <div class="integration-card">
+          <div class="integration-header">
+            <h3>{@tg_bot_name || "Telegram Bot"}</h3>
+            <span class="integration-badge ok">Connected</span>
+          </div>
+          <p>
+            <%= if @tg_bot_username do %>
+              Your dashboard is linked to <strong>@{@tg_bot_username}</strong>.
+            <% else %>
+              Your dashboard is linked to Telegram.
+            <% end %>
+          </p>
+          <p class="account-input-hint">{telegram_owner_label(@tg_chat_id)}</p>
+          <div class="account-actions mt-md">
+            <button
+              class="btn subtle btn-sm"
+              phx-click="tg_dashboard_test"
+              disabled={@tg_test_sending}
+            >
+              {if @tg_test_sending, do: "Sending...", else: "Send test notification"}
+            </button>
+            <button class="btn subtle btn-sm" phx-click="tg_dashboard_relink">
+              Relink phone
+            </button>
+            <button
+              class="btn subtle btn-sm"
+              phx-click="tg_dashboard_disconnect"
+              data-confirm="Disconnect Telegram? You can reconnect it later."
+            >
+              Disconnect Telegram
+            </button>
+          </div>
+          <p class="helper mt-md">
+            This test sends a direct Telegram notification from the dashboard. It does not prove the OpenClaw reply path is ready yet.
+          </p>
+          <p :if={@tg_error} class="account-input-hint error mt-sm">{@tg_error}</p>
+        </div>
+      <% else %>
+        <div class="integration-card">
+          <div class="integration-header">
+            <h3>Owner Phone Setup</h3>
+          </div>
+          <p>
+            Link one Telegram chat to this Pi so you can reach OpenClaw from your phone.
+          </p>
+
+          <%= if @tg_sub in [:not_configured, :entering_token, :validating, :quieting] do %>
+            <p class="helper">
+              You'll need a personal Telegram bot from <strong>@BotFather</strong>.
+            </p>
+            <div class="tg-qr-row">
+              <div
+                class="tg-qr"
+                id="dashboard-tg-qr-botfather"
+                phx-hook="QRCode"
+                data-url="https://t.me/BotFather"
+              >
+              </div>
+              <p class="tg-qr-label">
+                Scan to open <strong>@BotFather</strong>
+              </p>
+            </div>
+
+            <%= if @tg_sub == :not_configured do %>
+              <button class="btn primary mt-md" phx-click="tg_dashboard_start">
+                Set up Telegram
+              </button>
+            <% else %>
+              <form phx-submit="tg_dashboard_validate" class="account-input-group mt-md">
+                <label for="dashboard-tg-token-input">Bot token</label>
+                <input
+                  type="text"
+                  name="token"
+                  id="dashboard-tg-token-input"
+                  class={["account-input", @tg_error && "error"]}
+                  value={@tg_token || ""}
+                  placeholder="123456789:ABCdef..."
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <p :if={@tg_error} class="account-input-hint error">{@tg_error}</p>
+                <p :if={!@tg_error} class="account-input-hint">
+                  Paste the token BotFather gives you after you create the bot.
+                </p>
+                <button type="submit" class="btn primary mt-md" disabled={@tg_sub == :validating}>
+                  {if @tg_sub == :validating, do: "Validating...", else: "Connect bot"}
+                </button>
+              </form>
+              <p :if={@tg_sub == :quieting} class="account-input-hint">
+                Restarting the gateway without Telegram so this phone can be relinked safely.
+              </p>
+              <button class="btn ghost btn-sm mt-sm" phx-click="tg_dashboard_cancel">
+                Cancel
+              </button>
+            <% end %>
+          <% end %>
+
+          <%= if @tg_sub == :linking do %>
+            <h3 class="mt-md">Tap Start in Telegram</h3>
+            <div :if={telegram_deep_link(@tg_bot_username, @tg_nonce)} class="tg-qr-row">
+              <div
+                class="tg-qr"
+                id="dashboard-tg-qr-link"
+                phx-hook="QRCode"
+                data-url={telegram_deep_link(@tg_bot_username, @tg_nonce)}
+              >
+              </div>
+              <p class="tg-qr-label">
+                Scan to open
+                <strong>
+                  {if @tg_bot_username, do: "@#{@tg_bot_username}", else: "your bot"}
+                </strong>
+              </p>
+            </div>
+            <p class="helper">
+              Open Telegram, tap <strong>Start</strong>, and we'll try to link this phone automatically.
+            </p>
+            <div class="tg-polling">
+              <div class="tg-polling-dot"></div>
+              <span>
+                {if @tg_polling,
+                  do: "Checking for a matching Start message...",
+                  else: "Waiting for your Start message..."}
+              </span>
+            </div>
+            <div class="account-actions mt-md">
+              <a
+                :if={telegram_deep_link(@tg_bot_username, @tg_nonce)}
+                href={telegram_deep_link(@tg_bot_username, @tg_nonce)}
+                class="btn primary btn-sm"
+                target="_blank"
+                rel="noopener"
+              >
+                Open Telegram
+              </a>
+              <button class="btn subtle btn-sm" phx-click="tg_dashboard_check">
+                Check now
+              </button>
+              <button class="btn ghost btn-sm" phx-click="tg_dashboard_cancel">
+                Cancel
+              </button>
+            </div>
+            <p :if={@tg_error} class="account-input-hint error mt-sm">{@tg_error}</p>
+          <% end %>
+        </div>
+      <% end %>
     </.dash_panel>
 
     <%!-- Integrations --%>

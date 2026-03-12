@@ -20,7 +20,12 @@ defmodule Clawrig.Fleet.Config do
 
     case write(path, updated) do
       :ok ->
-        Phoenix.PubSub.broadcast(Clawrig.PubSub, "clawrig:fleet_config", {:config_updated, updated})
+        Phoenix.PubSub.broadcast(
+          Clawrig.PubSub,
+          "clawrig:fleet_config",
+          {:config_updated, updated}
+        )
+
         :ok
 
       {:error, reason} ->
@@ -53,7 +58,10 @@ defmodule Clawrig.Fleet.Config do
             %{}
 
           {:error, reason} ->
-            Logger.warning("[Fleet.Config] corrupt config at #{path}: #{inspect(reason)}, treating as empty")
+            Logger.warning(
+              "[Fleet.Config] corrupt config at #{path}: #{inspect(reason)}, treating as empty"
+            )
+
             %{}
         end
 

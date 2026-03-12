@@ -120,6 +120,113 @@ defmodule Clawrig.Integrations.Config do
     e -> {:error, "Failed to remove search config: #{Exception.message(e)}"}
   end
 
+  @doc """
+  Returns the current Telegram integration state.
+  """
+  @spec telegram_status() ::
+          :not_configured
+          | {:connected,
+             %{
+               bot_token: String.t(),
+               allow_from: [String.t()],
+               dm_policy: String.t()
+             }}
+  def telegram_status do
+    case telegram_config() do
+      %{
+        "enabled" => true,
+        "botToken" => token,
+        "allowFrom" => allow_from
+      } = telegram
+      when is_binary(token) and token != "" and is_list(allow_from) and allow_from != [] ->
+        {:connected,
+         %{
+           bot_token: token,
+           allow_from: Enum.map(allow_from, &to_string/1),
+           dm_policy: to_string(telegram["dmPolicy"] || "allowlist")
+         }}
+
+      _ ->
+        :not_configured
+    end
+  end
+
+  @doc """
+  Returns the raw Telegram config map from openclaw.json, or nil if absent.
+  """
+  @spec telegram_config() :: map() | nil
+  def telegram_config do
+    get_in(read_config(), ["channels", "telegram"])
+  end
+
+  @doc """
+  Writes Telegram owner-DM config to openclaw.json.
+  """
+  @spec write_telegram(String.t(), String.t()) :: :ok | {:error, String.t()}
+  def write_telegram(token, chat_id) do
+    config =
+      read_config()
+      |> deep_put(["channels", "telegram", "enabled"], true)
+      |> deep_put(["channels", "telegram", "botToken"], token)
+      |> deep_put(["channels", "telegram", "dmPolicy"], "allowlist")
+      |> deep_put(["channels", "telegram", "allowFrom"], [to_string(chat_id)])
+
+    write_config(config)
+  rescue
+    e -> {:error, "Failed to write Telegram config: #{Exception.message(e)}"}
+  end
+
+  @doc """
+  Returns the current exec security mode: "full", "allowlist", or "not_configured".
+  """
+  @spec exec_security_mode() :: String.t()
+  def exec_security_mode do
+    get_in(read_config(), ["tools", "exec", "security"]) || "not_configured"
+  end
+
+  @doc """
+  Ensure exec defaults for the ClawRig appliance.
+  Sets security to "full" and ask to "off" — safe because ClawRig
+  is a dedicated single-purpose device with limited blast radius.
+  """
+  @spec write_exec_defaults() :: :ok | {:error, String.t()}
+  def write_exec_defaults do
+    config =
+      read_config()
+      |> deep_put(["tools", "exec", "security"], "full")
+      |> deep_put(["tools", "exec", "ask"], "off")
+      |> deep_put(["tools", "exec", "host"], "gateway")
+
+    write_config(config)
+  rescue
+    e -> {:error, "Failed to write exec defaults: #{Exception.message(e)}"}
+  end
+
+  @doc """
+  Removes Telegram config from openclaw.json.
+  """
+  @spec remove_telegram() :: :ok | {:error, String.t()}
+  def remove_telegram do
+    config = read_config()
+
+    config =
+      case config do
+        %{"channels" => channels} when is_map(channels) ->
+          channels = Map.delete(channels, "telegram")
+
+          if channels == %{},
+            do: Map.delete(config, "channels"),
+            else: Map.put(config, "channels", channels)
+
+        _ ->
+          config
+      end
+
+    write_config(config)
+  rescue
+    e -> {:error, "Failed to remove Telegram config: #{Exception.message(e)}"}
+  end
+
   # -- Private --
 
   defp config_path do
@@ -129,16 +236,25 @@ defmodule Clawrig.Integrations.Config do
 
   defp read_config do
     case File.read(config_path()) do
-      {:ok, contents} -> Jason.decode!(contents)
-      _ -> %{}
+      {:ok, contents} ->
+        case String.trim(contents) do
+          "" -> %{}
+          json -> Jason.decode!(json)
+        end
+
+      _ ->
+        %{}
     end
+  rescue
+    Jason.DecodeError -> %{}
   end
 
   defp write_config(config) do
     path = config_path()
     File.mkdir_p!(Path.dirname(path))
+    encoded = Jason.encode!(config, pretty: true)
 
-    case File.write(path, Jason.encode!(config, pretty: true)) do
+    case write_atomic(path, encoded) do
       :ok -> :ok
       {:error, reason} -> {:error, "Failed to write openclaw.json: #{inspect(reason)}"}
     end
@@ -161,6 +277,19 @@ defmodule Clawrig.Integrations.Config do
     case Map.get(map, key) do
       child when is_map(child) -> Map.put(map, key, remove_key(child, rest))
       _ -> map
+    end
+  end
+
+  defp write_atomic(path, contents) do
+    tmp_path = "#{path}.tmp.#{System.unique_integer([:positive])}"
+
+    with :ok <- File.write(tmp_path, contents),
+         :ok <- File.rename(tmp_path, path) do
+      :ok
+    else
+      {:error, _reason} = error ->
+        _ = File.rm(tmp_path)
+        error
     end
   end
 end

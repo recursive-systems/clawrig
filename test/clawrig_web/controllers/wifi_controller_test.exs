@@ -40,6 +40,20 @@ defmodule ClawrigWeb.WifiControllerTest do
     assert html_response(conn, 200) =~ "Wi-Fi Setup"
   end
 
+  test "POST /portal/skip-wifi stops hotspot and records ethernet handoff", %{conn: conn} do
+    assert :ok = Manager.start_hotspot()
+    assert %{mode: :ap} = Manager.status()
+
+    conn = post(conn, "/portal/skip-wifi")
+
+    assert html_response(conn, 200) =~ "Ethernet connected"
+    assert html_response(conn, 200) =~ "http://192.168.1.42"
+    assert %{mode: :idle} = Manager.status()
+    assert State.get(:network_method) == :ethernet
+    assert State.get(:local_ip) == "192.168.1.42"
+    assert State.get(:preflight_done) == true
+  end
+
   test "GET /portal/status renders status", %{conn: conn} do
     conn = get(conn, "/portal/status")
     assert html_response(conn, 200) =~ "Network Status"

@@ -14,7 +14,9 @@ defmodule Clawrig.Gateway.OperatorClientTest do
     start_supervised!(MockTransport)
     MockTransport.reset()
 
-    auth_dir = Path.join(System.tmp_dir!(), "clawrig-gateway-auth-#{System.unique_integer([:positive])}")
+    auth_dir =
+      Path.join(System.tmp_dir!(), "clawrig-gateway-auth-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(auth_dir)
     auth_path = Path.join(auth_dir, "openclaw.json")
 
@@ -23,7 +25,9 @@ defmodule Clawrig.Gateway.OperatorClientTest do
       Jason.encode!(%{"gateway" => %{"auth" => %{"token" => "test-shared-token"}}})
     )
 
-    store_dir = Path.join(System.tmp_dir!(), "clawrig-gateway-store-#{System.unique_integer([:positive])}")
+    store_dir =
+      Path.join(System.tmp_dir!(), "clawrig-gateway-store-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(store_dir)
     store_path = Path.join(store_dir, "gateway-operator.json")
 

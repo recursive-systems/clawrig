@@ -75,6 +75,59 @@ async function clickIfVisible(locator, step, steps) {
   return false;
 }
 
+async function loginToDashboard(page, baseUrl, dashboardPassword, steps) {
+  if (!dashboardPassword) {
+    throw new Error("Dashboard password missing for post-setup login.");
+  }
+
+  await page.goto(`${baseUrl}/login`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+
+  const loginPassword = page.locator("#login-password").first();
+  await loginPassword.waitFor({ state: "visible", timeout: 30_000 });
+  await loginPassword.fill(dashboardPassword, { timeout: 15_000 });
+  await page.getByRole("button", { name: /Sign in/i }).first().click({ timeout: 15_000 });
+  steps.push({ step: "dashboard_login", status: "ok" });
+
+  await page.getByText("Overview").first().waitFor({ state: "visible", timeout: 30_000 });
+}
+
+async function waitForTelegramOwnerLink(page, timeoutSecs, result) {
+  const qr = page.locator("#tg-qr-bot").first();
+  await qr.waitFor({ state: "visible", timeout: 30_000 });
+  const deepLink = await qr.getAttribute("data-url");
+
+  if (!deepLink) {
+    throw new Error("Telegram deep link not found on wizard page.");
+  }
+
+  result.telegram_deep_link = deepLink;
+  console.log(`[telegram-assist] deep_link=${deepLink}`);
+
+  const deadline = Date.now() + timeoutSecs * 1000;
+  let linked = false;
+
+  while (Date.now() < deadline) {
+    const connectedHeading = page.getByRole("heading", { name: /^Connected$/i }).first();
+    if ((await connectedHeading.count()) > 0 && (await connectedHeading.isVisible())) {
+      linked = true;
+      break;
+    }
+
+    const checkNowBtn = page.getByRole("button", { name: /^Check now$/i }).first();
+    if ((await checkNowBtn.count()) > 0 && (await checkNowBtn.isVisible()) && (await checkNowBtn.isEnabled())) {
+      await checkNowBtn.click({ timeout: 10_000, force: true });
+    }
+
+    await page.waitForTimeout(3_000);
+  }
+
+  if (!linked) {
+    throw new Error(`Timed out waiting for Telegram /start after ${timeoutSecs}s. Open the deep link, tap Start, then retry.`);
+  }
+
+  result.steps.push({ step: "telegram_owner_link", status: "ok" });
+}
+
 async function waitForSetupReady(page, steps, baseUrl) {
   let retriedPortalFinish = false;
 
@@ -133,6 +186,7 @@ async function run() {
   const ssid = requireEnv("TEST_WIFI_SSID");
   const wifiPass = requireEnv("TEST_WIFI_PASS");
   const providerApiKey = requireEnv("TEST_PROVIDER_API_KEY");
+  const flowMode = (process.env.PI_E2E_FLOW_MODE || "full").toLowerCase();
 
   const providerMode = (process.env.PI_E2E_PROVIDER_MODE || "openai_api_key").toLowerCase();
   const requireHandoffReady = (process.env.PI_E2E_REQUIRE_HANDOFF_READY || "1") !== "0";
@@ -142,6 +196,9 @@ async function run() {
 
   const dashboardPassword = process.env.TEST_DASHBOARD_PASSWORD || "ClawRig123!";
   const telegramMode = (process.env.PI_E2E_TELEGRAM_MODE || "skip").toLowerCase();
+  const telegramAssistTimeoutSecs = Number(process.env.PI_E2E_TELEGRAM_ASSIST_TIMEOUT_SECS || "600");
+  const telegramSendTest =
+    (process.env.PI_E2E_TELEGRAM_SEND_TEST || (telegramMode === "assist_link" ? "1" : "0")) !== "0";
   const tailscaleMode = (process.env.PI_E2E_TAILSCALE_MODE || "off").toLowerCase();
   const telegramBotToken = process.env.TEST_TELEGRAM_BOT_TOKEN || "";
   const tailscaleAuthKey = process.env.TEST_TAILSCALE_AUTH_KEY || "";
@@ -168,106 +225,110 @@ async function run() {
   const page = await browser.newPage();
 
   try {
-    await page.goto(`${baseUrl}/portal`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-    result.steps.push({ step: "goto_portal", status: "ok" });
+    if (flowMode === "full") {
+      await page.goto(`${baseUrl}/portal`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      result.steps.push({ step: "goto_portal", status: "ok" });
 
-    let ssidInput = page.locator(`input[type="radio"][name="ssid"][value="${escCssAttr(ssid)}"]`);
-    let ssidFound = false;
+      let ssidInput = page.locator(`input[type="radio"][name="ssid"][value="${escCssAttr(ssid)}"]`);
+      let ssidFound = false;
 
-    for (let i = 0; i < 12; i++) {
-      if ((await ssidInput.count()) > 0) {
-        ssidFound = true;
-        break;
-      }
-
-      const rescanBtn = page.getByRole("button", { name: /Rescan networks/i });
-      if ((await rescanBtn.count()) > 0 && (await rescanBtn.first().isVisible())) {
-        // On real Pi portal, rescan may patch LiveView state without navigation.
-        await rescanBtn.first().click({ timeout: 10_000, noWaitAfter: true });
-      } else {
-        await page.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
-      }
-
-      await page.waitForTimeout(2_000);
-      ssidInput = page.locator(`input[type="radio"][name="ssid"][value="${escCssAttr(ssid)}"]`);
-    }
-
-    if (!ssidFound) {
-      throw new Error(`Target SSID not found on portal: ${ssid}`);
-    }
-
-    await ssidInput.first().check({ timeout: 15_000 });
-    result.steps.push({ step: "select_ssid", status: "ok" });
-
-    const pwdInput = page.locator("input[type=password]");
-    if ((await pwdInput.count()) === 0) {
-      throw new Error("No Wi-Fi password input found on portal.");
-    }
-
-    const portalPwd = pwdInput.first();
-    await portalPwd.fill(wifiPass, { timeout: 15_000 });
-
-    const pwdEcho = await portalPwd.inputValue();
-    if (pwdEcho !== wifiPass) {
-      throw new Error(`Wi-Fi password input mismatch before submit (len=${pwdEcho.length}).`);
-    }
-    result.steps.push({ step: "fill_wifi_password", status: "ok" });
-
-    const portalForm = page.locator("form.wifi-form").first();
-    if ((await portalForm.count()) === 0) {
-      throw new Error("Portal connect form not found.");
-    }
-
-    await portalForm.evaluate((form) => form.requestSubmit());
-    result.steps.push({ step: "portal_connect", status: "ok" });
-    await page.getByRole("button", { name: /^Finish$/i }).first().click({ timeout: 15_000 });
-    result.steps.push({ step: "portal_finish", status: "ok" });
-
-    // Wait for portal handoff to reach station mode before entering setup.
-    let handoffReady = false;
-    let lastHandoffStatus = null;
-
-    for (let i = 0; i < 90; i++) {
-      const status = await page.evaluate(async (base) => {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 4000);
-
-        try {
-          const r = await fetch(`${base}/portal/status.json`, {
-            cache: "no-store",
-            signal: controller.signal
-          });
-          if (!r.ok) return null;
-          return await r.json();
-        } catch (_e) {
-          return null;
-        } finally {
-          clearTimeout(timer);
+      for (let i = 0; i < 12; i++) {
+        if ((await ssidInput.count()) > 0) {
+          ssidFound = true;
+          break;
         }
-      }, baseUrl);
 
-      if (status) {
-        lastHandoffStatus = status;
+        const rescanBtn = page.getByRole("button", { name: /Rescan networks/i });
+        if ((await rescanBtn.count()) > 0 && (await rescanBtn.first().isVisible())) {
+          // On real Pi portal, rescan may patch LiveView state without navigation.
+          await rescanBtn.first().click({ timeout: 10_000, noWaitAfter: true });
+        } else {
+          await page.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
+        }
+
+        await page.waitForTimeout(2_000);
+        ssidInput = page.locator(`input[type="radio"][name="ssid"][value="${escCssAttr(ssid)}"]`);
       }
 
-      if (status && status.last_error) {
-        throw new Error(`Portal handoff failed: ${status.last_error}`);
+      if (!ssidFound) {
+        throw new Error(`Target SSID not found on portal: ${ssid}`);
       }
 
-      if (status && status.mode === "station" && status.ip) {
-        handoffReady = true;
-        break;
+      await ssidInput.first().check({ timeout: 15_000 });
+      result.steps.push({ step: "select_ssid", status: "ok" });
+
+      const pwdInput = page.locator("input[type=password]");
+      if ((await pwdInput.count()) === 0) {
+        throw new Error("No Wi-Fi password input found on portal.");
       }
 
-      await page.waitForTimeout(2_000);
-    }
+      const portalPwd = pwdInput.first();
+      await portalPwd.fill(wifiPass, { timeout: 15_000 });
 
-    if (!handoffReady && requireHandoffReady) {
-      throw new Error(`Portal handoff did not reach station mode with local IP. Last status: ${JSON.stringify(lastHandoffStatus)}`);
-    } else if (!handoffReady) {
-      result.steps.push({ step: "portal_handoff_ready", status: "skip" });
-    } else {
-      result.steps.push({ step: "portal_handoff_ready", status: "ok" });
+      const pwdEcho = await portalPwd.inputValue();
+      if (pwdEcho !== wifiPass) {
+        throw new Error(`Wi-Fi password input mismatch before submit (len=${pwdEcho.length}).`);
+      }
+      result.steps.push({ step: "fill_wifi_password", status: "ok" });
+
+      const portalForm = page.locator("form.wifi-form").first();
+      if ((await portalForm.count()) === 0) {
+        throw new Error("Portal connect form not found.");
+      }
+
+      await portalForm.evaluate((form) => form.requestSubmit());
+      result.steps.push({ step: "portal_connect", status: "ok" });
+      await page.getByRole("button", { name: /^Finish$/i }).first().click({ timeout: 15_000 });
+      result.steps.push({ step: "portal_finish", status: "ok" });
+
+      // Wait for portal handoff to reach station mode before entering setup.
+      let handoffReady = false;
+      let lastHandoffStatus = null;
+
+      for (let i = 0; i < 90; i++) {
+        const status = await page.evaluate(async (base) => {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 4000);
+
+          try {
+            const r = await fetch(`${base}/portal/status.json`, {
+              cache: "no-store",
+              signal: controller.signal
+            });
+            if (!r.ok) return null;
+            return await r.json();
+          } catch (_e) {
+            return null;
+          } finally {
+            clearTimeout(timer);
+          }
+        }, baseUrl);
+
+        if (status) {
+          lastHandoffStatus = status;
+        }
+
+        if (status && status.last_error) {
+          throw new Error(`Portal handoff failed: ${status.last_error}`);
+        }
+
+        if (status && status.mode === "station" && status.ip) {
+          handoffReady = true;
+          break;
+        }
+
+        await page.waitForTimeout(2_000);
+      }
+
+      if (!handoffReady && requireHandoffReady) {
+        throw new Error(`Portal handoff did not reach station mode with local IP. Last status: ${JSON.stringify(lastHandoffStatus)}`);
+      } else if (!handoffReady) {
+        result.steps.push({ step: "portal_handoff_ready", status: "skip" });
+      } else {
+        result.steps.push({ step: "portal_handoff_ready", status: "ok" });
+      }
+    } else if (flowMode !== "setup_only") {
+      throw new Error(`Unsupported PI_E2E_FLOW_MODE: ${flowMode}`);
     }
 
     await page.goto(`${baseUrl}/setup`, { waitUntil: "domcontentloaded", timeout: 60_000 });
@@ -319,19 +380,61 @@ async function run() {
     }
 
     if (providerMode === "compatible") {
-      const compatCard = page.locator("#provider-panel .provider-type-card").filter({ hasText: /OpenAI-compatible/i }).first();
+      let compatForm = page.locator("#provider-panel .openai-sub.active form[phx-submit='submit_compatible']").first();
+      if ((await compatForm.count()) === 0 || !(await compatForm.isVisible().catch(() => false))) {
+        const backToTypeAction = page.locator("#provider-panel button[phx-click='provider_back_to_type']").first();
+        if ((await backToTypeAction.count()) > 0 && (await backToTypeAction.isVisible())) {
+          await backToTypeAction.click({ timeout: 15_000, force: true });
+          result.steps.push({ step: "provider_back_to_type", status: "ok" });
+        } else {
+          result.steps.push({ step: "provider_back_to_type", status: "skip" });
+        }
 
-      if ((await compatCard.count()) > 0 && (await compatCard.isVisible())) {
-        await compatCard.click({ timeout: 15_000, force: true });
-      } else if ((await providerCards.count()) > 1) {
-        await providerCards.nth(1).click({ timeout: 15_000, force: true });
+        const chooseCompatibleAction = page.locator("#provider-panel button[phx-click='choose_compatible']").first();
+        if ((await chooseCompatibleAction.count()) > 0 || (await backToTypeAction.count()) > 0) {
+          for (let i = 0; i < 20; i++) {
+            if ((await chooseCompatibleAction.count()) > 0 && (await chooseCompatibleAction.isVisible().catch(() => false))) {
+              break;
+            }
+            await page.waitForTimeout(500);
+          }
+        }
+
+        if ((await chooseCompatibleAction.count()) > 0 && (await chooseCompatibleAction.isVisible().catch(() => false))) {
+          await chooseCompatibleAction.click({ timeout: 15_000, force: true });
+          result.steps.push({ step: "provider_choose_compatible_action", status: "ok" });
+        } else {
+          const choseCompatible = await pushLiveEvent(page, "choose_compatible", {}, 10_000);
+          result.steps.push({
+            step: "provider_choose_compatible_action",
+            status: choseCompatible ? "ok" : "skip"
+          });
+        }
       } else {
-        throw new Error("Compatible provider card not found.");
+        result.steps.push({ step: "provider_back_to_type", status: "skip" });
+        result.steps.push({ step: "provider_choose_compatible_action", status: "skip" });
+      }
+
+      compatForm = page.locator("#provider-panel .openai-sub.active form[phx-submit='submit_compatible']").first();
+
+      if ((await compatForm.count()) === 0 || !(await compatForm.isVisible().catch(() => false))) {
+        const compatCard = page
+          .locator("#provider-panel .provider-type-card")
+          .filter({ hasText: /Other Provider|OpenAI-compatible|LiteLLM|Fireworks|Groq/i })
+          .first();
+
+        if ((await compatCard.count()) > 0 && (await compatCard.isVisible())) {
+          await compatCard.click({ timeout: 15_000, force: true });
+        } else if ((await providerCards.count()) > 1) {
+          await providerCards.nth(1).click({ timeout: 15_000, force: true });
+        } else {
+          throw new Error("Compatible provider card not found.");
+        }
       }
 
       result.steps.push({ step: "provider_select_compatible", status: "ok" });
 
-      const compatForm = page.locator("#provider-panel .openai-sub.active form[phx-submit='submit_compatible']").first();
+      compatForm = page.locator("#provider-panel .openai-sub.active form[phx-submit='submit_compatible']").first();
       await compatForm.waitFor({ state: "visible", timeout: 30_000 });
 
       const baseUrlInput = compatForm.locator("#base-url-input, input[name='base_url']").first();
@@ -411,9 +514,9 @@ async function run() {
       result.steps
     );
 
-    if (telegramMode === "validate_token") {
+    if (telegramMode === "validate_token" || telegramMode === "assist_link") {
       if (!telegramBotToken) {
-        throw new Error("PI_E2E_TELEGRAM_MODE=validate_token requires TEST_TELEGRAM_BOT_TOKEN.");
+        throw new Error(`PI_E2E_TELEGRAM_MODE=${telegramMode} requires TEST_TELEGRAM_BOT_TOKEN.`);
       }
 
       let tgStarted = await pushLiveEvent(page, "tg_start", {}, 10_000);
@@ -442,23 +545,39 @@ async function run() {
       );
 
       result.steps.push({ step: "telegram_token_validate", status: "ok" });
+
+      if (telegramMode === "assist_link") {
+        await waitForTelegramOwnerLink(page, telegramAssistTimeoutSecs, result);
+
+        const continueBtn = page.locator(".wizard-footer").getByRole("button", { name: "Continue", exact: true }).first();
+        const continued = await clickWhenEnabled(continueBtn, 30_000);
+        if (!continued) {
+          throw new Error("Telegram step did not advance after owner link.");
+        }
+
+        result.steps.push({ step: "telegram_continue", status: "ok" });
+      }
     } else {
       result.steps.push({ step: "telegram_token_validate", status: "skip" });
     }
 
-    let telegramSkipped = false;
-    const footerSkip = page.locator(".wizard-footer").getByRole("button", { name: /Skip/i }).first();
+    if (telegramMode !== "assist_link") {
+      let telegramSkipped = false;
+      const footerSkip = page.locator(".wizard-footer").getByRole("button", { name: /Skip/i }).first();
 
-    for (let i = 0; i < 40; i++) {
-      if ((await footerSkip.count()) > 0 && (await footerSkip.isVisible()) && (await footerSkip.isEnabled())) {
-        await footerSkip.click({ timeout: 15_000, force: true });
-        telegramSkipped = true;
-        break;
+      for (let i = 0; i < 40; i++) {
+        if ((await footerSkip.count()) > 0 && (await footerSkip.isVisible()) && (await footerSkip.isEnabled())) {
+          await footerSkip.click({ timeout: 15_000, force: true });
+          telegramSkipped = true;
+          break;
+        }
+        await page.waitForTimeout(500);
       }
-      await page.waitForTimeout(500);
-    }
 
-    result.steps.push({ step: "telegram_skip", status: telegramSkipped ? "ok" : "skip" });
+      result.steps.push({ step: "telegram_skip", status: telegramSkipped ? "ok" : "skip" });
+    } else {
+      result.steps.push({ step: "telegram_skip", status: "skip", detail: "assist_link" });
+    }
 
     const dashPwd = page.locator("article.panel.active #dashboard-password");
     for (let i = 0; i < 60; i++) {
@@ -517,6 +636,25 @@ async function run() {
     }
 
     result.steps.push({ step: "assert_post_setup_redirect", status: "ok" });
+
+    if (telegramMode === "assist_link") {
+      await loginToDashboard(page, baseUrl, dashboardPassword, result.steps);
+      await page.goto(`${baseUrl}/telegram`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      await page.getByRole("heading", { name: /^Telegram$/i }).first().waitFor({ state: "visible", timeout: 30_000 });
+      await page.getByText(/^Connected$/i).first().waitFor({ state: "visible", timeout: 30_000 });
+      await page.getByText(/Owner linked/i).first().waitFor({ state: "visible", timeout: 30_000 });
+      result.steps.push({ step: "dashboard_telegram_connected_assert", status: "ok" });
+
+      if (telegramSendTest) {
+        const sendTestBtn = page.getByRole("button", { name: /Send test notification/i }).first();
+        await sendTestBtn.waitFor({ state: "visible", timeout: 30_000 });
+        await sendTestBtn.click({ timeout: 15_000, force: true });
+        await page.getByText(/Test notification sent\./i).first().waitFor({ state: "visible", timeout: 30_000 });
+        result.steps.push({ step: "dashboard_telegram_test_notification", status: "ok" });
+      } else {
+        result.steps.push({ step: "dashboard_telegram_test_notification", status: "skip" });
+      }
+    }
 
     if (tailscaleMode === "connect") {
       if (!tailscaleAuthKey) {

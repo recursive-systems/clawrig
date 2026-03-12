@@ -23,7 +23,7 @@ defmodule Clawrig.Application do
         ClawrigWeb.Endpoint,
         # Notify systemd after all services are up
         :systemd.ready()
-      ] ++ hotspot_task()
+      ] ++ hotspot_task() ++ exec_defaults_task()
 
     opts = [strategy: :one_for_one, name: Clawrig.Supervisor]
     Supervisor.start_link(children, opts)
@@ -50,6 +50,24 @@ defmodule Clawrig.Application do
     else
       []
     end
+  end
+
+  defp exec_defaults_task do
+    [
+      Supervisor.child_spec(
+        {Task,
+         fn ->
+           try do
+             if Clawrig.Integrations.Config.exec_security_mode() != "full" do
+               Clawrig.Integrations.Config.write_exec_defaults()
+             end
+           rescue
+             _ -> :ok
+           end
+         end},
+        id: :exec_defaults_task
+      )
+    ]
   end
 
   defp gateway_operator_child do

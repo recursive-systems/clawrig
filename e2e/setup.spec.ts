@@ -13,8 +13,8 @@ test.describe("setup wizard", () => {
     await page.locator("#provider-panel .provider-type-card").first().click();
     await page.locator("#provider-panel").getByRole("button", { name: "Sign in with ChatGPT" }).click();
 
-    await expect(page.getByText("Prefer a bigger screen for sign-in?")).toBeVisible();
-    await expect(page.getByText("Computer is recommended for ChatGPT sign-in.")).toBeVisible();
+    await expect(page.getByText("Before you start:")).toBeVisible();
+    await expect(page.getByText("Device code authorization for Codex")).toBeVisible();
     await expect(page.locator("#device-code-text")).toBeVisible();
 
     await page.goto("/setup");

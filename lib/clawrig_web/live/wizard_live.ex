@@ -42,6 +42,7 @@ defmodule ClawrigWeb.WizardLive do
      |> assign(:tg_chat_id, state.tg_chat_id)
      |> assign(:tg_bot_name, state.tg_bot_name)
      |> assign(:tg_bot_username, state.tg_bot_username)
+     |> assign(:tg_nonce, Map.get(state, :tg_nonce))
      |> assign(:tg_sub, telegram_sub_on_mount(state))
      |> assign(:tg_baseline_update_id, Map.get(state, :tg_baseline_update_id))
      |> assign(:tg_status, nil)
@@ -58,6 +59,7 @@ defmodule ClawrigWeb.WizardLive do
      |> assign(:ip_confirmed, false)
      |> assign(:mdns_url, Clawrig.DeviceIdentity.mdns_url())
      |> maybe_resume_device_code_polling()
+     |> maybe_restore_telegram_nonce()
      |> then(fn s -> if s.assigns.step == :receipt, do: detect_and_assign_ip(s), else: s end)}
   end
 
@@ -574,11 +576,13 @@ defmodule ClawrigWeb.WizardLive do
     case Telegram.validate_token(token) do
       {:ok, %{bot_name: bot_name, bot_username: bot_username}} ->
         baseline_update_id = Telegram.latest_update_id(token)
+        nonce = Telegram.generate_nonce()
 
         State.merge(%{
           tg_token: token,
           tg_bot_name: bot_name,
           tg_bot_username: bot_username,
+          tg_nonce: nonce,
           tg_baseline_update_id: baseline_update_id,
           tg_chat_id: nil
         })
@@ -588,6 +592,7 @@ defmodule ClawrigWeb.WizardLive do
            tg_token: token,
            tg_bot_name: bot_name,
            tg_bot_username: bot_username,
+           tg_nonce: nonce,
            tg_chat_id: nil,
            tg_sub: :chat,
            tg_status: :waiting_for_start,
@@ -613,7 +618,11 @@ defmodule ClawrigWeb.WizardLive do
     if socket.assigns.tg_sub != :chat || socket.assigns.tg_chat_id do
       {:noreply, assign(socket, :tg_polling, false)}
     else
-      case Telegram.detect_chat(socket.assigns.tg_token, socket.assigns[:tg_baseline_update_id]) do
+      case Telegram.detect_chat(
+             socket.assigns.tg_token,
+             socket.assigns.tg_nonce,
+             socket.assigns[:tg_baseline_update_id]
+           ) do
         {:ok, %{chat_id: chat_id, first_name: _first_name, update_id: update_id}} ->
           State.merge(%{tg_chat_id: chat_id, tg_baseline_update_id: update_id})
           Telegram.save_config(socket.assigns.tg_token, chat_id, socket.assigns.tg_bot_name)
@@ -741,6 +750,16 @@ defmodule ClawrigWeb.WizardLive do
 
       Process.send_after(self(), :openai_poll, 1000)
       assign(socket, openai_polling: true, openai_poll_count: 0, openai_resuming: true)
+    else
+      socket
+    end
+  end
+
+  defp maybe_restore_telegram_nonce(socket) do
+    if (socket.assigns.tg_sub == :chat and socket.assigns.tg_token) && !socket.assigns.tg_nonce do
+      nonce = Telegram.generate_nonce()
+      State.put(:tg_nonce, nonce)
+      assign(socket, :tg_nonce, nonce)
     else
       socket
     end

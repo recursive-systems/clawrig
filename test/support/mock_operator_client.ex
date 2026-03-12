@@ -60,7 +60,11 @@ defmodule Clawrig.Gateway.MockOperatorClient do
   end
 
   def emit(event, session_key \\ Gateway.session_key()) do
-    topic = if match?({:operator_status, _, _}, event), do: Gateway.operator_topic(), else: Gateway.chat_topic(session_key)
+    topic =
+      if match?({:operator_status, _, _}, event),
+        do: Gateway.operator_topic(),
+        else: Gateway.chat_topic(session_key)
+
     Phoenix.PubSub.broadcast(Clawrig.PubSub, topic, event)
   end
 
@@ -124,7 +128,8 @@ defmodule Clawrig.Gateway.MockOperatorClient do
       120
     )
 
-    {:reply, {:ok, %{"runId" => run_id}}, %{state | status: :connected, run_seq: state.run_seq + 1}}
+    {:reply, {:ok, %{"runId" => run_id}},
+     %{state | status: :connected, run_seq: state.run_seq + 1}}
   end
 
   def handle_call({:abort, session_key, run_id}, _from, state) do
@@ -185,10 +190,16 @@ defmodule Clawrig.Gateway.MockOperatorClient do
     Phoenix.PubSub.broadcast(
       Clawrig.PubSub,
       Gateway.chat_topic(session_key),
-      {:chat_done,
-       session_key,
-       run_id,
-       %{id: "assistant-#{run_id}", kind: :message, role: "assistant", content: content, streaming: false, status: "done", run_id: run_id}}
+      {:chat_done, session_key, run_id,
+       %{
+         id: "assistant-#{run_id}",
+         kind: :message,
+         role: "assistant",
+         content: content,
+         streaming: false,
+         status: "done",
+         run_id: run_id
+       }}
     )
 
     {:noreply, state}

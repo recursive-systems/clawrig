@@ -74,7 +74,10 @@ defmodule ClawrigWeb.ChatLive do
     {:noreply, socket}
   end
 
-  def handle_info({:chat_history, session_key, messages, _meta}, %{assigns: %{session_key: session_key}} = socket) do
+  def handle_info(
+        {:chat_history, session_key, messages, _meta},
+        %{assigns: %{session_key: session_key}} = socket
+      ) do
     message_lookup =
       messages
       |> Enum.map(&ensure_item_defaults/1)
@@ -85,18 +88,27 @@ defmodule ClawrigWeb.ChatLive do
       socket
       |> assign(:message_lookup, message_lookup)
       |> assign(:chat_error, nil)
-      |> assign(:run_state, if(socket.assigns.run_state == :aborting, do: :idle, else: socket.assigns.run_state))
+      |> assign(
+        :run_state,
+        if(socket.assigns.run_state == :aborting, do: :idle, else: socket.assigns.run_state)
+      )
       |> stream(:messages, Map.values(message_lookup), reset: true)
 
     {:noreply, socket}
   end
 
-  def handle_info({:chat_delta, session_key, run_id, chunk}, %{assigns: %{session_key: session_key}} = socket) do
+  def handle_info(
+        {:chat_delta, session_key, run_id, chunk},
+        %{assigns: %{session_key: session_key}} = socket
+      ) do
     {socket, _id} = append_assistant_delta(socket, run_id, chunk)
     {:noreply, socket}
   end
 
-  def handle_info({:chat_done, session_key, run_id, message}, %{assigns: %{session_key: session_key}} = socket) do
+  def handle_info(
+        {:chat_done, session_key, run_id, message},
+        %{assigns: %{session_key: session_key}} = socket
+      ) do
     message = ensure_item_defaults(message)
 
     has_active_message =
@@ -121,7 +133,10 @@ defmodule ClawrigWeb.ChatLive do
     end
   end
 
-  def handle_info({:chat_aborted, session_key, run_id}, %{assigns: %{session_key: session_key}} = socket) do
+  def handle_info(
+        {:chat_aborted, session_key, run_id},
+        %{assigns: %{session_key: session_key}} = socket
+      ) do
     socket =
       socket
       |> mark_run_complete(run_id, "stopped")
@@ -179,7 +194,9 @@ defmodule ClawrigWeb.ChatLive do
 
       true ->
         user_message = base_message("user", text)
-        assistant_placeholder = base_message("assistant", "", %{streaming: true, status: "streaming"})
+
+        assistant_placeholder =
+          base_message("assistant", "", %{streaming: true, status: "streaming"})
 
         socket =
           socket
@@ -213,7 +230,12 @@ defmodule ClawrigWeb.ChatLive do
   end
 
   def handle_event("chat_abort", _params, %{assigns: %{run_state: :streaming}} = socket) do
-    _ = socket.assigns.operator_module.abort(socket.assigns.session_key, socket.assigns.active_run_id)
+    _ =
+      socket.assigns.operator_module.abort(
+        socket.assigns.session_key,
+        socket.assigns.active_run_id
+      )
+
     {:noreply, assign(socket, :run_state, :aborting)}
   end
 
@@ -238,9 +260,15 @@ defmodule ClawrigWeb.ChatLive do
     {:noreply, socket}
   end
 
-  def handle_event("approval_decide", %{"approval_id" => approval_id, "decision" => decision}, socket) do
+  def handle_event(
+        "approval_decide",
+        %{"approval_id" => approval_id, "decision" => decision},
+        socket
+      ) do
     _ = socket.assigns.operator_module.resolve_approval(approval_id, decision)
-    {:noreply, update_item(socket, approval_id, fn item -> Map.put(item, :status, "#{decision}-pending") end)}
+
+    {:noreply,
+     update_item(socket, approval_id, fn item -> Map.put(item, :status, "#{decision}-pending") end)}
   end
 
   defp append_assistant_delta(socket, run_id, chunk) do
@@ -260,7 +288,9 @@ defmodule ClawrigWeb.ChatLive do
       if message_id do
         {socket, message_id}
       else
-        placeholder = base_message("assistant", "", %{streaming: true, status: "streaming", run_id: run_id})
+        placeholder =
+          base_message("assistant", "", %{streaming: true, status: "streaming", run_id: run_id})
+
         socket = put_item(socket, placeholder)
         {socket, item_id(placeholder)}
       end
@@ -277,7 +307,10 @@ defmodule ClawrigWeb.ChatLive do
       |> assign(:run_state, :streaming)
       |> assign(:active_run_id, run_id || socket.assigns.active_run_id)
       |> assign(:active_assistant_message_id, message_id)
-      |> assign(:assistant_message_ids_by_run, maybe_index_run(socket.assigns.assistant_message_ids_by_run, run_id, message_id))
+      |> assign(
+        :assistant_message_ids_by_run,
+        maybe_index_run(socket.assigns.assistant_message_ids_by_run, run_id, message_id)
+      )
 
     {socket, message_id}
   end
@@ -312,7 +345,9 @@ defmodule ClawrigWeb.ChatLive do
   end
 
   defp mark_run_complete(socket, run_id, status) do
-    message_id = socket.assigns.assistant_message_ids_by_run[run_id] || socket.assigns.active_assistant_message_id
+    message_id =
+      socket.assigns.assistant_message_ids_by_run[run_id] ||
+        socket.assigns.active_assistant_message_id
 
     if message_id do
       update_item(socket, message_id, fn item ->
@@ -460,10 +495,12 @@ defmodule ClawrigWeb.ChatLive do
   defp operator_label(_), do: "Unavailable"
 
   defp blocked_copy(:unavailable, detail) do
-    detail[:detail] || detail["detail"] || "ClawRig is still waiting for the local Gateway to come up."
+    detail[:detail] || detail["detail"] ||
+      "ClawRig is still waiting for the local Gateway to come up."
   end
 
   defp blocked_copy(:unpaired, detail) do
-    detail[:detail] || detail["detail"] || "Approve this dashboard with the local Gateway to unlock chat for the main agent."
+    detail[:detail] || detail["detail"] ||
+      "Approve this dashboard with the local Gateway to unlock chat for the main agent."
   end
 end

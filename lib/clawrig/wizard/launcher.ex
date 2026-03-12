@@ -7,6 +7,9 @@ defmodule Clawrig.Wizard.Launcher do
   Auth is handled by `openclaw onboard` during the OpenAI wizard step.
   """
   def finalize(mode, tg_token, tg_chat_id \\ nil) do
+    # Ensure appliance exec defaults (security: full, ask: off)
+    Clawrig.Integrations.Config.write_exec_defaults()
+
     home = System.get_env("HOME") || "/root"
     config_path = Path.join(home, ".openclaw/openclaw.json")
 
@@ -32,7 +35,7 @@ defmodule Clawrig.Wizard.Launcher do
         end
       else
         # Channels not configured yet — write the full config.
-        tg_config = %{"enabled" => true, "botToken" => tg_token, "dmPolicy" => "pairing"}
+        tg_config = %{"enabled" => true, "botToken" => tg_token, "dmPolicy" => "allowlist"}
 
         tg_config =
           if tg_chat_id,

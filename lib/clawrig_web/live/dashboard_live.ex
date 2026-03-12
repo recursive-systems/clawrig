@@ -2,6 +2,7 @@ defmodule ClawrigWeb.DashboardLive do
   use ClawrigWeb, :live_view
 
   alias Clawrig.Integrations.Config, as: IntegrationsConfig
+  alias Clawrig.Integrations.Telegram, as: TelegramService
   alias Clawrig.Integrations.SearchProxy
   alias Clawrig.PreviewState
   alias Clawrig.System.Commands
@@ -10,6 +11,7 @@ defmodule ClawrigWeb.DashboardLive do
 
   @refresh_interval 10_000
   @openai_poll_timeout_count 180
+  @telegram_auto_poll_attempts 6
 
   @impl true
   def mount(_params, _session, socket) do
@@ -18,6 +20,8 @@ defmodule ClawrigWeb.DashboardLive do
       Phoenix.PubSub.subscribe(Clawrig.PubSub, "clawrig:node")
       send(self(), :refresh_status)
     end
+
+    telegram_status = IntegrationsConfig.telegram_status()
 
     socket =
       socket
@@ -75,6 +79,19 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:password_current_value, "")
       |> assign(:password_new_value, "")
       |> assign(:password_new_confirm_value, "")
+      |> assign(:telegram_status, telegram_status)
+      |> assign(:tg_sub, telegram_sub_from_status(telegram_status))
+      |> assign(:tg_bot_name, nil)
+      |> assign(:tg_bot_username, nil)
+      |> assign(:tg_token, telegram_token_from_status(telegram_status))
+      |> assign(:tg_chat_id, telegram_chat_id_from_status(telegram_status))
+      |> assign(:tg_nonce, nil)
+      |> assign(:tg_baseline_update_id, nil)
+      |> assign(:tg_error, nil)
+      |> assign(:tg_polling, false)
+      |> assign(:tg_auto_polls_remaining, 0)
+      |> assign(:tg_snapshot, nil)
+      |> assign(:tg_test_sending, false)
 
     {:ok, socket}
   end
@@ -83,7 +100,14 @@ defmodule ClawrigWeb.DashboardLive do
   def handle_params(params, _uri, socket) do
     preview_overrides = PreviewState.apply_dashboard(params)
     update_notice = update_reauth_notice(preview_overrides[:update_status])
-    {:noreply, socket |> assign(preview_overrides) |> assign(:update_notice, update_notice)}
+
+    socket =
+      socket
+      |> assign(preview_overrides)
+      |> assign(:update_notice, update_notice)
+      |> maybe_load_telegram_panel()
+
+    {:noreply, socket}
   end
 
   # ---------- Events ----------
@@ -559,9 +583,124 @@ defmodule ClawrigWeb.DashboardLive do
     end
   end
 
+  def handle_event("tg_dashboard_start", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(
+       tg_sub: :entering_token,
+       tg_error: nil,
+       tg_nonce: nil,
+       tg_baseline_update_id: nil,
+       tg_polling: false,
+       tg_auto_polls_remaining: 0,
+       tg_snapshot: nil
+     )}
+  end
+
+  def handle_event("tg_dashboard_validate", %{"token" => token}, socket) do
+    token = String.trim(token || "")
+
+    if token == "" do
+      {:noreply, assign(socket, :tg_error, "Please paste your bot token.")}
+    else
+      send(self(), {:tg_dashboard_validate, token, socket.assigns.tg_snapshot})
+
+      {:noreply,
+       socket
+       |> assign(
+         tg_sub: :validating,
+         tg_error: nil,
+         tg_token: token,
+         tg_polling: false,
+         tg_auto_polls_remaining: 0
+       )}
+    end
+  end
+
+  def handle_event("tg_dashboard_check", _params, socket) do
+    send(self(), :tg_dashboard_poll)
+    {:noreply, assign(socket, tg_polling: true, tg_error: nil)}
+  end
+
+  def handle_event("tg_dashboard_cancel", _params, socket) do
+    {:noreply, cancel_telegram_flow(socket)}
+  end
+
+  def handle_event("tg_dashboard_relink", _params, socket) do
+    if socket.assigns.tg_token && socket.assigns.tg_chat_id do
+      snapshot = %{token: socket.assigns.tg_token, chat_id: socket.assigns.tg_chat_id}
+
+      case IntegrationsConfig.remove_telegram() do
+        :ok ->
+          pid = self()
+
+          Task.start(fn ->
+            result = Commands.impl().start_gateway()
+            send(pid, {:tg_relink_restart_complete, socket.assigns.tg_token, snapshot, result})
+          end)
+
+          {:noreply,
+           socket
+           |> assign(
+             tg_sub: :quieting,
+             tg_error: nil,
+             tg_snapshot: snapshot,
+             tg_polling: false,
+             tg_auto_polls_remaining: 0
+           )
+           |> put_flash(:info, "Quieting Telegram while we relink this phone...")}
+
+        {:error, msg} ->
+          {:noreply, put_flash(assign(socket, :tg_error, msg), :error, msg)}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("tg_dashboard_disconnect", _params, socket) do
+    case IntegrationsConfig.remove_telegram() do
+      :ok ->
+        Task.start(fn -> Commands.impl().start_gateway() end)
+
+        {:noreply,
+         socket
+         |> reset_telegram_assigns()
+         |> put_flash(:info, "Telegram removed. Gateway restarting...")}
+
+      {:error, msg} ->
+        {:noreply, put_flash(assign(socket, :tg_error, msg), :error, msg)}
+    end
+  end
+
+  def handle_event("tg_dashboard_test", _params, socket) do
+    if socket.assigns.tg_token && socket.assigns.tg_chat_id do
+      pid = self()
+
+      Task.start(fn ->
+        result =
+          TelegramService.send_message(
+            socket.assigns.tg_token,
+            socket.assigns.tg_chat_id,
+            "Test notification from your ClawRig dashboard."
+          )
+
+        send(pid, {:tg_test_result, result})
+      end)
+
+      {:noreply, assign(socket, tg_test_sending: true, tg_error: nil)}
+    else
+      {:noreply, socket}
+    end
+  end
+
   def handle_event("page_visible", _params, socket) do
     if socket.assigns.openai_polling and socket.assigns.account_sub == :device_code do
       send(self(), :account_poll)
+    end
+
+    if socket.assigns.tg_polling and socket.assigns.tg_sub == :linking do
+      send(self(), :tg_dashboard_poll)
     end
 
     {:noreply, socket}
@@ -674,6 +813,153 @@ defmodule ClawrigWeb.DashboardLive do
        |> assign(:autoheal, autoheal)
        |> assign(:autoheal_log, autoheal_log)
        |> assign(:node_detail, node_detail)}
+    end
+  end
+
+  def handle_info(:tg_load_metadata, socket) do
+    if socket.assigns.tg_token do
+      case TelegramService.validate_token(socket.assigns.tg_token) do
+        {:ok, %{bot_name: bot_name, bot_username: bot_username}} ->
+          {:noreply, assign(socket, tg_bot_name: bot_name, tg_bot_username: bot_username)}
+
+        {:error, _} ->
+          {:noreply, socket}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_info({:tg_dashboard_validate, token, snapshot}, socket) do
+    case TelegramService.validate_token(token) do
+      {:ok, %{bot_name: bot_name, bot_username: bot_username}} ->
+        baseline_update_id = TelegramService.latest_update_id(token)
+        nonce = TelegramService.generate_nonce()
+
+        Process.send_after(self(), :tg_dashboard_poll, 2000)
+
+        {:noreply,
+         socket
+         |> assign(
+           telegram_status: :not_configured,
+           tg_sub: :linking,
+           tg_bot_name: bot_name,
+           tg_bot_username: bot_username,
+           tg_token: token,
+           tg_nonce: nonce,
+           tg_baseline_update_id: baseline_update_id,
+           tg_error: nil,
+           tg_polling: true,
+           tg_auto_polls_remaining: @telegram_auto_poll_attempts,
+           tg_snapshot: snapshot
+         )}
+
+      {:error, msg} ->
+        {:noreply, restore_or_show_telegram_error(socket, snapshot, msg)}
+    end
+  end
+
+  def handle_info({:tg_relink_restart_complete, token, snapshot, result}, socket) do
+    cond do
+      socket.assigns.tg_snapshot != snapshot ->
+        {:noreply, socket}
+
+      result != :ok ->
+        {:noreply,
+         restore_or_show_telegram_error(
+           socket,
+           snapshot,
+           "Could not quiet Telegram before relinking."
+         )}
+
+      true ->
+        send(self(), {:tg_dashboard_validate, token, snapshot})
+        {:noreply, assign(socket, :tg_sub, :validating)}
+    end
+  end
+
+  def handle_info(:tg_dashboard_poll, socket) do
+    if socket.assigns.tg_sub != :linking || !socket.assigns.tg_token || !socket.assigns.tg_nonce do
+      {:noreply, assign(socket, tg_polling: false)}
+    else
+      case TelegramService.detect_owner_start(
+             socket.assigns.tg_token,
+             socket.assigns.tg_nonce,
+             socket.assigns.tg_baseline_update_id
+           ) do
+        {:ok, %{chat_id: chat_id, update_id: update_id}} ->
+          case IntegrationsConfig.write_telegram(socket.assigns.tg_token, chat_id) do
+            :ok ->
+              Task.start(fn ->
+                Commands.impl().start_gateway()
+
+                _ =
+                  TelegramService.send_message(
+                    socket.assigns.tg_token,
+                    chat_id,
+                    "✅ Telegram is connected to your ClawRig dashboard. Give OpenClaw a few seconds to restart, then send another message here."
+                  )
+              end)
+
+              {:noreply,
+               socket
+               |> assign(
+                 telegram_status:
+                   {:connected,
+                    %{
+                      bot_token: socket.assigns.tg_token,
+                      allow_from: [chat_id],
+                      dm_policy: "allowlist"
+                    }},
+                 tg_sub: :connected,
+                 tg_chat_id: chat_id,
+                 tg_baseline_update_id: update_id,
+                 tg_error: nil,
+                 tg_polling: false,
+                 tg_auto_polls_remaining: 0,
+                 tg_snapshot: nil
+               )
+               |> put_flash(:info, "Telegram connected. Gateway restarting...")}
+
+            {:error, msg} ->
+              {:noreply, restore_or_show_telegram_error(socket, socket.assigns.tg_snapshot, msg)}
+          end
+
+        :no_messages ->
+          remaining = max(socket.assigns.tg_auto_polls_remaining - 1, 0)
+
+          if remaining > 0 do
+            Process.send_after(self(), :tg_dashboard_poll, 2000)
+          end
+
+          {:noreply,
+           assign(socket,
+             tg_polling: remaining > 0,
+             tg_auto_polls_remaining: remaining,
+             tg_error:
+               if(remaining == 0,
+                 do:
+                   "No new Start message found yet. Open Telegram, tap Start, then tap Check now.",
+                 else: nil
+               )
+           )}
+      end
+    end
+  end
+
+  def handle_info({:tg_test_result, result}, socket) do
+    case result do
+      :ok ->
+        {:noreply,
+         socket
+         |> assign(:tg_test_sending, false)
+         |> put_flash(:info, "Test notification sent.")}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(tg_test_sending: false, tg_error: reason)
+         |> put_flash(:error, reason)}
     end
   end
 
@@ -1095,6 +1381,106 @@ defmodule ClawrigWeb.DashboardLive do
     System.get_env("CLAWRIG_ENABLE_DEV_TAILSCALE_BYPASS", "false") == "true"
   end
 
+  defp maybe_load_telegram_panel(socket) do
+    if socket.assigns.live_action == :telegram do
+      socket
+      |> load_telegram_from_config()
+      |> maybe_queue_telegram_metadata()
+    else
+      socket
+    end
+  end
+
+  defp load_telegram_from_config(socket) do
+    status = IntegrationsConfig.telegram_status()
+
+    if socket.assigns[:tg_sub] in [:entering_token, :validating, :quieting, :linking] do
+      assign(socket, :telegram_status, status)
+    else
+      socket
+      |> assign(:telegram_status, status)
+      |> assign(:tg_sub, telegram_sub_from_status(status))
+      |> assign(:tg_token, telegram_token_from_status(status))
+      |> assign(:tg_chat_id, telegram_chat_id_from_status(status))
+      |> assign(:tg_nonce, nil)
+      |> assign(:tg_baseline_update_id, nil)
+      |> assign(:tg_error, nil)
+      |> assign(:tg_polling, false)
+      |> assign(:tg_auto_polls_remaining, 0)
+      |> assign(:tg_snapshot, nil)
+    end
+  end
+
+  defp maybe_queue_telegram_metadata(socket) do
+    if (socket.assigns.tg_sub == :connected and socket.assigns.tg_token) &&
+         is_nil(socket.assigns.tg_bot_username) do
+      send(self(), :tg_load_metadata)
+    end
+
+    socket
+  end
+
+  defp restore_or_show_telegram_error(socket, nil, msg) do
+    assign(socket, tg_sub: :entering_token, tg_error: msg, tg_polling: false, tg_snapshot: nil)
+  end
+
+  defp restore_or_show_telegram_error(socket, snapshot, msg) do
+    socket
+    |> restore_telegram_snapshot(snapshot)
+    |> assign(:tg_error, msg)
+    |> put_flash(:error, msg)
+  end
+
+  defp restore_telegram_snapshot(socket, %{token: token, chat_id: chat_id}) do
+    case IntegrationsConfig.write_telegram(token, chat_id) do
+      :ok ->
+        Task.start(fn -> Commands.impl().start_gateway() end)
+
+        socket
+        |> assign(
+          telegram_status:
+            {:connected,
+             %{bot_token: token, allow_from: [to_string(chat_id)], dm_policy: "allowlist"}},
+          tg_sub: :connected,
+          tg_token: token,
+          tg_chat_id: to_string(chat_id),
+          tg_nonce: nil,
+          tg_baseline_update_id: nil,
+          tg_polling: false,
+          tg_auto_polls_remaining: 0,
+          tg_snapshot: nil
+        )
+
+      {:error, _} ->
+        reset_telegram_assigns(socket)
+    end
+  end
+
+  defp cancel_telegram_flow(socket) do
+    case socket.assigns.tg_snapshot do
+      nil -> load_telegram_from_config(socket)
+      snapshot -> restore_telegram_snapshot(socket, snapshot)
+    end
+  end
+
+  defp reset_telegram_assigns(socket) do
+    assign(socket,
+      telegram_status: :not_configured,
+      tg_sub: :not_configured,
+      tg_bot_name: nil,
+      tg_bot_username: nil,
+      tg_token: nil,
+      tg_chat_id: nil,
+      tg_nonce: nil,
+      tg_baseline_update_id: nil,
+      tg_error: nil,
+      tg_polling: false,
+      tg_auto_polls_remaining: 0,
+      tg_snapshot: nil,
+      tg_test_sending: false
+    )
+  end
+
   # ---------- View helpers ----------
 
   def status_color(:loading), do: "loading"
@@ -1119,6 +1505,25 @@ defmodule ClawrigWeb.DashboardLive do
   def status_label(nil), do: "N/A"
   def status_label(other) when is_binary(other), do: other
   def status_label(_), do: "Unknown"
+
+  def telegram_sub_from_status({:connected, _}), do: :connected
+  def telegram_sub_from_status(_), do: :not_configured
+
+  def telegram_token_from_status({:connected, %{bot_token: token}}), do: token
+  def telegram_token_from_status(_), do: nil
+
+  def telegram_chat_id_from_status({:connected, %{allow_from: [chat_id | _]}}), do: chat_id
+  def telegram_chat_id_from_status(_), do: nil
+
+  def telegram_deep_link(bot_username, nonce)
+      when is_binary(bot_username) and bot_username != "" and is_binary(nonce) and nonce != "" do
+    TelegramService.deep_link(bot_username, nonce)
+  end
+
+  def telegram_deep_link(_, _), do: nil
+
+  def telegram_owner_label(chat_id) when is_binary(chat_id), do: "Owner linked: #{chat_id}"
+  def telegram_owner_label(_), do: "Owner linked"
 
   def autoheal_health_label(status) do
     case status do

@@ -106,7 +106,7 @@ if [ -f "$SCRIPT_DIR/clawrig-updater-sudoers" ]; then
   sudo install -m 440 "$SCRIPT_DIR/clawrig-updater-sudoers" /etc/sudoers.d/clawrig-updater
 fi
 
-# Configure exec tool for gateway (allowlist, no prompts)
+# Configure exec tool for gateway (full security, no prompts)
 python3 -c "
 import json, os
 cfg_path = '/home/pi/.openclaw/openclaw.json'
@@ -116,7 +116,7 @@ if os.path.exists(cfg_path):
     tools = cfg.setdefault('tools', {})
     tools.pop('profile', None)
     tools['allow'] = ['group:messaging', 'read', 'exec']
-    tools['exec'] = {'host': 'gateway', 'security': 'allowlist', 'ask': 'off'}
+    tools['exec'] = {'host': 'gateway', 'security': 'full', 'ask': 'off'}
     with open(cfg_path, 'w') as f:
         json.dump(cfg, f, indent=2)
     os.chown(cfg_path, 1000, 1000)

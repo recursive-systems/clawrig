@@ -4,7 +4,12 @@ defmodule Clawrig.Gateway.OperatorStoreTest do
   alias Clawrig.Gateway.OperatorStore
 
   setup do
-    path = Path.join(System.tmp_dir!(), "clawrig-operator-store-#{System.unique_integer([:positive])}.json")
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "clawrig-operator-store-#{System.unique_integer([:positive])}.json"
+      )
+
     Application.put_env(:clawrig, :gateway_operator_store_path, path)
 
     on_exit(fn ->

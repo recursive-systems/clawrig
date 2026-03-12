@@ -22,7 +22,14 @@ defmodule ClawrigWeb.ChatLiveTest do
 
     :ok =
       MockOperatorClient.seed_history([
-        %{id: "history-1", kind: :message, role: "assistant", content: "Gateway history", streaming: false, status: "done"}
+        %{
+          id: "history-1",
+          kind: :message,
+          role: "assistant",
+          content: "Gateway history",
+          streaming: false,
+          status: "done"
+        }
       ])
 
     {:ok, view, html} = live(conn, ~p"/chat")
@@ -37,8 +44,22 @@ defmodule ClawrigWeb.ChatLiveTest do
 
     :ok =
       MockOperatorClient.seed_history([
-        %{id: "history-empty", kind: :message, role: "assistant", content: "", streaming: false, status: "done"},
-        %{id: "history-2", kind: :message, role: "assistant", content: "Visible history", streaming: false, status: "done"}
+        %{
+          id: "history-empty",
+          kind: :message,
+          role: "assistant",
+          content: "",
+          streaming: false,
+          status: "done"
+        },
+        %{
+          id: "history-2",
+          kind: :message,
+          role: "assistant",
+          content: "Visible history",
+          streaming: false,
+          status: "done"
+        }
       ])
 
     {:ok, view, _html} = live(conn, ~p"/chat")
@@ -54,8 +75,22 @@ defmodule ClawrigWeb.ChatLiveTest do
 
     :ok =
       MockOperatorClient.seed_history([
-        %{id: "history-tool", kind: :message, role: "toolResult", content: "(no output)", streaming: false, status: "done"},
-        %{id: "history-3", kind: :message, role: "assistant", content: "Visible assistant reply", streaming: false, status: "done"}
+        %{
+          id: "history-tool",
+          kind: :message,
+          role: "toolResult",
+          content: "(no output)",
+          streaming: false,
+          status: "done"
+        },
+        %{
+          id: "history-3",
+          kind: :message,
+          role: "assistant",
+          content: "Visible assistant reply",
+          streaming: false,
+          status: "done"
+        }
       ])
 
     {:ok, view, _html} = live(conn, ~p"/chat")
@@ -73,7 +108,15 @@ defmodule ClawrigWeb.ChatLiveTest do
 
     MockOperatorClient.emit(
       {:chat_done, "agent:main:main", "run-blank",
-       %{id: "blank-live", kind: :message, role: "assistant", content: "", streaming: false, status: "done", run_id: "run-blank"}}
+       %{
+         id: "blank-live",
+         kind: :message,
+         role: "assistant",
+         content: "",
+         streaming: false,
+         status: "done",
+         run_id: "run-blank"
+       }}
     )
 
     Process.sleep(20)
@@ -87,7 +130,14 @@ defmodule ClawrigWeb.ChatLiveTest do
 
     MockOperatorClient.emit(
       {:chat_done, "agent:main:main", nil,
-       %{id: "user-echo", kind: :message, role: "user", content: "Echoed user event", streaming: false, status: "done"}}
+       %{
+         id: "user-echo",
+         kind: :message,
+         role: "user",
+         content: "Echoed user event",
+         streaming: false,
+         status: "done"
+       }}
     )
 
     Process.sleep(20)
@@ -138,13 +188,22 @@ defmodule ClawrigWeb.ChatLiveTest do
 
     MockOperatorClient.emit(
       {:chat_approval_requested,
-       %{id: "approval-1", kind: :approval, title: "Restart Gateway", detail: "The agent wants to restart the Gateway.", status: "pending"}}
+       %{
+         id: "approval-1",
+         kind: :approval,
+         title: "Restart Gateway",
+         detail: "The agent wants to restart the Gateway.",
+         status: "pending"
+       }}
     )
 
     Process.sleep(20)
     assert render(view) =~ "Restart Gateway"
 
-    view |> element(~s|button[phx-value-approval_id="approval-1"][phx-value-decision="approve"]|) |> render_click()
+    view
+    |> element(~s|button[phx-value-approval_id="approval-1"][phx-value-decision="approve"]|)
+    |> render_click()
+
     Process.sleep(20)
 
     assert render(view) =~ "approved"
@@ -157,11 +216,11 @@ defmodule ClawrigWeb.ChatLiveTest do
     _html = render_submit(view, "chat_submit", %{"text" => "stop me"})
     Process.sleep(40)
 
-    view |> element("button", "Stop") |> render_click()
+    view |> element(~s|button[aria-label="Stop generation"]|) |> render_click()
     Process.sleep(20)
 
     html = render(view)
     assert html =~ "Mock response to: stop me"
-    assert html =~ "stopped"
+    refute html =~ ~s(aria-label="Stop generation")
   end
 end

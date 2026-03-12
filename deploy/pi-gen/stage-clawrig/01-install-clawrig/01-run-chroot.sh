@@ -45,7 +45,7 @@ cat > /home/pi/.openclaw/openclaw.json << 'OCJSON'
   "gateway": {"mode": "local"},
   "tools": {
     "allow": ["group:messaging", "read", "exec"],
-    "exec": {"host": "gateway", "security": "allowlist", "ask": "off"}
+    "exec": {"host": "gateway", "security": "full", "ask": "off"}
   }
 }
 OCJSON

@@ -803,7 +803,10 @@ defmodule Clawrig.Updater do
     end
   rescue
     e ->
-      Logger.error("[Updater] Auth probe crashed: #{Exception.message(e)} — treating as reauth_required")
+      Logger.error(
+        "[Updater] Auth probe crashed: #{Exception.message(e)} — treating as reauth_required"
+      )
+
       {:error, :reauth_required}
   end
 

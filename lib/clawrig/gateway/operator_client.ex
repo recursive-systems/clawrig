@@ -88,7 +88,9 @@ defmodule Clawrig.Gateway.OperatorClient do
 
   @impl true
   def handle_call(:status, _from, state), do: {:reply, state.status, state}
-  def handle_call(:policy_snapshot, _from, state), do: {:reply, state.policy_snapshot || %{}, state}
+
+  def handle_call(:policy_snapshot, _from, state),
+    do: {:reply, state.policy_snapshot || %{}, state}
 
   def handle_call({:history, session_key}, _from, %{status: :connected} = state) do
     case send_request("chat.history", %{"sessionKey" => session_key}, :history, state) do
@@ -137,14 +139,23 @@ defmodule Clawrig.Gateway.OperatorClient do
     {:reply, {:error, status_error(state.status)}, state}
   end
 
-  def handle_call({:resolve_approval, approval_id, decision, opts}, _from, %{status: :connected} = state) do
+  def handle_call(
+        {:resolve_approval, approval_id, decision, opts},
+        _from,
+        %{status: :connected} = state
+      ) do
     params = %{
       "approvalId" => approval_id,
       "decision" => decision,
       "reason" => Keyword.get(opts, :reason)
     }
 
-    case send_request("exec.approval.resolve", compact_map(params), {:resolve_approval, approval_id}, state) do
+    case send_request(
+           "exec.approval.resolve",
+           compact_map(params),
+           {:resolve_approval, approval_id},
+           state
+         ) do
       {:ok, state} -> {:reply, {:ok, :pending}, state}
       {:error, reason, state} -> {:reply, {:error, reason}, state}
     end
@@ -177,8 +188,8 @@ defmodule Clawrig.Gateway.OperatorClient do
             {:noreply, state}
 
           {:error, _reason, state} ->
-          schedule_connect_check()
-          {:noreply, state}
+            schedule_connect_check()
+            {:noreply, state}
         end
 
       {:blocked, detail} ->
@@ -188,7 +199,8 @@ defmodule Clawrig.Gateway.OperatorClient do
     end
   end
 
-  def handle_info(:heartbeat, %{status: :connected, transport: transport} = state) when not is_nil(transport) do
+  def handle_info(:heartbeat, %{status: :connected, transport: transport} = state)
+      when not is_nil(transport) do
     case transport_module().send_frame(transport, :ping) do
       {:ok, transport} ->
         schedule_heartbeat(state.tick_interval || 15_000)
@@ -240,7 +252,10 @@ defmodule Clawrig.Gateway.OperatorClient do
   defp handle_frame({:text, text}, state) do
     case Protocol.decode(text) do
       {:event, "chat", payload} ->
-        Logger.debug("[Gateway.Operator] chat event: state=#{payload["state"]}, run=#{payload["runId"]}")
+        Logger.debug(
+          "[Gateway.Operator] chat event: state=#{payload["state"]}, run=#{payload["runId"]}"
+        )
+
         {:ok, handle_chat_event(payload, state)}
 
       {:event, "agent", payload} ->
@@ -280,8 +295,11 @@ defmodule Clawrig.Gateway.OperatorClient do
 
   defp handle_frame({:ping, data}, %{transport: transport} = state) do
     case transport_module().send_frame(transport, {:pong, data}) do
-      {:ok, transport} -> {:ok, %{state | transport: transport}}
-      {:error, transport, reason} -> {:disconnect, disconnect(%{state | transport: transport}, reason)}
+      {:ok, transport} ->
+        {:ok, %{state | transport: transport}}
+
+      {:error, transport, reason} ->
+        {:disconnect, disconnect(%{state | transport: transport}, reason)}
     end
   end
 
@@ -299,7 +317,8 @@ defmodule Clawrig.Gateway.OperatorClient do
 
     cond do
       map_size(shared_auth) == 0 and not (is_binary(device_token) and device_token != "") ->
-        {:error, :missing_auth, %{state | status: :unpaired, last_error: "Gateway auth is not configured"}}
+        {:error, :missing_auth,
+         %{state | status: :unpaired, last_error: "Gateway auth is not configured"}}
 
       is_binary(device_token) and device_token != "" ->
         auth = compact_map(Map.merge(shared_auth, %{"deviceToken" => device_token}))
@@ -333,7 +352,13 @@ defmodule Clawrig.Gateway.OperatorClient do
     else
       {:error, {:hello_error, error}} ->
         Logger.warning("[Gateway.Operator] Hello error: #{inspect(hello_reason(error))}")
-        state = publish_status(%{state | status: :unpaired, last_error: hello_reason(error)}, hello_reason(error))
+
+        state =
+          publish_status(
+            %{state | status: :unpaired, last_error: hello_reason(error)},
+            hello_reason(error)
+          )
+
         {:error, hello_reason(error), state}
 
       {:error, reason} ->
@@ -375,7 +400,8 @@ defmodule Clawrig.Gateway.OperatorClient do
   end
 
   defp handshake(auth, scopes) do
-    with {:ok, transport, buffered_data} <- transport_module().connect(@gateway_host, @gateway_port, @gateway_path),
+    with {:ok, transport, buffered_data} <-
+           transport_module().connect(@gateway_host, @gateway_port, @gateway_path),
          {:ok, transport, hello} <- handshake_frames(transport, buffered_data, auth, scopes) do
       {:ok, transport, hello}
     end
@@ -613,7 +639,9 @@ defmodule Clawrig.Gateway.OperatorClient do
       "final" ->
         # Only finalize if agent lifecycle.end hasn't already done so
         if state.active_run_id do
-          message = normalize_message(payload["message"] || %{"content" => "", "role" => "assistant"})
+          message =
+            normalize_message(payload["message"] || %{"content" => "", "role" => "assistant"})
+
           broadcast_chat({:chat_done, session_key, run_id, message})
           %{state | active_run_id: nil}
         else
@@ -681,7 +709,9 @@ defmodule Clawrig.Gateway.OperatorClient do
             list
             |> Enum.reject(&raw_api_message?/1)
             |> Enum.map(&normalize_message/1)
-          _ -> nil
+
+          _ ->
+            nil
         end
       end)
 
@@ -719,10 +749,6 @@ defmodule Clawrig.Gateway.OperatorClient do
     }
   end
 
-  defp broadcastable_live_message?(message) do
-    message.role not in ["user", "toolResult"] and String.trim(message.content || "") != ""
-  end
-
   # Gateway history returns two assistant entries per turn:
   # 1. Raw API response with thinking/tool_use blocks or textSignature fields
   # 2. Clean display-only version with just type: "text"
@@ -743,7 +769,9 @@ defmodule Clawrig.Gateway.OperatorClient do
       id: payload["approvalId"] || payload["id"] || unique_id("approval"),
       kind: :approval,
       title: payload["title"] || payload["label"] || "Approval requested",
-      detail: payload["detail"] || payload["reason"] || payload["summary"] || "The agent needs approval to continue.",
+      detail:
+        payload["detail"] || payload["reason"] || payload["summary"] ||
+          "The agent needs approval to continue.",
       status: "pending",
       raw: payload
     }
@@ -785,6 +813,7 @@ defmodule Clawrig.Gateway.OperatorClient do
 
     detail = hello_reason(reason)
     new_status = if OperatorStore.identity().device_token, do: :connecting, else: :unpaired
+
     state = %{
       state
       | transport: nil,
@@ -815,7 +844,11 @@ defmodule Clawrig.Gateway.OperatorClient do
   end
 
   defp broadcast_status(status, detail) do
-    Phoenix.PubSub.broadcast(Clawrig.PubSub, Gateway.operator_topic(), {:operator_status, status, detail})
+    Phoenix.PubSub.broadcast(
+      Clawrig.PubSub,
+      Gateway.operator_topic(),
+      {:operator_status, status, detail}
+    )
   end
 
   defp broadcast_chat(event) do

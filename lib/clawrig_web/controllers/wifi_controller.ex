@@ -21,8 +21,13 @@ defmodule ClawrigWeb.WifiController do
 
     Clawrig.Wizard.State.merge(%{
       network_method: :ethernet,
-      local_ip: ip
+      local_ip: ip,
+      preflight_done: Commands.impl().check_internet()
     })
+
+    # Ethernet onboarding should hand the user off to the main setup flow, not
+    # keep browser requests trapped in captive-portal mode.
+    _ = Manager.stop_hotspot()
 
     render(conn, :continue_on_computer, ip: ip, mdns_url: Clawrig.DeviceIdentity.mdns_url())
   end

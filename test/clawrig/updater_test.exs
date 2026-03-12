@@ -144,7 +144,9 @@ defmodule Clawrig.UpdaterTest do
 
   describe "post_update_auth_probe_public/1" do
     setup do
-      tmp = Path.join(System.tmp_dir!(), "clawrig-test-probe-#{System.unique_integer([:positive])}")
+      tmp =
+        Path.join(System.tmp_dir!(), "clawrig-test-probe-#{System.unique_integer([:positive])}")
+
       File.mkdir_p!(tmp)
 
       auth_profiles_path = Path.join(tmp, "auth-profiles.json")

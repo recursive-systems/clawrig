@@ -1,12 +1,17 @@
 _build/
 deps/
+node_modules/
+assets/node_modules/
 cover/
 doc/
 tmp/
+.tmp/
 .git/
 .elixir_ls/
 .fetch
+playwright-report/
 deploy/bundle/
 deploy/*.tar.gz
+deploy/pi-gen/pi-gen-repo/
 erl_crash.dump
 test/

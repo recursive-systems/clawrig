@@ -23,8 +23,14 @@ defmodule Clawrig.Provider.Config do
 
     config =
       case File.read(config_path) do
-        {:ok, contents} -> Jason.decode!(contents)
-        _ -> %{}
+        {:ok, contents} ->
+          case String.trim(contents) do
+            "" -> %{}
+            json -> Jason.decode!(json)
+          end
+
+        _ ->
+          %{}
       end
 
     # Provider config matching OpenClaw's models.providers format
@@ -48,11 +54,12 @@ defmodule Clawrig.Provider.Config do
 
     File.mkdir_p!(Path.dirname(config_path))
 
-    case File.write(config_path, Jason.encode!(config, pretty: true)) do
+    case write_atomic(config_path, Jason.encode!(config, pretty: true)) do
       :ok -> :ok
       {:error, reason} -> {:error, "Failed to write openclaw.json: #{inspect(reason)}"}
     end
   rescue
+    Jason.DecodeError -> {:error, "Provider config error: openclaw.json is invalid JSON"}
     e -> {:error, "Provider config error: #{Exception.message(e)}"}
   end
 
@@ -72,5 +79,18 @@ defmodule Clawrig.Provider.Config do
   defp deep_put(map, [key | rest], value) do
     child = Map.get(map, key, %{})
     Map.put(map, key, deep_put(child, rest, value))
+  end
+
+  defp write_atomic(path, contents) do
+    tmp_path = "#{path}.tmp.#{System.unique_integer([:positive])}"
+
+    with :ok <- File.write(tmp_path, contents),
+         :ok <- File.rename(tmp_path, path) do
+      :ok
+    else
+      {:error, _reason} = error ->
+        _ = File.rm(tmp_path)
+        error
+    end
   end
 end

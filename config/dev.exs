@@ -11,6 +11,7 @@ state_path = System.get_env("CLAWRIG_STATE_PATH", "wizard-state.json")
 oobe_marker = System.get_env("CLAWRIG_OOBE_MARKER", ".oobe-complete")
 node_identity_path = System.get_env("CLAWRIG_NODE_IDENTITY_PATH", "priv/node-identity.json")
 dashboard_auth_path = System.get_env("CLAWRIG_DASHBOARD_AUTH_PATH", "priv/dashboard-auth.json")
+
 gateway_operator_store_path =
   System.get_env("CLAWRIG_GATEWAY_OPERATOR_STORE_PATH", "priv/gateway-operator.json")
 

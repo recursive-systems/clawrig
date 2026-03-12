@@ -12,7 +12,7 @@ NotifyAccess=main
 WatchdogSec=30
 TimeoutStartSec=120
 WorkingDirectory=/opt/clawrig
-ExecStartPre=+/opt/clawrig/bin/clawrig-boot-guard.sh
+ExecStartPre=/bin/sleep 15
 ExecStart=/opt/clawrig/bin/clawrig start
 EnvironmentFile=/etc/clawrig.env
 Environment=PHX_SERVER=true

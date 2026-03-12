@@ -42,6 +42,7 @@ npm-debug.log
 /.oobe-complete
 /priv/node-identity.json
 /priv/dashboard-auth.json
+/priv/gateway-operator.json
 
 # Deploy build artifacts
 /deploy/bundle/

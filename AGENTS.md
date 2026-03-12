@@ -420,14 +420,19 @@ When validating a ClawRig release on a real Raspberry Pi, follow this workflow. 
 
 These steps require human action before an agent can proceed:
 
-1. **1Password auth** — run `op signin` or ensure a service account token is set. Verify with `op whoami`.
+1. **1Password auth** — prefer `OP_SERVICE_ACCOUNT_TOKEN` on the host, or run `op signin`. Verify with `op whoami`.
 2. **Env file** — copy `scripts/clawrig-pi-test.env.template` to `~/.config/clawrig-test/pi-test.env` and fill in values (or use `op://` references).
 3. **Physical device** — ensure the Pi is powered on and connected to the network via Ethernet.
 4. **Mode B approval** — if a full first-run reset is needed, the human must explicitly set `PI_VALIDATION_MODE=B` and `PI_MODE_B_APPROVED=1`. **Never** perform destructive resets without these being set.
+5. **Automated Mode B transport** — if a script will remove `.oobe-complete` and drive the browser automatically, the Pi must remain reachable over ethernet after reset. A Wi-Fi-only Pi will re-enter hotspot mode and leave the home LAN, so `run-pi-e2e-happy-path.sh` is not the right tool for that case.
+6. **Hotspot helper opt-in** — `run-pi-e2e-hotspot-happy-path.sh` is experimental/manual-only. Never run it unless the human explicitly wants the host Mac Wi‑Fi to switch and sets `PI_E2E_ALLOW_WIFI_HOST_SWITCH=1`.
 
 ### Agent-executable flow
 
 ```bash
+# 0. Treat ~/.config/clawrig-test/pi-test.env as the active-device source of truth.
+#    Prefer TEST_PI_HOST=.local, TEST_PI_HOST_FALLBACK_IP, and TEST_PI_EXPECT_HOSTNAME.
+
 # 1. Discover the Pi on the local network
 bash projects/clawrig/scripts/pi-discover.sh --env
 # outputs: TEST_PI_HOST=<ip>
@@ -439,7 +444,7 @@ bash projects/clawrig/scripts/pi-test-env-resolve.sh --discover --output /tmp/cl
 CLAWRIG_VERSION=<version> bash projects/clawrig/clawrig/deploy/build-release.sh
 
 # 4. Deploy to Pi (read env vars from resolved file)
-eval "$(grep '^TEST_PI' /tmp/clawrig-test-session.env)"
+eval "$(grep '^export TEST_PI' /tmp/clawrig-test-session.env)"
 sshpass -p "$TEST_PI_PASS" scp -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
   projects/clawrig/clawrig/deploy/bundle/* "$TEST_PI_USER@$TEST_PI_HOST:~/clawrig-deploy/"
 sshpass -p "$TEST_PI_PASS" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
@@ -460,7 +465,11 @@ sshpass -p "$TEST_PI_PASS" ssh "$TEST_PI_USER@$TEST_PI_HOST" "bash -s" \
 
 - **Always use explicit timeouts** on SSH and curl commands: `-o ConnectTimeout=10`, `--connect-timeout 10`
 - **Never run Mode B without `PI_MODE_B_APPROVED=1`** — ask the human first
+- **Never run automated reset-based Mode B on a Wi-Fi-only Pi** — use ethernet-backed reachability or do the hotspot/OOBE flow manually
+- **Do not use the hotspot helper by default** — ethernet-backed validation remains the standard path
+- If the human explicitly requests host Wi‑Fi switching, `projects/clawrig/scripts/run-pi-e2e-hotspot-happy-path.sh` requires `PI_E2E_ALLOW_WIFI_HOST_SWITCH=1`
 - **Record results** using `pi-record-result.sh` — writes JSON to `.trajectories/`
 - **Device discovery** — mDNS hostnames go stale after identity reassignment. Always use `pi-discover.sh` or verify by IP if `.local` names don't resolve.
-- **Env vars don't persist** between shell commands. Read from `/tmp/clawrig-test-session.env` in each command using `eval "$(grep '^TEST_PI' /tmp/clawrig-test-session.env)"` or pass `--env-file`.
+- **Env vars don't persist** between shell commands. Read from `/tmp/clawrig-test-session.env` in each command using `eval "$(grep '^export TEST_PI' /tmp/clawrig-test-session.env)"` or pass `--env-file`.
+- **Active device source of truth** — check `~/.config/clawrig-test/pi-test.env` first before guessing which Pi to target.
 - The acceptance matrix is at `projects/clawrig/docs/pi-acceptance.json` — use it to map OOBE test IDs to commands.

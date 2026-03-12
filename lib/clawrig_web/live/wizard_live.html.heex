@@ -164,8 +164,6 @@
               &rarr; Security &rarr; enable <strong>"Device code authorization for Codex"</strong>.
             </div>
 
-
-
             <div :if={@openai_user_code} class="device-code-display">
               <span class="device-code-value" id="device-code-text">
                 <span
@@ -693,10 +691,15 @@
               </p>
             </div>
           </div>
-          <label class="ip-gate-confirm" phx-click="confirm_ip">
-            <input type="checkbox" checked={@ip_confirmed} />
-            <span>I've saved my dashboard access details</span>
-          </label>
+          <div class="ip-gate-confirm">
+            <input
+              id="ip-gate-confirm-checkbox"
+              type="checkbox"
+              checked={@ip_confirmed}
+              phx-click="confirm_ip"
+            />
+            <label for="ip-gate-confirm-checkbox">I've saved my dashboard access details</label>
+          </div>
         </div>
 
         <p :if={@finish_message} class="helper">{@finish_message}</p>
