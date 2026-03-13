@@ -412,6 +412,104 @@ And **never** do this:
 
 <!-- usage-rules-end -->
 
+## OTP / GenServer guardrails
+
+These rules were encoded after hardening review found recurring agent mistakes in ClawRig's GenServer modules.
+
+### Never ignore return values from fallible operations
+
+When calling a function that returns `:ok | {:error, reason}`, **always** match on the result and handle the error case. This applies especially to rollback, file operations, and system commands inside GenServers.
+
+**Never do this:**
+
+    rollback()
+    File.rm(@pending_marker)
+    # silently swallowed — if rollback fails, marker is deleted anyway
+
+**Always do this:**
+
+    case rollback() do
+      :ok ->
+        File.rm(@pending_marker)
+        broadcast({:ok, :rolled_back})
+
+      {:error, reason} ->
+        Logger.error("Rollback failed: #{inspect(reason)} — keeping marker for retry")
+        broadcast({:error, "rollback failed"})
+    end
+
+### Never use invalid atoms as sentinel values
+
+When a function returns a value from a known set (e.g., `:station | :ap | :idle`), **never** use `:error` or other out-of-domain atoms as a fallback. Use a valid domain value.
+
+**Never do this:**
+
+    {:error, "connect_timeout_no_hotspot"}
+    # :error is not a valid wifi mode — downstream pattern matches break
+
+**Always do this:**
+
+    {:idle, "connect_timeout_no_hotspot"}
+
+### Always add `@impl true` on ALL callback clauses
+
+When adding a new `handle_info`, `handle_call`, or `handle_cast` clause, **always** annotate it with `@impl true`. If there are multiple clauses for the same callback (e.g., pattern-matched on different messages), each group of clauses needs `@impl true` on the first clause.
+
+### Guard timer-based handlers with activation flags
+
+GenServers that start dormant and activate later (e.g., after OOBE) **must** guard their `:check` / timer handlers against the inactive state. Without this, a late-arriving timer message can start a duplicate check loop.
+
+    @impl true
+    def handle_info(:check, %{active: false} = state), do: {:noreply, state}
+
+    def handle_info(:check, state) do
+      state = do_check(state)
+      schedule_check()
+      {:noreply, state}
+    end
+
+Also guard the activation message to prevent double-activation:
+
+    @impl true
+    def handle_info(:oobe_complete, %{active: true} = state), do: {:noreply, state}
+
+### Never block LiveView processes
+
+**Never** put `Process.sleep/1`, synchronous `GenServer.call/2`, or long-running operations directly in a LiveView `handle_event` or `handle_info` callback. These block the LiveView process and freeze the UI.
+
+**Always** use `Task.start/1` or `Task.async/1` for operations that may take more than a few milliseconds:
+
+    # BAD — freezes the LiveView for 3+ seconds
+    def handle_event("finalize", _, socket) do
+      Manager.stop_hotspot()        # blocks
+      Commands.start_gateway()      # blocks
+      Process.sleep(3_000)          # blocks
+      {:noreply, socket}
+    end
+
+    # GOOD — returns immediately, work happens in background
+    def handle_event("finalize", _, socket) do
+      Task.start(fn ->
+        Manager.stop_hotspot()
+        Commands.start_gateway()
+      end)
+      {:noreply, socket}
+    end
+
+### Use streaming for large file operations on Pi
+
+The Pi has 1-2 GB RAM. **Never** read entire files into memory for checksumming or processing. Use `File.stream!/2` with a reasonable chunk size:
+
+    # BAD — loads entire tarball into memory, can OOM
+    data = File.read!(path)
+    :crypto.hash(:sha256, data) |> Base.encode16(case: :lower)
+
+    # GOOD — streams in 64KB chunks
+    File.stream!(path, 65_536)
+    |> Enum.reduce(:crypto.hash_init(:sha256), &:crypto.hash_update(&2, &1))
+    |> :crypto.hash_final()
+    |> Base.encode16(case: :lower)
+
 ## Pi device validation
 
 When validating a ClawRig release on a real Raspberry Pi, follow this workflow. Scripts live in `projects/clawrig/scripts/`.
