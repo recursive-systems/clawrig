@@ -8,6 +8,7 @@ defmodule Clawrig.System.Commands do
   @callback run_openclaw(args :: [String.t()]) :: {String.t(), integer()}
   @callback gateway_status() :: :running | :stopped
   @callback start_gateway() :: :ok | {:error, String.t()}
+  @callback invalidate_agent_sessions() :: :ok | {:error, String.t()}
   @callback install_gateway() :: :ok | {:error, String.t()}
   @callback detect_local_ip() :: String.t() | nil
   @callback has_ethernet_ip() :: boolean()

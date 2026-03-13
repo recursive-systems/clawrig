@@ -707,6 +707,111 @@
           <% end %>
         <% end %>
       </div>
+
+      <div class="integration-card">
+        <div class="integration-header">
+          <h3>Browser Use</h3>
+          <span :if={@browser_mode in [:managed_trial, :byok]} class="integration-badge ok">
+            Active
+          </span>
+        </div>
+
+        <%= if @browser_mode == :managed_trial do %>
+          <p>Browser automation enabled with ClawRig trial.</p>
+          <div :if={@browser_usage} class="usage-section">
+            <div class="usage-bar-label">
+              ${browser_usage_field(@browser_usage, "used_usd", "0.00")} / ${browser_usage_field(@browser_usage, "budget_usd", "3.00")} this month
+            </div>
+            <div class="usage-bar-track">
+              <div
+                class={[
+                  "usage-bar-fill",
+                  browser_usage_field(@browser_usage, "remaining_usd", "0.00") == "0.00" && "full"
+                ]}
+                style={"width: #{browser_usage_percent(@browser_usage)}%"}
+              >
+              </div>
+            </div>
+            <p class="usage-limit-hint">
+              About {browser_usage_field(@browser_usage, "estimated_runs_left", 0)} standard runs left this month.
+            </p>
+            <p :if={!browser_global_available?(@browser_usage)} class="account-input-hint error">
+              {browser_usage_field(
+                @browser_usage,
+                "message",
+                "ClawRig's shared Browser Use trial pool is full for this month. Add your own Browser Use Cloud key to continue."
+              )}
+            </p>
+          </div>
+          <div class="account-actions mt-md">
+            <button
+              class="btn subtle btn-sm"
+              phx-click="browser_remove"
+              data-confirm="Remove Browser Use? Your agent will no longer be able to browse interactive websites."
+            >
+              Remove
+            </button>
+          </div>
+        <% else %>
+          <%= if @browser_mode == :byok do %>
+            <p>Browser automation enabled with your Browser Use Cloud key.</p>
+            <div class="account-actions">
+              <button
+                class="btn subtle btn-sm"
+                phx-click="browser_remove"
+                data-confirm="Remove Browser Use? Your agent will no longer be able to browse interactive websites."
+              >
+                Remove
+              </button>
+            </div>
+          <% else %>
+            <%= if @browser_mode == :byok_form do %>
+              <p>
+                You'll need a Browser Use Cloud API key
+                (<a href="https://cloud.browser-use.com" target="_blank" rel="noopener">manage it here</a>).
+              </p>
+              <form phx-submit="browser_submit_api_key" class="account-input-group">
+                <label for="browser-use-api-key-input">Browser Use Cloud API Key</label>
+                <input
+                  type="password"
+                  name="api_key"
+                  id="browser-use-api-key-input"
+                  class={["account-input", @browser_error && "error"]}
+                  placeholder="bu_..."
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <p :if={@browser_error} class="account-input-hint error">{@browser_error}</p>
+                <button type="submit" class="btn primary mt-md">
+                  Save API Key
+                </button>
+              </form>
+              <button class="btn ghost btn-sm mt-sm" phx-click="browser_back">
+                Back
+              </button>
+            <% else %>
+              <p>
+                Enable Browser Use Cloud so your AI agent can handle interactive websites like eBay, forms, and JS-heavy pages.
+              </p>
+              <p :if={@browser_error} class="account-input-hint error">{@browser_error}</p>
+              <button
+                class="btn primary mt-md"
+                phx-click="browser_enable_trial"
+                disabled={@browser_registering}
+              >
+                {if @browser_registering, do: "Enabling...", else: "Enable Browser Trial"}
+              </button>
+              <p class="account-input-hint">Managed trial · About 15 standard runs per month</p>
+              <div class="integration-divider">
+                <span>or</span>
+              </div>
+              <button class="btn subtle btn-sm" phx-click="browser_show_byok">
+                Use my Browser Use Cloud key
+              </button>
+            <% end %>
+          <% end %>
+        <% end %>
+      </div>
     </.dash_panel>
 
     <%!-- System --%>

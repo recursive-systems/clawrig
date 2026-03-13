@@ -34,6 +34,10 @@ defmodule Clawrig.System.MockCommandsTest do
     assert MockCommands.gateway_status() == :running
   end
 
+  test "invalidate_agent_sessions returns :ok" do
+    assert :ok = MockCommands.invalidate_agent_sessions()
+  end
+
   test "run_openclaw handles various commands" do
     assert {"RPC probe: ok\n", 0} = MockCommands.run_openclaw(["gateway", "status"])
     assert {_, 0} = MockCommands.run_openclaw(["--version"])

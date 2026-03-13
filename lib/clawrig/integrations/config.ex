@@ -5,6 +5,8 @@ defmodule Clawrig.Integrations.Config do
 
   @clawrig_plugin_id "clawrig"
   @clawrig_plugin_dir_name "clawrig"
+  @browser_skill_id "clawrig-browser-use"
+  @meta_integrations_path ["meta", "clawrig", "integrations"]
 
   @doc """
   Returns the current web search mode:
@@ -46,6 +48,127 @@ defmodule Clawrig.Integrations.Config do
   end
 
   @doc """
+  Returns whether the user explicitly opted out of managed auto-enable for web search.
+  """
+  @spec search_auto_opt_out?() :: boolean()
+  def search_auto_opt_out? do
+    get_in(read_config(), @meta_integrations_path ++ ["webSearchOptOut"]) == true
+  end
+
+  @doc """
+  Returns the current Browser Use integration mode:
+  - :managed_trial — using the ClawRig broker with a device token
+  - :byok — user's own Browser Use Cloud API key
+  - :not_configured — Browser Use is disabled
+  """
+  @spec browser_mode() :: :managed_trial | :byok | :not_configured
+  def browser_mode do
+    browser = browser_config() || %{}
+    browser_settings = browser_settings(browser)
+
+    cond do
+      browser["enabled"] == true and browser_settings["mode"] == "managed_trial" and
+          is_binary(browser_settings["deviceToken"]) and browser_settings["deviceToken"] != "" ->
+        :managed_trial
+
+      browser["enabled"] == true and browser_settings["mode"] == "byok" and
+          is_binary(browser["apiKey"]) and browser["apiKey"] != "" ->
+        :byok
+
+      true ->
+        :not_configured
+    end
+  end
+
+  @doc """
+  Returns the managed Browser Use device token from openclaw.json, or nil.
+  """
+  @spec browser_usage_token() :: String.t() | nil
+  def browser_usage_token do
+    browser = browser_config() || %{}
+    browser_settings = browser_settings(browser)
+
+    if browser_settings["mode"] == "managed_trial" do
+      browser_settings["deviceToken"]
+    end
+  end
+
+  @doc """
+  Returns whether the user explicitly opted out of managed auto-enable for Browser Use.
+  """
+  @spec browser_auto_opt_out?() :: boolean()
+  def browser_auto_opt_out? do
+    get_in(read_config(), @meta_integrations_path ++ ["browserUseOptOut"]) == true
+  end
+
+  @doc """
+  Writes managed Browser Use broker config to openclaw.json.
+  """
+  @spec write_browser_trial(String.t()) :: :ok | {:error, String.t()}
+  def write_browser_trial(device_token) do
+    config =
+      read_config()
+      |> deep_put(["skills", "entries", @browser_skill_id, "enabled"], true)
+      |> deep_put(["skills", "entries", @browser_skill_id, "config", "mode"], "managed_trial")
+      |> deep_put(["skills", "entries", @browser_skill_id, "config", "runtime"], "remote")
+      |> deep_put(
+        ["skills", "entries", @browser_skill_id, "config", "brokerUrl"],
+        Clawrig.Integrations.BrowserUseBroker.proxy_url()
+      )
+      |> deep_put(
+        ["skills", "entries", @browser_skill_id, "config", "deviceToken"],
+        device_token
+      )
+      |> remove_key(["skills", "entries", @browser_skill_id, "apiKey"])
+      |> remove_key(["skills", "entries", @browser_skill_id, "mode"])
+      |> remove_key(["skills", "entries", @browser_skill_id, "runtime"])
+      |> remove_key(["skills", "entries", @browser_skill_id, "brokerUrl"])
+      |> remove_key(["skills", "entries", @browser_skill_id, "deviceToken"])
+      |> remove_path(@meta_integrations_path ++ ["browserUseOptOut"])
+
+    write_config(config)
+  rescue
+    e -> {:error, "Failed to write Browser Use trial config: #{Exception.message(e)}"}
+  end
+
+  @doc """
+  Writes Browser Use Cloud BYOK config to openclaw.json.
+  """
+  @spec write_browser_api_key(String.t()) :: :ok | {:error, String.t()}
+  def write_browser_api_key(api_key) do
+    config =
+      read_config()
+      |> deep_put(["skills", "entries", @browser_skill_id, "enabled"], true)
+      |> deep_put(["skills", "entries", @browser_skill_id, "config", "mode"], "byok")
+      |> deep_put(["skills", "entries", @browser_skill_id, "config", "runtime"], "remote")
+      |> deep_put(["skills", "entries", @browser_skill_id, "apiKey"], api_key)
+      |> remove_key(["skills", "entries", @browser_skill_id, "brokerUrl"])
+      |> remove_key(["skills", "entries", @browser_skill_id, "deviceToken"])
+      |> remove_key(["skills", "entries", @browser_skill_id, "config", "brokerUrl"])
+      |> remove_key(["skills", "entries", @browser_skill_id, "config", "deviceToken"])
+      |> remove_key(["skills", "entries", @browser_skill_id, "mode"])
+      |> remove_key(["skills", "entries", @browser_skill_id, "runtime"])
+      |> remove_path(@meta_integrations_path ++ ["browserUseOptOut"])
+
+    write_config(config)
+  rescue
+    e -> {:error, "Failed to write Browser Use Cloud config: #{Exception.message(e)}"}
+  end
+
+  @doc """
+  Removes Browser Use skill config from openclaw.json.
+  """
+  @spec remove_browser_config() :: :ok | {:error, String.t()}
+  def remove_browser_config do
+    read_config()
+    |> remove_path(["skills", "entries", @browser_skill_id])
+    |> deep_put(@meta_integrations_path ++ ["browserUseOptOut"], true)
+    |> write_config()
+  rescue
+    e -> {:error, "Failed to remove Browser Use config: #{Exception.message(e)}"}
+  end
+
+  @doc """
   Write managed search config (Perplexity via proxy) to openclaw.json.
 
   OpenClaw config format:
@@ -65,6 +188,7 @@ defmodule Clawrig.Integrations.Config do
       )
       |> deep_put(["tools", "web", "search", "perplexity", "apiKey"], device_token)
       |> deep_put(["tools", "web", "search", "perplexity", "model"], "sonar")
+      |> remove_path(@meta_integrations_path ++ ["webSearchOptOut"])
 
     # Remove any leftover Brave BYOK config
     config = remove_key(config, ["tools", "web", "search", "apiKey"])
@@ -83,6 +207,7 @@ defmodule Clawrig.Integrations.Config do
       read_config()
       |> deep_put(["tools", "web", "search", "provider"], "brave")
       |> deep_put(["tools", "web", "search", "apiKey"], api_key)
+      |> remove_path(@meta_integrations_path ++ ["webSearchOptOut"])
 
     # Remove any leftover managed/perplexity config
     config = remove_key(config, ["tools", "web", "search", "perplexity"])
@@ -118,7 +243,9 @@ defmodule Clawrig.Integrations.Config do
           config
       end
 
-    write_config(config)
+    config
+    |> deep_put(@meta_integrations_path ++ ["webSearchOptOut"], true)
+    |> write_config()
   rescue
     e -> {:error, "Failed to remove search config: #{Exception.message(e)}"}
   end
@@ -263,6 +390,32 @@ defmodule Clawrig.Integrations.Config do
           )
       },
       %{
+        id: @browser_skill_id,
+        name: "Browser Use",
+        description: "Optional Browser Use Cloud browsing for interactive and JS-heavy websites.",
+        source: "optional",
+        state:
+          cond do
+            !plugin_present? -> "broken"
+            browser_mode() == :not_configured -> "disabled"
+            true -> "enabled"
+          end,
+        detail:
+          cond do
+            !plugin_present? ->
+              "Bundled Browser Use helper files are unavailable because the ClawRig plugin is missing."
+
+            browser_mode() == :not_configured ->
+              "Available as an optional integration for interactive browsing tasks."
+
+            browser_mode() == :managed_trial ->
+              "Configured through the Browser Use integration below using the ClawRig trial broker."
+
+            true ->
+              "Configured through the Browser Use integration below using your Browser Use Cloud key."
+          end
+      },
+      %{
         id: "pdf-export",
         name: "PDF Export",
         description: "Future export helpers for turning responses into PDFs.",
@@ -319,6 +472,13 @@ defmodule Clawrig.Integrations.Config do
   rescue
     Jason.DecodeError -> %{}
   end
+
+  defp browser_config do
+    get_in(read_config(), ["skills", "entries", @browser_skill_id])
+  end
+
+  defp browser_settings(%{"config" => settings}) when is_map(settings), do: settings
+  defp browser_settings(settings) when is_map(settings), do: settings
 
   defp write_config(config) do
     path = config_path()
@@ -387,6 +547,26 @@ defmodule Clawrig.Integrations.Config do
     case Map.get(map, key) do
       child when is_map(child) -> Map.put(map, key, remove_key(child, rest))
       _ -> map
+    end
+  end
+
+  defp remove_path(map, [key]) do
+    Map.delete(map, key)
+  end
+
+  defp remove_path(map, [key | rest]) do
+    case Map.get(map, key) do
+      child when is_map(child) ->
+        updated_child = remove_path(child, rest)
+
+        if updated_child == %{} do
+          Map.delete(map, key)
+        else
+          Map.put(map, key, updated_child)
+        end
+
+      _ ->
+        map
     end
   end
 

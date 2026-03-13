@@ -57,7 +57,11 @@ tar xzf "$SCRIPT_DIR/clawrig.tar.gz" -C "$TAR_STAGE"
 mkdir -p "$TAR_STAGE/clawrig/plugins"
 rm -rf "$TAR_STAGE/clawrig/plugins/clawrig"
 cp -R "$PLUGIN_SRC" "$TAR_STAGE/clawrig/plugins/clawrig"
+find "$TAR_STAGE/clawrig/plugins/clawrig" -name '._*' -delete
 chmod 755 "$TAR_STAGE/clawrig/plugins/clawrig/bin/clawrig-info"
+if [ -f "$TAR_STAGE/clawrig/plugins/clawrig/bin/clawrig-browser-use" ]; then
+  chmod 755 "$TAR_STAGE/clawrig/plugins/clawrig/bin/clawrig-browser-use"
+fi
 (cd "$TAR_STAGE" && tar czf "$SCRIPT_DIR/clawrig.tar.gz" clawrig)
 rm -rf "$TAR_STAGE"
 

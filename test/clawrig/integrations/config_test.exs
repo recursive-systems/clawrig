@@ -100,8 +100,92 @@ defmodule Clawrig.Integrations.ConfigTest do
     assert [
              %{id: "clawrig", state: "enabled", source: "default"},
              %{id: "web-search", state: "disabled", source: "optional"},
+             %{id: "clawrig-browser-use", state: "disabled", source: "optional"},
              %{id: "pdf-export", state: "coming_soon", source: "optional"}
            ] = Config.skills_center()
+  end
+
+  test "browser_mode returns not_configured on empty config" do
+    assert :not_configured = Config.browser_mode()
+    assert is_nil(Config.browser_usage_token())
+    refute Config.browser_auto_opt_out?()
+    refute Config.search_auto_opt_out?()
+  end
+
+  test "write_browser_trial persists broker-backed config" do
+    assert :ok = Config.write_browser_trial("cbu_dev_123")
+
+    assert :managed_trial = Config.browser_mode()
+    assert "cbu_dev_123" == Config.browser_usage_token()
+
+    config =
+      home_config_path()
+      |> File.read!()
+      |> Jason.decode!()
+
+    assert get_in(config, ["skills", "entries", "clawrig-browser-use", "config", "mode"]) ==
+             "managed_trial"
+
+    assert get_in(config, ["skills", "entries", "clawrig-browser-use", "config", "brokerUrl"]) ==
+             "https://rs-browser-use.fly.dev"
+
+    refute Config.browser_auto_opt_out?()
+  end
+
+  test "write_browser_api_key persists byok config and clears managed fields" do
+    assert :ok = Config.remove_browser_config()
+    assert :ok = Config.write_browser_trial("cbu_dev_123")
+    assert :ok = Config.write_browser_api_key("bu_secret_123")
+
+    assert :byok = Config.browser_mode()
+    assert is_nil(Config.browser_usage_token())
+
+    config =
+      home_config_path()
+      |> File.read!()
+      |> Jason.decode!()
+
+    assert get_in(config, ["skills", "entries", "clawrig-browser-use", "apiKey"]) ==
+             "bu_secret_123"
+
+    assert is_nil(get_in(config, ["skills", "entries", "clawrig-browser-use", "deviceToken"]))
+    assert is_nil(get_in(config, ["skills", "entries", "clawrig-browser-use", "config", "deviceToken"]))
+    assert get_in(config, ["skills", "entries", "clawrig-browser-use", "config", "mode"]) ==
+             "byok"
+
+    refute Config.browser_auto_opt_out?()
+  end
+
+  test "remove_browser_config clears browser use, marks opt-out, and leaves search config intact" do
+    assert :ok = Config.write_browser_trial("cbu_dev_123")
+    assert :ok = Config.write_brave_key("BSA-test")
+    assert :ok = Config.remove_browser_config()
+
+    assert :not_configured = Config.browser_mode()
+    assert :byok = Config.search_mode()
+    assert Config.browser_auto_opt_out?()
+  end
+
+  test "remove_search_config clears search and marks opt-out" do
+    assert :ok = Config.write_managed_search("search_dev_123")
+    assert :ok = Config.remove_search_config()
+
+    assert :not_configured = Config.search_mode()
+    assert Config.search_auto_opt_out?()
+  end
+
+  test "write search config clears prior opt-out" do
+    assert :ok = Config.remove_search_config()
+    assert Config.search_auto_opt_out?()
+
+    assert :ok = Config.write_managed_search("search_dev_123")
+    refute Config.search_auto_opt_out?()
+
+    assert :ok = Config.remove_search_config()
+    assert Config.search_auto_opt_out?()
+
+    assert :ok = Config.write_brave_key("BSA-user-key")
+    refute Config.search_auto_opt_out?()
   end
 
   test "remove_telegram removes channel config" do

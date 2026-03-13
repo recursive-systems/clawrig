@@ -3,6 +3,7 @@ defmodule ClawrigWeb.DashboardLiveTest do
   import Phoenix.LiveViewTest
 
   alias Clawrig.Integrations.Config
+  alias Clawrig.TestSupport.MockBrowserUseBrokerHTTP
   alias Clawrig.TestSupport.MockTelegramHTTP
 
   setup do
@@ -31,6 +32,10 @@ defmodule ClawrigWeb.DashboardLiveTest do
     Application.put_env(:clawrig, :telegram_http, MockTelegramHTTP)
     MockTelegramHTTP.reset()
 
+    original_browser_http = Application.get_env(:clawrig, :browser_use_broker_http)
+    Application.put_env(:clawrig, :browser_use_broker_http, MockBrowserUseBrokerHTTP)
+    MockBrowserUseBrokerHTTP.reset()
+
     Application.put_env(:clawrig, :oobe_complete, true)
     Application.put_env(:clawrig, :enable_preview_states, true)
 
@@ -44,6 +49,10 @@ defmodule ClawrigWeb.DashboardLiveTest do
       if original_http,
         do: Application.put_env(:clawrig, :telegram_http, original_http),
         else: Application.delete_env(:clawrig, :telegram_http)
+
+      if original_browser_http,
+        do: Application.put_env(:clawrig, :browser_use_broker_http, original_browser_http),
+        else: Application.delete_env(:clawrig, :browser_use_broker_http)
 
       Application.delete_env(:clawrig, :oobe_complete)
       Application.delete_env(:clawrig, :enable_preview_states)
@@ -85,8 +94,93 @@ defmodule ClawrigWeb.DashboardLiveTest do
       assert html =~ "Skills"
       assert html =~ "ClawRig"
       assert html =~ "Bundled with every device"
+      assert html =~ "Browser Use"
       assert html =~ "PDF Export"
       assert html =~ "Coming soon"
+    end
+
+    test "enables managed browser use trial from the dashboard", %{conn: conn} do
+      MockBrowserUseBrokerHTTP.put_register_result(
+        {:ok, %{status: 201, body: %{"token" => "cbu_dev_123"}}}
+      )
+
+      MockBrowserUseBrokerHTTP.put_usage_result(
+        "cbu_dev_123",
+        {:ok,
+         %{
+           status: 200,
+           body: %{
+             "used_usd" => "0.20",
+             "remaining_usd" => "2.80",
+             "budget_usd" => "3.00",
+             "estimated_runs_left" => 14,
+             "global_available" => true
+           }
+         }}
+      )
+
+      {:ok, view, _html} = live(conn, ~p"/integrations")
+
+      _ = view |> element("button[phx-click=browser_enable_trial]") |> render_click()
+      send(view.pid, {:browser_register_result, {:ok, %{"token" => "cbu_dev_123"}}})
+      html = render(view)
+
+      assert html =~ "Browser automation enabled with ClawRig trial"
+      assert :managed_trial = Config.browser_mode()
+    end
+
+    test "supports browser use byok and removal", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/integrations")
+
+      view |> element("button[phx-click=browser_show_byok]") |> render_click()
+
+      html =
+        view
+        |> element("form[phx-submit=browser_submit_api_key]")
+        |> render_submit(%{"api_key" => "bu_test_key"})
+
+      assert html =~ "Browser automation enabled with your Browser Use Cloud key"
+      assert :byok = Config.browser_mode()
+
+      html = view |> element("button[phx-click=browser_remove]") |> render_click()
+
+      assert html =~ "Enable Browser Trial"
+      assert :not_configured = Config.browser_mode()
+    end
+
+    test "keeps the browser use byok form open during refresh polling", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/integrations")
+      view |> element("button[phx-click=browser_show_byok]") |> render_click()
+
+      send(view.pid, :refresh_status)
+      html = render(view)
+
+      assert html =~ "Browser Use Cloud API Key"
+    end
+
+    test "shows the global exhaustion message for managed browser use", %{conn: conn} do
+      assert :ok = Config.write_browser_trial("cbu_dev_123")
+
+      {:ok, view, _html} = live(conn, ~p"/integrations")
+
+      send(
+        view.pid,
+        {:status_result, :running, true, "Test WiFi", false, :not_configured, nil, :managed_trial,
+         %{
+           "used_usd" => "3.00",
+           "remaining_usd" => "0.00",
+           "budget_usd" => "3.00",
+           "estimated_runs_left" => 0,
+           "global_available" => false,
+           "message" =>
+             "ClawRig's shared Browser Use trial pool is full for this month. Add your own Browser Use Cloud key to continue."
+         }, %{installed: false, running: false, ip: nil, hostname: nil},
+         %{"enabled" => true}, [], %{}}
+      )
+
+      html = render(view)
+
+      assert html =~ "shared Browser Use trial pool is full"
     end
   end
 

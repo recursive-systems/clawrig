@@ -76,6 +76,8 @@ defmodule Clawrig.System.MacCommands do
   @impl true
   defdelegate start_gateway, to: Clawrig.System.MockCommands
   @impl true
+  defdelegate invalidate_agent_sessions, to: Clawrig.System.MockCommands
+  @impl true
   defdelegate install_gateway, to: Clawrig.System.MockCommands
   @impl true
   defdelegate detect_local_ip, to: Clawrig.System.MockCommands

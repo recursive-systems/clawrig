@@ -58,6 +58,13 @@ defmodule Clawrig.Application do
       Supervisor.child_spec(
         {Task,
          fn ->
+           _ = Clawrig.Gateway.SessionVersion.reconcile()
+         end},
+        id: :gateway_session_version_task
+      ),
+      Supervisor.child_spec(
+        {Task,
+         fn ->
            try do
              if Clawrig.Integrations.Config.exec_security_mode() != "full" do
                Clawrig.Integrations.Config.write_exec_defaults()
@@ -67,6 +74,17 @@ defmodule Clawrig.Application do
            end
          end},
         id: :exec_defaults_task
+      ),
+      Supervisor.child_spec(
+        {Task,
+         fn ->
+           try do
+             _ = Clawrig.Integrations.ManagedDefaults.reconcile()
+           rescue
+             _ -> :ok
+           end
+         end},
+        id: :managed_integration_defaults_task
       )
     ]
   end

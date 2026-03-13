@@ -48,6 +48,17 @@ sudo chown -R pi:pi /opt/clawrig
 if [ -f /opt/clawrig/plugins/clawrig/bin/clawrig-info ]; then
   sudo ln -sf /opt/clawrig/plugins/clawrig/bin/clawrig-info /usr/local/bin/clawrig-info
 fi
+if [ -f /opt/clawrig/plugins/clawrig/bin/clawrig-browser-use ]; then
+  sudo chmod 755 /opt/clawrig/plugins/clawrig/bin/clawrig-browser-use
+fi
+sudo find /opt/clawrig/plugins/clawrig -name '._*' -delete
+if [ -d /opt/clawrig/plugins/clawrig/skills ] && [ -d /usr/lib/node_modules/openclaw/skills ]; then
+  for skill_dir in /opt/clawrig/plugins/clawrig/skills/*; do
+    [ -d "$skill_dir" ] || continue
+    skill_name="$(basename "$skill_dir")"
+    sudo ln -sfn "$skill_dir" "/usr/lib/node_modules/openclaw/skills/$skill_name"
+  done
+fi
 
 # 3. Generate SECRET_KEY_BASE (using openssl, no mix needed)
 echo ""

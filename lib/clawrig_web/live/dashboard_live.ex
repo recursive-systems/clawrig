@@ -2,6 +2,7 @@ defmodule ClawrigWeb.DashboardLive do
   use ClawrigWeb, :live_view
 
   alias Clawrig.Integrations.Config, as: IntegrationsConfig
+  alias Clawrig.Integrations.BrowserUseBroker
   alias Clawrig.Integrations.Telegram, as: TelegramService
   alias Clawrig.Integrations.SearchProxy
   alias Clawrig.PreviewState
@@ -57,6 +58,10 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:brave_error, nil)
       |> assign(:brave_usage, nil)
       |> assign(:brave_registering, false)
+      |> assign(:browser_mode, IntegrationsConfig.browser_mode())
+      |> assign(:browser_error, nil)
+      |> assign(:browser_usage, nil)
+      |> assign(:browser_registering, false)
       |> assign(:skills_center, IntegrationsConfig.skills_center())
       |> assign(:tailscale, :loading)
       |> assign(:tailscale_error, nil)
@@ -556,7 +561,7 @@ defmodule ClawrigWeb.DashboardLive do
     else
       case IntegrationsConfig.write_brave_key(key) do
         :ok ->
-          Task.start(fn -> Commands.impl().start_gateway() end)
+          restart_gateway_with_session_refresh()
 
           {:noreply,
            socket
@@ -576,7 +581,7 @@ defmodule ClawrigWeb.DashboardLive do
   def handle_event("brave_remove", _params, socket) do
     case IntegrationsConfig.remove_search_config() do
       :ok ->
-        Task.start(fn -> Commands.impl().start_gateway() end)
+        restart_gateway_with_session_refresh()
 
         {:noreply,
          socket
@@ -590,6 +595,70 @@ defmodule ClawrigWeb.DashboardLive do
 
       {:error, msg} ->
         {:noreply, assign(socket, :brave_error, msg)}
+    end
+  end
+
+  def handle_event("browser_enable_trial", _params, socket) do
+    pid = self()
+
+    Task.start(fn ->
+      result = BrowserUseBroker.register_device()
+      send(pid, {:browser_register_result, result})
+    end)
+
+    {:noreply, assign(socket, browser_registering: true, browser_error: nil)}
+  end
+
+  def handle_event("browser_show_byok", _params, socket) do
+    {:noreply, assign(socket, browser_mode: :byok_form, browser_error: nil)}
+  end
+
+  def handle_event("browser_back", _params, socket) do
+    {:noreply, assign(socket, browser_mode: :not_configured, browser_error: nil)}
+  end
+
+  def handle_event("browser_submit_api_key", %{"api_key" => key}, socket) do
+    key = String.trim(key)
+
+    if key == "" do
+      {:noreply, assign(socket, :browser_error, "Please paste your Browser Use Cloud API key.")}
+    else
+      case IntegrationsConfig.write_browser_api_key(key) do
+        :ok ->
+          restart_gateway_with_session_refresh()
+
+          {:noreply,
+           socket
+           |> assign(
+             browser_mode: :byok,
+             browser_error: nil,
+             skills_center: IntegrationsConfig.skills_center()
+           )
+           |> put_flash(:info, "Browser Use enabled. Gateway restarting...")}
+
+        {:error, msg} ->
+          {:noreply, assign(socket, :browser_error, msg)}
+      end
+    end
+  end
+
+  def handle_event("browser_remove", _params, socket) do
+    case IntegrationsConfig.remove_browser_config() do
+      :ok ->
+        restart_gateway_with_session_refresh()
+
+        {:noreply,
+         socket
+         |> assign(
+           browser_mode: :not_configured,
+           browser_error: nil,
+           browser_usage: nil,
+           skills_center: IntegrationsConfig.skills_center()
+         )
+         |> put_flash(:info, "Browser Use removed. Gateway restarting...")}
+
+      {:error, msg} ->
+        {:noreply, assign(socket, :browser_error, msg)}
     end
   end
 
@@ -645,6 +714,7 @@ defmodule ClawrigWeb.DashboardLive do
           pid = self()
 
           Task.start(fn ->
+            _ = Commands.impl().invalidate_agent_sessions()
             result = Commands.impl().start_gateway()
             send(pid, {:tg_relink_restart_complete, socket.assigns.tg_token, snapshot, result})
           end)
@@ -671,7 +741,7 @@ defmodule ClawrigWeb.DashboardLive do
   def handle_event("tg_dashboard_disconnect", _params, socket) do
     case IntegrationsConfig.remove_telegram() do
       :ok ->
-        Task.start(fn -> Commands.impl().start_gateway() end)
+        restart_gateway_with_session_refresh()
 
         {:noreply,
          socket
@@ -769,13 +839,28 @@ defmodule ClawrigWeb.DashboardLive do
               end
           end
 
+        browser_mode = IntegrationsConfig.browser_mode()
+
+        browser_usage =
+          case IntegrationsConfig.browser_usage_token() do
+            nil ->
+              nil
+
+            token ->
+              case BrowserUseBroker.get_usage(token) do
+                {:ok, usage} -> usage
+                _ -> nil
+              end
+          end
+
         tailscale = Commands.impl().tailscale_status()
         node_detail = Clawrig.Node.Client.status_detail()
 
         send(
           pid,
           {:status_result, gateway, internet, wifi_ssid, ethernet_connected, brave_mode,
-           brave_usage, tailscale, autoheal, autoheal_log, node_detail}
+           brave_usage, browser_mode, browser_usage, tailscale, autoheal, autoheal_log,
+           node_detail}
         )
       end)
 
@@ -785,7 +870,8 @@ defmodule ClawrigWeb.DashboardLive do
 
   def handle_info(
         {:status_result, gateway, internet, wifi_ssid, ethernet_connected, brave_mode,
-         brave_usage, tailscale, autoheal, autoheal_log, node_detail},
+         brave_usage, _browser_mode, browser_usage, tailscale, autoheal, autoheal_log,
+         node_detail},
         socket
       ) do
     if socket.assigns[:preview_scenario] do
@@ -807,6 +893,13 @@ defmodule ClawrigWeb.DashboardLive do
           do: :byok_form,
           else: brave_mode
 
+      fresh_browser_mode = IntegrationsConfig.browser_mode()
+
+      current_browser_mode =
+        if socket.assigns.browser_mode == :byok_form,
+          do: :byok_form,
+          else: fresh_browser_mode
+
       tailscale_effective = socket.assigns[:tailscale_dev_override] || tailscale
 
       {:noreply,
@@ -819,6 +912,8 @@ defmodule ClawrigWeb.DashboardLive do
        |> assign(:account_sub, account_sub)
        |> assign(:brave_mode, current_brave_mode)
        |> assign(:brave_usage, brave_usage)
+       |> assign(:browser_mode, current_browser_mode)
+       |> assign(:browser_usage, browser_usage)
        |> assign(:skills_center, IntegrationsConfig.skills_center())
        |> assign(:tailscale, tailscale_effective)
        |> assign(:autoheal, autoheal)
@@ -902,6 +997,7 @@ defmodule ClawrigWeb.DashboardLive do
           case IntegrationsConfig.write_telegram(socket.assigns.tg_token, chat_id) do
             :ok ->
               Task.start(fn ->
+                _ = Commands.impl().invalidate_agent_sessions()
                 Commands.impl().start_gateway()
 
                 _ =
@@ -1045,7 +1141,7 @@ defmodule ClawrigWeb.DashboardLive do
   def handle_info({:brave_register_result, {:ok, %{"token" => token}}}, socket) do
     case IntegrationsConfig.write_managed_search(token) do
       :ok ->
-        Task.start(fn -> Commands.impl().start_gateway() end)
+        restart_gateway_with_session_refresh()
 
         {:noreply,
          socket
@@ -1064,6 +1160,47 @@ defmodule ClawrigWeb.DashboardLive do
 
   def handle_info({:brave_register_result, {:error, msg}}, socket) do
     {:noreply, assign(socket, brave_registering: false, brave_error: msg)}
+  end
+
+  # ---------- Browser Use registration info ----------
+
+  def handle_info({:browser_register_result, {:ok, body}}, socket) do
+    token = body["deviceToken"] || body["token"]
+
+    case token do
+      token when is_binary(token) and token != "" ->
+        case IntegrationsConfig.write_browser_trial(token) do
+          :ok ->
+            restart_gateway_with_session_refresh()
+
+            {:noreply,
+             socket
+             |> assign(
+               browser_mode: :managed_trial,
+               browser_registering: false,
+               browser_error: nil,
+               browser_usage:
+                 if(is_map(body["usage"]), do: body["usage"], else: socket.assigns.browser_usage),
+               skills_center: IntegrationsConfig.skills_center()
+             )
+             |> put_flash(:info, "Browser Use trial enabled. Gateway restarting...")}
+
+          {:error, msg} ->
+            {:noreply, assign(socket, browser_registering: false, browser_error: msg)}
+        end
+
+      _ ->
+        {:noreply,
+         assign(
+           socket,
+           browser_registering: false,
+           browser_error: "Broker response did not include a Browser Use device token."
+         )}
+    end
+  end
+
+  def handle_info({:browser_register_result, {:error, msg}}, socket) do
+    {:noreply, assign(socket, browser_registering: false, browser_error: msg)}
   end
 
   # ---------- Account info ----------
@@ -1215,7 +1352,7 @@ defmodule ClawrigWeb.DashboardLive do
       provider_model_id: model_id
     })
 
-    Task.start(fn -> Commands.impl().start_gateway() end)
+    restart_gateway_with_session_refresh()
 
     {:noreply,
      socket
@@ -1249,7 +1386,7 @@ defmodule ClawrigWeb.DashboardLive do
       openai_user_code: nil
     })
 
-    Task.start(fn -> Commands.impl().start_gateway() end)
+    restart_gateway_with_session_refresh()
 
     {:noreply,
      socket
@@ -1274,6 +1411,13 @@ defmodule ClawrigWeb.DashboardLive do
   end
 
   # ---------- Private ----------
+
+  defp restart_gateway_with_session_refresh do
+    Task.start(fn ->
+      _ = Commands.impl().invalidate_agent_sessions()
+      Commands.impl().start_gateway()
+    end)
+  end
 
   defp normalize_update_status(:checking), do: {:checking, nil}
   defp normalize_update_status({:ok, :up_to_date}), do: {:up_to_date, nil}
@@ -1455,7 +1599,7 @@ defmodule ClawrigWeb.DashboardLive do
   defp restore_telegram_snapshot(socket, %{token: token, chat_id: chat_id}) do
     case IntegrationsConfig.write_telegram(token, chat_id) do
       :ok ->
-        Task.start(fn -> Commands.impl().start_gateway() end)
+        restart_gateway_with_session_refresh()
 
         socket
         |> assign(
@@ -1658,6 +1802,35 @@ defmodule ClawrigWeb.DashboardLive do
   def dashboard_primary_url(local_ip, mdns_url) do
     if is_binary(local_ip) and local_ip != "", do: "http://#{local_ip}", else: mdns_url
   end
+
+  def browser_usage_field(nil, _field, fallback), do: fallback
+
+  def browser_usage_field(usage, field, fallback) do
+    Map.get(usage, field) || fallback
+  end
+
+  def browser_global_available?(usage) when is_map(usage) do
+    Map.get(usage, "global_available", true) != false
+  end
+
+  def browser_global_available?(_), do: true
+
+  def browser_usage_percent(usage) do
+    used = usage |> browser_usage_field("used_usd", "0.00") |> to_float()
+    budget = usage |> browser_usage_field("budget_usd", "3.00") |> to_float()
+    min(100, round(used / max(budget, 0.01) * 100))
+  end
+
+  defp to_float(value) when is_binary(value) do
+    case Float.parse(value) do
+      {parsed, _} -> parsed
+      :error -> 0.0
+    end
+  end
+
+  defp to_float(value) when is_integer(value), do: value / 1
+  defp to_float(value) when is_float(value), do: value
+  defp to_float(_value), do: 0.0
 
   def dashboard_patch(:index), do: ~p"/"
   def dashboard_patch(:wifi), do: ~p"/wifi"

@@ -61,6 +61,11 @@ defmodule Clawrig.System.MockCommands do
   end
 
   @impl true
+  def invalidate_agent_sessions do
+    :ok
+  end
+
+  @impl true
   def install_gateway do
     :ok
   end

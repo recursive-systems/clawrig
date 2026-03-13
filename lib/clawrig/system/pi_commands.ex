@@ -1,6 +1,8 @@
 defmodule Clawrig.System.PiCommands do
   @behaviour Clawrig.System.Commands
 
+  alias Clawrig.Gateway.SessionStore
+
   @connect_attempts 12
   @ssid_retry_sleep_ms 2_500
 
@@ -363,6 +365,11 @@ defmodule Clawrig.System.PiCommands do
       Port.close(port)
       :ok
     end
+  end
+
+  @impl true
+  def invalidate_agent_sessions do
+    SessionStore.invalidate_all(System.get_env("HOME") || "/home/pi")
   end
 
   defp patch_gateway_startup_delay do

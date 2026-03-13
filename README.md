@@ -102,6 +102,7 @@ Application config (in `config/`):
 | Key | Description | Default |
 |---|---|---|
 | `:search_proxy_url` | Search proxy service URL | `https://rs-search-proxy.fly.dev` |
+| `:browser_use_broker_url` | Browser Use broker service URL | `https://rs-browser-use.fly.dev` |
 | `:openai_client_id` | OpenAI OAuth client ID for device code flow | built-in |
 | `:auth_profiles_path` | Path to OpenClaw auth profiles JSON | `~/.openclaw/agents/main/agent/auth-profiles.json` |
 

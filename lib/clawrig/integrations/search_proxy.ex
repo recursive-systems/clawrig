@@ -15,7 +15,7 @@ defmodule Clawrig.Integrations.SearchProxy do
     hostname = Clawrig.DeviceIdentity.hostname()
     device_id = Clawrig.Node.Client.device_id()
 
-    case Req.post("#{proxy_url()}/v1/device/register",
+    case http().post("#{proxy_url()}/v1/device/register",
            json: %{device_id: device_id, hostname: hostname},
            receive_timeout: 15_000
          ) do
@@ -38,7 +38,7 @@ defmodule Clawrig.Integrations.SearchProxy do
   Returns {:ok, %{used, limit, period, resets_at}} or {:error, reason}.
   """
   def get_usage(token) do
-    case Req.get("#{proxy_url()}/v1/device/usage",
+    case http().get("#{proxy_url()}/v1/device/usage",
            headers: [{"authorization", "Bearer #{token}"}],
            receive_timeout: 10_000
          ) do
@@ -49,7 +49,16 @@ defmodule Clawrig.Integrations.SearchProxy do
         {:error, "Invalid token"}
 
       {:error, %{reason: reason}} ->
-        {:error, "Connection failed: #{inspect(reason)}"}
+      {:error, "Connection failed: #{inspect(reason)}"}
     end
   end
+
+  defp http do
+    Application.get_env(:clawrig, :search_proxy_http, Clawrig.Integrations.SearchProxy.ReqClient)
+  end
+end
+
+defmodule Clawrig.Integrations.SearchProxy.ReqClient do
+  def get(url, opts \\ []), do: Req.get(url, opts)
+  def post(url, opts \\ []), do: Req.post(url, opts)
 end
