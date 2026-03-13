@@ -20,6 +20,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check out ClawRig plugin
+        uses: actions/checkout@v4
+        with:
+          repository: recursive-systems/openclaw-plugin-clawrig
+          path: clawrig-plugin
+
+      - name: Set up Elixir and Erlang
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "28.2"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -38,52 +50,25 @@ jobs:
           key: docker-arm64-${{ hashFiles('mix.lock') }}
           restore-keys: docker-arm64-
 
+      - name: Install Elixir deps
+        run: mix deps.get
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Run Elixir test suite
+        run: mix test
+
       - name: Build ARM64 Elixir release
+        env:
+          CLAWRIG_PLUGIN_DIR: ${{ github.workspace }}/clawrig-plugin
         run: |
-          docker buildx build \
-            -f deploy/Dockerfile.build \
-            -t clawrig-build \
-            --load \
-            --cache-from type=local,src=/tmp/.buildx-cache \
-            --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
-            ${CLAWRIG_VERSION:+--build-arg CLAWRIG_VERSION=$CLAWRIG_VERSION} \
-            .
+          bash deploy/build-release.sh
 
-          # Rotate cache to avoid unbounded growth
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
-          # Extract tarball and assemble bundle
-          docker create --name clawrig-extract clawrig-build true 2>/dev/null || \
-            (docker rm clawrig-extract && docker create --name clawrig-extract clawrig-build true)
-          docker cp clawrig-extract:/app/clawrig.tar.gz deploy/clawrig.tar.gz
-          docker rm clawrig-extract
-
-          # Assemble deploy bundle (same as build-release.sh but inline to avoid
-          # the script's buildx detection which would duplicate the build)
-          BUNDLE_DIR=deploy/bundle
-          rm -rf "$BUNDLE_DIR"
-          mkdir -p "$BUNDLE_DIR"
-          cp deploy/clawrig.tar.gz "$BUNDLE_DIR/"
-          cp deploy/pi-setup.sh "$BUNDLE_DIR/"
-          cp deploy/dnsmasq-captive.conf "$BUNDLE_DIR/"
-          cp deploy/clawrig-avahi.service "$BUNDLE_DIR/"
-          cp deploy/systemd/clawrig.service "$BUNDLE_DIR/"
-
-          INSTALL_DIR=deploy/pi-gen/stage-clawrig/01-install-clawrig/files
-          cp "$INSTALL_DIR/clawrig-updater-sudoers" "$BUNDLE_DIR/"
-          if [ -f "$INSTALL_DIR/update-pubkey.pem" ]; then
-            cp "$INSTALL_DIR/update-pubkey.pem" "$BUNDLE_DIR/"
-          fi
-
-          IDENTITY_DIR=deploy/pi-gen/stage-clawrig/03-configure-system/files
-          cp "$IDENTITY_DIR/clawrig-assign-identity.sh" "$BUNDLE_DIR/"
-          cp "$IDENTITY_DIR/clawrig-assign-identity.service" "$BUNDLE_DIR/"
-
-          WATCHDOG_DIR=deploy/pi-gen/stage-clawrig/04-configure-watchdog/files
-          cp "$WATCHDOG_DIR"/clawrig-gateway-watchdog.* "$BUNDLE_DIR/"
-          cp "$WATCHDOG_DIR"/clawrig-daily-repair.* "$BUNDLE_DIR/"
-          cp "$WATCHDOG_DIR/diagnostic-schema.json" "$BUNDLE_DIR/"
+      - name: Assert Browser Use plugin is bundled
+        run: |
+          tar tzf deploy/bundle/clawrig.tar.gz | grep -q 'clawrig/plugins/clawrig/bin/clawrig-browser-use'
+          tar tzf deploy/bundle/clawrig.tar.gz | grep -q 'clawrig/plugins/clawrig/skills/clawrig-browser-use/SKILL.md'
 
       - name: Stage files for pi-gen
         run: |

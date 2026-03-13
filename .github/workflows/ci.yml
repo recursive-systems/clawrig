@@ -1,0 +1,71 @@
+name: ClawRig CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Test and E2E
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Elixir and Erlang
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "28.2"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install Elixir deps
+        run: mix deps.get
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Run Elixir test suite
+        run: mix test
+
+      - name: Install Playwright deps
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E
+        run: npm run e2e
+
+  bundle:
+    name: Build bundle with plugin
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out ClawRig plugin
+        uses: actions/checkout@v4
+        with:
+          repository: recursive-systems/openclaw-plugin-clawrig
+          path: clawrig-plugin
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ARM64 release bundle
+        env:
+          CLAWRIG_VERSION: 0.0.0-ci-smoke
+          CLAWRIG_PLUGIN_DIR: ${{ github.workspace }}/clawrig-plugin
+        run: bash deploy/build-release.sh
+
+      - name: Assert Browser Use plugin is bundled
+        run: |
+          tar tzf deploy/bundle/clawrig.tar.gz | grep -q 'clawrig/plugins/clawrig/bin/clawrig-browser-use'
+          tar tzf deploy/bundle/clawrig.tar.gz | grep -q 'clawrig/plugins/clawrig/skills/clawrig-browser-use/SKILL.md'
