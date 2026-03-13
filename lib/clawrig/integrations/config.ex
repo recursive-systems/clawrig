@@ -3,6 +3,9 @@ defmodule Clawrig.Integrations.Config do
   Reads and writes integration config in ~/.openclaw/openclaw.json.
   """
 
+  @clawrig_plugin_id "clawrig"
+  @clawrig_plugin_dir_name "clawrig"
+
   @doc """
   Returns the current web search mode:
   - :managed — using the ClawRig search proxy (Perplexity via proxy)
@@ -203,6 +206,74 @@ defmodule Clawrig.Integrations.Config do
   end
 
   @doc """
+  Ensures the bundled ClawRig plugin is enabled in openclaw.json.
+  """
+  @spec write_plugin_defaults() :: :ok | {:error, String.t()}
+  def write_plugin_defaults do
+    read_config()
+    |> ensure_plugin_defaults()
+    |> write_config()
+  rescue
+    e -> {:error, "Failed to write plugin defaults: #{Exception.message(e)}"}
+  end
+
+  @doc """
+  Returns the current dashboard-facing skills center model.
+  """
+  @spec skills_center() :: [map()]
+  def skills_center do
+    plugin_enabled? = clawrig_plugin_enabled?()
+    plugin_present? = clawrig_plugin_present?()
+
+    [
+      %{
+        id: @clawrig_plugin_id,
+        name: "ClawRig",
+        description:
+          "Answers questions about your dashboard, device status, readonly diagnostics, updates, and local usage state.",
+        source: "default",
+        state:
+          cond do
+            plugin_present? and plugin_enabled? -> "enabled"
+            plugin_present? -> "disabled"
+            true -> "broken"
+          end,
+        detail:
+          cond do
+            plugin_present? and plugin_enabled? ->
+              "Bundled with every device and ready to answer ClawRig-specific questions."
+
+            plugin_present? ->
+              "Plugin files are present, but OpenClaw is not configured to load the default ClawRig skill."
+
+            true ->
+              "Expected plugin files are missing from #{clawrig_plugin_dir()}."
+          end
+      },
+      %{
+        id: "web-search",
+        name: "Web Search",
+        description: "Optional web lookups for the assistant.",
+        source: "optional",
+        state: if(search_mode() == :not_configured, do: "disabled", else: "enabled"),
+        detail:
+          if(search_mode() == :not_configured,
+            do: "Available as an optional integration.",
+            else: "Configured through the Web Search integration below."
+          )
+      },
+      %{
+        id: "pdf-export",
+        name: "PDF Export",
+        description: "Future export helpers for turning responses into PDFs.",
+        source: "optional",
+        state: "coming_soon",
+        detail: "Not shipped in ClawRig v1."
+      }
+    ]
+  end
+
+  @doc """
   Removes Telegram config from openclaw.json.
   """
   @spec remove_telegram() :: :ok | {:error, String.t()}
@@ -252,13 +323,52 @@ defmodule Clawrig.Integrations.Config do
   defp write_config(config) do
     path = config_path()
     File.mkdir_p!(Path.dirname(path))
-    encoded = Jason.encode!(config, pretty: true)
+
+    encoded =
+      config
+      |> ensure_plugin_defaults()
+      |> Jason.encode!(pretty: true)
 
     case write_atomic(path, encoded) do
       :ok -> :ok
       {:error, reason} -> {:error, "Failed to write openclaw.json: #{inspect(reason)}"}
     end
   end
+
+  defp clawrig_plugin_present? do
+    File.exists?(Path.join(clawrig_plugin_dir(), "openclaw.plugin.json"))
+  end
+
+  defp clawrig_plugin_enabled? do
+    read_config()
+    |> get_in(["plugins", "entries", @clawrig_plugin_id, "enabled"])
+    |> Kernel.==(true)
+  end
+
+  defp clawrig_plugin_dir do
+    Path.join(clawrig_plugin_root(), @clawrig_plugin_dir_name)
+  end
+
+  defp clawrig_plugin_root do
+    Application.get_env(:clawrig, :openclaw_plugin_install_root, "/opt/clawrig/plugins")
+  end
+
+  defp ensure_plugin_defaults(config) do
+    existing_paths = get_in(config, ["plugins", "load", "paths"]) || []
+
+    config
+    |> deep_put(
+      ["plugins", "load", "paths"],
+      prepend_unique(clawrig_plugin_root(), existing_paths)
+    )
+    |> deep_put(["plugins", "entries", @clawrig_plugin_id, "enabled"], true)
+  end
+
+  defp prepend_unique(value, list) when is_list(list) do
+    [value | Enum.reject(list, &(&1 == value))]
+  end
+
+  defp prepend_unique(value, _), do: [value]
 
   defp deep_put(map, [key], value) do
     Map.put(map, key, value)

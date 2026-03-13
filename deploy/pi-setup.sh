@@ -45,6 +45,9 @@ echo "==> Installing release to /opt/clawrig..."
 sudo mkdir -p /opt/clawrig
 sudo tar xzf "$TARBALL" -C /opt/clawrig --strip-components=1
 sudo chown -R pi:pi /opt/clawrig
+if [ -f /opt/clawrig/plugins/clawrig/bin/clawrig-info ]; then
+  sudo ln -sf /opt/clawrig/plugins/clawrig/bin/clawrig-info /usr/local/bin/clawrig-info
+fi
 
 # 3. Generate SECRET_KEY_BASE (using openssl, no mix needed)
 echo ""
@@ -114,6 +117,15 @@ if os.path.exists(cfg_path):
     with open(cfg_path) as f:
         cfg = json.load(f)
     tools = cfg.setdefault('tools', {})
+    plugins = cfg.setdefault('plugins', {})
+    plugins.setdefault('load', {})
+    paths = plugins['load'].get('paths') or []
+    if '/opt/clawrig/plugins' not in paths:
+        paths = ['/opt/clawrig/plugins'] + [p for p in paths if p != '/opt/clawrig/plugins']
+    plugins['load']['paths'] = paths
+    entries = plugins.setdefault('entries', {})
+    clawrig = entries.setdefault('clawrig', {})
+    clawrig['enabled'] = True
     tools.pop('profile', None)
     tools['allow'] = ['group:messaging', 'read', 'exec']
     tools['exec'] = {'host': 'gateway', 'security': 'full', 'ask': 'off'}

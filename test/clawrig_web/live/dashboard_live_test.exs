@@ -7,12 +7,25 @@ defmodule ClawrigWeb.DashboardLiveTest do
 
   setup do
     original_home = System.get_env("HOME")
+    original_plugin_root = Application.get_env(:clawrig, :openclaw_plugin_install_root)
 
     home =
       Path.join(System.tmp_dir!(), "clawrig-dashboard-home-#{System.unique_integer([:positive])}")
 
     File.mkdir_p!(home)
     System.put_env("HOME", home)
+
+    plugin_root =
+      Path.join(
+        System.tmp_dir!(),
+        "clawrig-dashboard-plugin-#{System.unique_integer([:positive])}"
+      )
+
+    plugin_dir = Path.join(plugin_root, "clawrig")
+    File.mkdir_p!(plugin_dir)
+    File.write!(Path.join(plugin_dir, "openclaw.plugin.json"), "{}")
+    Application.put_env(:clawrig, :openclaw_plugin_install_root, plugin_root)
+    :ok = Config.write_plugin_defaults()
 
     original_http = Application.get_env(:clawrig, :telegram_http)
     Application.put_env(:clawrig, :telegram_http, MockTelegramHTTP)
@@ -24,6 +37,10 @@ defmodule ClawrigWeb.DashboardLiveTest do
     on_exit(fn ->
       if original_home, do: System.put_env("HOME", original_home), else: System.delete_env("HOME")
 
+      if original_plugin_root,
+        do: Application.put_env(:clawrig, :openclaw_plugin_install_root, original_plugin_root),
+        else: Application.delete_env(:clawrig, :openclaw_plugin_install_root)
+
       if original_http,
         do: Application.put_env(:clawrig, :telegram_http, original_http),
         else: Application.delete_env(:clawrig, :telegram_http)
@@ -31,6 +48,7 @@ defmodule ClawrigWeb.DashboardLiveTest do
       Application.delete_env(:clawrig, :oobe_complete)
       Application.delete_env(:clawrig, :enable_preview_states)
       File.rm_rf(home)
+      File.rm_rf(plugin_root)
     end)
 
     :ok
@@ -57,6 +75,18 @@ defmodule ClawrigWeb.DashboardLiveTest do
     test "renders account section", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/account")
       assert html =~ "AI Provider"
+    end
+  end
+
+  describe "dashboard integrations" do
+    test "renders the skills center with the default clawrig skill", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/integrations")
+
+      assert html =~ "Skills"
+      assert html =~ "ClawRig"
+      assert html =~ "Bundled with every device"
+      assert html =~ "PDF Export"
+      assert html =~ "Coming soon"
     end
   end
 

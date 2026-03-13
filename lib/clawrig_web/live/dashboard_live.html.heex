@@ -581,6 +581,30 @@
 
     <%!-- Integrations --%>
     <.dash_panel :if={@live_action == :integrations} title="Integrations" back>
+      <div class="integration-card skills-center-card">
+        <div class="integration-header">
+          <h3>Skills</h3>
+        </div>
+        <p class="setting-hint">Default skills ship with ClawRig. Optional skills stay off until you enable them.</p>
+        <div class="skills-list">
+          <div :for={skill <- @skills_center} class="skill-row">
+            <div class="skill-copy">
+              <div class="skill-title-row">
+                <strong>{skill.name}</strong>
+                <span class={["integration-badge", skill_badge_class(skill.state)]}>
+                  {skill_state_label(skill.state)}
+                </span>
+              </div>
+              <p>{skill.description}</p>
+              <p class="skill-detail">
+                <span class="skill-source">{String.capitalize(skill.source)}</span>
+                <span>{skill.detail}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="integration-card">
         <div class="integration-header">
           <h3>Web Search</h3>

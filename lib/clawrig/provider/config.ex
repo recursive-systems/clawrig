@@ -5,6 +5,8 @@ defmodule Clawrig.Provider.Config do
   that exposes an OpenAI-compatible /v1 API.
   """
 
+  alias Clawrig.Integrations.Config, as: IntegrationsConfig
+
   @doc """
   Write an OpenAI-compatible provider to ~/.openclaw/openclaw.json.
 
@@ -55,7 +57,7 @@ defmodule Clawrig.Provider.Config do
     File.mkdir_p!(Path.dirname(config_path))
 
     case write_atomic(config_path, Jason.encode!(config, pretty: true)) do
-      :ok -> :ok
+      :ok -> IntegrationsConfig.write_plugin_defaults()
       {:error, reason} -> {:error, "Failed to write openclaw.json: #{inspect(reason)}"}
     end
   rescue

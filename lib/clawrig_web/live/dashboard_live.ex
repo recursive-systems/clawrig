@@ -57,6 +57,7 @@ defmodule ClawrigWeb.DashboardLive do
       |> assign(:brave_error, nil)
       |> assign(:brave_usage, nil)
       |> assign(:brave_registering, false)
+      |> assign(:skills_center, IntegrationsConfig.skills_center())
       |> assign(:tailscale, :loading)
       |> assign(:tailscale_error, nil)
       |> assign(:tailscale_connecting, false)
@@ -559,7 +560,11 @@ defmodule ClawrigWeb.DashboardLive do
 
           {:noreply,
            socket
-           |> assign(brave_mode: :byok, brave_error: nil)
+           |> assign(
+             brave_mode: :byok,
+             brave_error: nil,
+             skills_center: IntegrationsConfig.skills_center()
+           )
            |> put_flash(:info, "Web search enabled. Gateway restarting...")}
 
         {:error, msg} ->
@@ -575,7 +580,12 @@ defmodule ClawrigWeb.DashboardLive do
 
         {:noreply,
          socket
-         |> assign(brave_mode: :not_configured, brave_error: nil, brave_usage: nil)
+         |> assign(
+           brave_mode: :not_configured,
+           brave_error: nil,
+           brave_usage: nil,
+           skills_center: IntegrationsConfig.skills_center()
+         )
          |> put_flash(:info, "Web search removed. Gateway restarting...")}
 
       {:error, msg} ->
@@ -809,6 +819,7 @@ defmodule ClawrigWeb.DashboardLive do
        |> assign(:account_sub, account_sub)
        |> assign(:brave_mode, current_brave_mode)
        |> assign(:brave_usage, brave_usage)
+       |> assign(:skills_center, IntegrationsConfig.skills_center())
        |> assign(:tailscale, tailscale_effective)
        |> assign(:autoheal, autoheal)
        |> assign(:autoheal_log, autoheal_log)
@@ -1038,7 +1049,12 @@ defmodule ClawrigWeb.DashboardLive do
 
         {:noreply,
          socket
-         |> assign(brave_mode: :managed, brave_registering: false, brave_error: nil)
+         |> assign(
+           brave_mode: :managed,
+           brave_registering: false,
+           brave_error: nil,
+           skills_center: IntegrationsConfig.skills_center()
+         )
          |> put_flash(:info, "Web search enabled. Gateway restarting...")}
 
       {:error, msg} ->
@@ -1188,6 +1204,8 @@ defmodule ClawrigWeb.DashboardLive do
         {:account_save_compatible_result, :ok, display_name, base_url, model_id},
         socket
       ) do
+    _ = IntegrationsConfig.write_plugin_defaults()
+
     State.merge(%{
       provider_done: true,
       provider_type: "openai-compatible",
@@ -1220,6 +1238,7 @@ defmodule ClawrigWeb.DashboardLive do
   end
 
   def handle_info({:account_save_result, :ok, method}, socket) do
+    _ = IntegrationsConfig.write_plugin_defaults()
     method_str = if method == :api_key, do: "api-key", else: "device-code"
 
     State.merge(%{
@@ -1310,6 +1329,8 @@ defmodule ClawrigWeb.DashboardLive do
   defp update_reauth_notice(_), do: nil
 
   defp after_provider_reconnect(socket) do
+    _ = IntegrationsConfig.write_plugin_defaults()
+
     case {State.get(:update_resume_version), State.get(:update_resume_reason)} do
       {version, :rolled_back_auth_required} when is_binary(version) ->
         attempts = State.get(:update_retry_attempts) || 0
@@ -1505,6 +1526,19 @@ defmodule ClawrigWeb.DashboardLive do
   def status_label(nil), do: "N/A"
   def status_label(other) when is_binary(other), do: other
   def status_label(_), do: "Unknown"
+
+  def skill_badge_class("enabled"), do: "ok"
+  def skill_badge_class("requires_setup"), do: "warn"
+  def skill_badge_class("broken"), do: "err"
+  def skill_badge_class("coming_soon"), do: "muted"
+  def skill_badge_class(_), do: "warn"
+
+  def skill_state_label("enabled"), do: "Enabled"
+  def skill_state_label("disabled"), do: "Disabled"
+  def skill_state_label("requires_setup"), do: "Requires setup"
+  def skill_state_label("broken"), do: "Broken"
+  def skill_state_label("coming_soon"), do: "Coming soon"
+  def skill_state_label(other), do: other
 
   def telegram_sub_from_status({:connected, _}), do: :connected
   def telegram_sub_from_status(_), do: :not_configured

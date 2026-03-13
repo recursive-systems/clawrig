@@ -5,6 +5,9 @@ set -e
 mkdir -p /opt/clawrig
 tar xzf /tmp/clawrig.tar.gz -C /opt/clawrig --strip-components=1
 chown -R 1000:1000 /opt/clawrig
+if [ -f /opt/clawrig/plugins/clawrig/bin/clawrig-info ]; then
+  ln -sf /opt/clawrig/plugins/clawrig/bin/clawrig-info /usr/local/bin/clawrig-info
+fi
 rm /tmp/clawrig.tar.gz
 
 # Generate SECRET_KEY_BASE

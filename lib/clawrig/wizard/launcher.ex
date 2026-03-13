@@ -9,6 +9,7 @@ defmodule Clawrig.Wizard.Launcher do
   def finalize(mode, tg_token, tg_chat_id \\ nil) do
     # Ensure appliance exec defaults (security: full, ask: off)
     Clawrig.Integrations.Config.write_exec_defaults()
+    Clawrig.Integrations.Config.write_plugin_defaults()
 
     home = System.get_env("HOME") || "/root"
     config_path = Path.join(home, ".openclaw/openclaw.json")

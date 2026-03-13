@@ -43,6 +43,10 @@ cat > /home/pi/.openclaw/openclaw.json << 'OCJSON'
 {
   "agents": {"defaults": {"model": {"primary": "openai-codex/gpt-5.3-codex"}}},
   "gateway": {"mode": "local"},
+  "plugins": {
+    "load": {"paths": ["/opt/clawrig/plugins"]},
+    "entries": {"clawrig": {"enabled": true}}
+  },
   "tools": {
     "allow": ["group:messaging", "read", "exec"],
     "exec": {"host": "gateway", "security": "full", "ask": "off"}

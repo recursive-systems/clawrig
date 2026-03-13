@@ -3,6 +3,8 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+REPO_ROOT="$(cd "$PROJECT_DIR/../../.." && pwd)"
+PLUGIN_SRC="${CLAWRIG_PLUGIN_DIR:-$REPO_ROOT/plugins/clawrig}"
 
 # Use docker if available, fall back to podman
 if command -v docker &>/dev/null && docker info &>/dev/null; then
@@ -43,6 +45,21 @@ $DOCKER create --name clawrig-extract clawrig-build true 2>/dev/null || \
   ($DOCKER rm clawrig-extract && $DOCKER create --name clawrig-extract clawrig-build true)
 $DOCKER cp clawrig-extract:/app/clawrig.tar.gz "$SCRIPT_DIR/clawrig.tar.gz"
 $DOCKER rm clawrig-extract
+
+if [ ! -d "$PLUGIN_SRC" ]; then
+  echo "Error: ClawRig plugin source not found at $PLUGIN_SRC" >&2
+  exit 1
+fi
+
+echo "==> Bundling ClawRig plugin from $PLUGIN_SRC..."
+TAR_STAGE="$(mktemp -d)"
+tar xzf "$SCRIPT_DIR/clawrig.tar.gz" -C "$TAR_STAGE"
+mkdir -p "$TAR_STAGE/clawrig/plugins"
+rm -rf "$TAR_STAGE/clawrig/plugins/clawrig"
+cp -R "$PLUGIN_SRC" "$TAR_STAGE/clawrig/plugins/clawrig"
+chmod 755 "$TAR_STAGE/clawrig/plugins/clawrig/bin/clawrig-info"
+(cd "$TAR_STAGE" && tar czf "$SCRIPT_DIR/clawrig.tar.gz" clawrig)
+rm -rf "$TAR_STAGE"
 
 echo "==> Assembling deploy bundle..."
 BUNDLE_DIR="$SCRIPT_DIR/bundle"
