@@ -51,6 +51,8 @@ defmodule Clawrig.Gateway.Watchdog do
   end
 
   @impl true
+  def handle_info(:check, %{active: false} = state), do: {:noreply, state}
+
   def handle_info(:check, state) do
     state = do_check(state)
     Process.send_after(self(), :check, @check_interval)

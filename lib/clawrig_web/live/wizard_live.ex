@@ -683,14 +683,14 @@ defmodule ClawrigWeb.WizardLive do
 
       Phoenix.PubSub.broadcast(Clawrig.PubSub, "clawrig:oobe", :oobe_complete)
 
-      # Tear down hotspot if still running.
-      # WiFi flow: already torn down by safe_connect, this is a no-op.
-      # Ethernet flow: hotspot is still up and must be stopped.
-      Clawrig.Wifi.Manager.stop_hotspot()
-
-      # Best-effort gateway start (non-blocking).
-      # If this fails, the watchdog will pick it up within ~2 minutes.
+      # Best-effort teardown and gateway start (non-blocking).
+      # If hotspot teardown or gateway start fails, the watchdog picks it up.
       Task.start(fn ->
+        # Tear down hotspot if still running.
+        # WiFi flow: already torn down by safe_connect, this is a no-op.
+        # Ethernet flow: hotspot is still up and must be stopped.
+        Clawrig.Wifi.Manager.stop_hotspot()
+
         Commands.impl().start_gateway()
         # Give startup a brief head start, then send a clear readiness hint in Telegram.
         Process.sleep(3000)

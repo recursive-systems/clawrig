@@ -239,6 +239,19 @@ defmodule Clawrig.Updater do
         %{version: version, mode: mode} = parse_pending_marker(marker)
         Logger.info("[Updater] Found pending update marker for v#{version}, running health check")
 
+        # Verify the swap actually completed by checking installed version.
+        # If the marker was written but the swap crashed before completing,
+        # the installed version won't match the marker version.
+        installed = read_local_version()
+
+        if installed != version and installed != "0.0.0" do
+          Logger.warning(
+            "[Updater] Pending marker says v#{version} but installed is v#{installed} — swap never completed, cleaning up"
+          )
+
+          File.rm(@pending_marker)
+          broadcast({:error, "update to v#{version} did not complete (still on v#{installed})"})
+        else
         # Give the service a moment to stabilize after restart.
         # This sleep blocks the GenServer but is acceptable inside handle_continue —
         # it does not delay supervisor startup or systemd.ready().
@@ -321,6 +334,7 @@ defmodule Clawrig.Updater do
                 Logger.error("[Updater] Rollback failed: #{inspect(reason)} — keeping pending marker for retry")
                 broadcast({:error, "health check failed and rollback failed for v#{version}"})
             end
+        end
         end
 
       {:error, :enoent} ->
