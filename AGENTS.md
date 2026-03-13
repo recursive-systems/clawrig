@@ -412,6 +412,19 @@ And **never** do this:
 
 <!-- usage-rules-end -->
 
+## Subtree boundary
+
+This directory (`projects/clawrig/clawrig/`) is a git subtree pushed to `recursive-systems/clawrig`. **Only project-idiomatic files belong here.** Agent workflow artifacts must live outside the subtree prefix:
+
+| Artifact | Correct location | Wrong location |
+|---|---|---|
+| `.trajectories/` | `projects/clawrig/.trajectories/` | `projects/clawrig/clawrig/.trajectories/` |
+| `.notes/` | `projects/clawrig/.notes/` | `projects/clawrig/clawrig/.notes/` |
+| Validation results | `projects/clawrig/.trajectories/` | `projects/clawrig/clawrig/.trajectories/` |
+| Decomposition plans | `projects/clawrig/` | `projects/clawrig/clawrig/` |
+
+**Rule:** Never create `.trajectories/`, `.notes/`, `DECOMPOSITION.md`, or other agent-only artifacts inside `projects/clawrig/clawrig/`. They are gitignored there and will not be tracked. Place them at `projects/clawrig/` instead.
+
 ## OTP / GenServer guardrails
 
 These rules were encoded after hardening review found recurring agent mistakes in ClawRig's GenServer modules.
@@ -566,7 +579,7 @@ sshpass -p "$TEST_PI_PASS" ssh "$TEST_PI_USER@$TEST_PI_HOST" "bash -s" \
 - **Never run automated reset-based Mode B on a Wi-Fi-only Pi** — use ethernet-backed reachability or do the hotspot/OOBE flow manually
 - **Do not use the hotspot helper by default** — ethernet-backed validation remains the standard path
 - If the human explicitly requests host Wi‑Fi switching, `projects/clawrig/scripts/run-pi-e2e-hotspot-happy-path.sh` requires `PI_E2E_ALLOW_WIFI_HOST_SWITCH=1`
-- **Record results** using `pi-record-result.sh` — writes JSON to `.trajectories/`
+- **Record results** using `pi-record-result.sh` — writes JSON to `projects/clawrig/.trajectories/` (outside the subtree prefix)
 - **Device discovery** — mDNS hostnames go stale after identity reassignment. Always use `pi-discover.sh` or verify by IP if `.local` names don't resolve.
 - **Env vars don't persist** between shell commands. Read from `/tmp/clawrig-test-session.env` in each command using `eval "$(grep '^export TEST_PI' /tmp/clawrig-test-session.env)"` or pass `--env-file`.
 - **Active device source of truth** — check `~/.config/clawrig-test/pi-test.env` first before guessing which Pi to target.

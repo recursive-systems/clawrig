@@ -53,3 +53,7 @@ npm-debug.log
 /deploy/pi-gen/stage-clawrig/01-install-clawrig/files/clawrig.service
 /deploy/pi-gen/stage-clawrig/02-configure-networking/files/dnsmasq-captive.conf
 /deploy/pi-gen/stage-clawrig/02-configure-networking/files/clawrig-avahi.service
+
+# Agent workflow artifacts — live in monorepo at projects/clawrig/, not here
+/.trajectories/
+/.notes/
