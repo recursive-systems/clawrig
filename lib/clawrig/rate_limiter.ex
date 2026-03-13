@@ -16,24 +16,32 @@ defmodule Clawrig.RateLimiter do
     GenServer.start_link(__MODULE__, nil, name: __MODULE__)
   end
 
+  # Direct ETS reads/writes — safe because the table is :public and
+  # these operations are atomic in ETS. Fails open if table is unavailable
+  # (GenServer restarting) so login still works during transient outages.
   def check(ip) do
     now = System.system_time(:second)
     cutoff = now - @window_seconds
 
-    # Clean old entries for this IP
     :ets.select_delete(__MODULE__, [{{ip, :"$1"}, [{:<, :"$1", cutoff}], [true]}])
 
     count = :ets.select_count(__MODULE__, [{{ip, :"$1"}, [{:>=, :"$1", cutoff}], [true]}])
 
     if count >= @max_attempts, do: :blocked, else: :ok
+  rescue
+    ArgumentError -> :ok
   end
 
   def record_failure(ip) do
     :ets.insert(__MODULE__, {ip, System.system_time(:second)})
+  rescue
+    ArgumentError -> :ok
   end
 
   def reset(ip) do
     :ets.match_delete(__MODULE__, {ip, :_})
+  rescue
+    ArgumentError -> :ok
   end
 
   @impl true

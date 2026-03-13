@@ -3,7 +3,8 @@ defmodule Clawrig.Gateway.Watchdog do
   Monitors the OpenClaw gateway process. If the gateway service is running
   but not listening on port 18789 (a known cold-boot issue), restarts it.
 
-  Only runs in prod after OOBE is complete.
+  Only active in prod. Starts dormant if OOBE is incomplete and
+  activates when the `:oobe_complete` PubSub message arrives.
 
   - Initial delay: 45s (let the system settle after boot)
   - Check interval: 60s

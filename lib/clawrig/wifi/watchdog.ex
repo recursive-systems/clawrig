@@ -2,7 +2,8 @@ defmodule Clawrig.Wifi.Watchdog do
   @moduledoc """
   Monitors Wi-Fi connectivity and falls back to hotspot mode when the
   device loses its network connection (e.g. password changed, moved to
-  a new location). Only runs in prod after OOBE is complete.
+  a new location). Only active in prod. Starts dormant if OOBE is
+  incomplete and activates when the `:oobe_complete` PubSub message arrives.
 
   Check interval: 60 s
   Failure threshold: 3 consecutive failures (~3 min) before fallback

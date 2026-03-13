@@ -2,7 +2,7 @@ defmodule Clawrig.Updater do
   @moduledoc """
   OTA updater GenServer.
 
-  Checks GitHub Releases on a 30-minute timer for the latest release,
+  Checks GitHub Releases on a daily timer for the latest release,
   verifies checksums and signatures, and performs atomic swap upgrades
   with rollback on health-check failure.
 
@@ -240,9 +240,9 @@ defmodule Clawrig.Updater do
         Logger.info("[Updater] Found pending update marker for v#{version}, running health check")
 
         # Give the service a moment to stabilize after restart.
-        # Uses a timer instead of blocking sleep so the GenServer mailbox stays responsive.
+        # This sleep blocks the GenServer but is acceptable inside handle_continue —
+        # it does not delay supervisor startup or systemd.ready().
         Process.sleep(5_000)
-        # NOTE: This sleep is acceptable inside handle_continue (non-blocking to supervisor).
 
         service_active? =
           case System.cmd("sudo", ["systemctl", "is-active", "clawrig"], stderr_to_stdout: true) do
@@ -275,16 +275,22 @@ defmodule Clawrig.Updater do
               "[Updater] Post-update auth probe requires re-auth for auto update v#{version}; rolling back"
             )
 
-            rollback()
-            File.rm(@pending_marker)
+            case rollback() do
+              :ok ->
+                File.rm(@pending_marker)
 
-            State.merge(%{
-              update_resume_version: version,
-              update_resume_reason: :rolled_back_auth_required,
-              update_retry_attempts: 0
-            })
+                State.merge(%{
+                  update_resume_version: version,
+                  update_resume_reason: :rolled_back_auth_required,
+                  update_retry_attempts: 0
+                })
 
-            broadcast({:ok, :rolled_back_auth_required, version})
+                broadcast({:ok, :rolled_back_auth_required, version})
+
+              {:error, reason} ->
+                Logger.error("[Updater] Rollback failed: #{inspect(reason)} — keeping pending marker for retry")
+                broadcast({:error, "rollback failed after auth-required update to v#{version}"})
+            end
 
           :pending_reauth_post_update ->
             Logger.warning(
@@ -305,9 +311,16 @@ defmodule Clawrig.Updater do
 
           :health_failed ->
             Logger.error("[Updater] Post-update health check failed — rolling back")
-            rollback()
-            File.rm(@pending_marker)
-            broadcast({:error, "health check failed after update to v#{version}, rolled back"})
+
+            case rollback() do
+              :ok ->
+                File.rm(@pending_marker)
+                broadcast({:error, "health check failed after update to v#{version}, rolled back"})
+
+              {:error, reason} ->
+                Logger.error("[Updater] Rollback failed: #{inspect(reason)} — keeping pending marker for retry")
+                broadcast({:error, "health check failed and rollback failed for v#{version}"})
+            end
         end
 
       {:error, :enoent} ->
@@ -491,7 +504,7 @@ defmodule Clawrig.Updater do
       case swap_and_restart(parsed.version, mode) do
         :ok ->
           # The process will be killed by systemctl restart.
-          # Boot-time reconciliation in init/1 handles the health check.
+          # Boot-time reconciliation in handle_continue handles the health check.
           Logger.info("[Updater] Update to #{parsed.version} applied, restarting service")
           {:ok, :updated}
 
@@ -624,7 +637,12 @@ defmodule Clawrig.Updater do
       e ->
         Logger.error("[Updater] Swap failed: #{Exception.message(e)} — rolling back")
         File.rm(@pending_marker)
-        rollback()
+
+        case rollback() do
+          :ok -> :ok
+          {:error, reason} -> Logger.error("[Updater] Rollback also failed: #{inspect(reason)}")
+        end
+
         {:error, "swap failed: #{Exception.message(e)}"}
     end
   end
