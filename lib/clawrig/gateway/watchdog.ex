@@ -108,7 +108,10 @@ defmodule Clawrig.Gateway.Watchdog do
         Process.sleep(3_000)
 
         if port_listening?() do
-          Logger.info("[GatewayWatchdog] Gateway restart confirmed (port #{@gateway_port} listening)")
+          Logger.info(
+            "[GatewayWatchdog] Gateway restart confirmed (port #{@gateway_port} listening)"
+          )
+
           :ok
         else
           Logger.warning(

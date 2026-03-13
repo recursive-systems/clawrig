@@ -50,11 +50,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify plugin repo access token
+        run: |
+          if [ -z "${{ secrets.CLAWRIG_PLUGIN_REPO_TOKEN }}" ]; then
+            echo "::error::Set CLAWRIG_PLUGIN_REPO_TOKEN with read access to recursive-systems/openclaw-plugin-clawrig"
+            exit 1
+          fi
+
       - name: Check out ClawRig plugin
         uses: actions/checkout@v4
         with:
           repository: recursive-systems/openclaw-plugin-clawrig
           path: clawrig-plugin
+          token: ${{ secrets.CLAWRIG_PLUGIN_REPO_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

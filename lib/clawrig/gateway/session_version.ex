@@ -30,7 +30,9 @@ defmodule Clawrig.Gateway.SessionVersion do
   end
 
   defp refresh_sessions_for_version(version, marker_path) do
-    Logger.info("[Gateway.SessionVersion] Detected ClawRig release change to #{version}, refreshing OpenClaw sessions")
+    Logger.info(
+      "[Gateway.SessionVersion] Detected ClawRig release change to #{version}, refreshing OpenClaw sessions"
+    )
 
     with :ok <- Commands.impl().invalidate_agent_sessions(),
          :ok <- Commands.impl().start_gateway(),
@@ -38,7 +40,10 @@ defmodule Clawrig.Gateway.SessionVersion do
       :ok
     else
       {:error, reason} = error ->
-        Logger.warning("[Gateway.SessionVersion] Could not refresh sessions for #{version}: #{inspect(reason)}")
+        Logger.warning(
+          "[Gateway.SessionVersion] Could not refresh sessions for #{version}: #{inspect(reason)}"
+        )
+
         error
     end
   end
@@ -48,8 +53,11 @@ defmodule Clawrig.Gateway.SessionVersion do
     |> Path.dirname()
     |> File.mkdir_p()
     |> case do
-      :ok -> File.write(path, version <> "\n")
-      {:error, reason} -> {:error, "Could not create version marker directory: #{inspect(reason)}"}
+      :ok ->
+        File.write(path, version <> "\n")
+
+      {:error, reason} ->
+        {:error, "Could not create version marker directory: #{inspect(reason)}"}
     end
     |> case do
       :ok -> :ok

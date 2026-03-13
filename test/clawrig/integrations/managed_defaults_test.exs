@@ -114,6 +114,7 @@ defmodule Clawrig.Integrations.ManagedDefaultsTest do
     assert :managed_trial = Config.browser_mode()
     assert_receive :invalidate_agent_sessions
     assert_receive :start_gateway
+
     assert %{device_id: _device_id, hostname: _hostname} =
              MockSearchProxyHTTP.last_register_payload()
 

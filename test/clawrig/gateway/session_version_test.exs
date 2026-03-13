@@ -46,7 +46,12 @@ defmodule Clawrig.Gateway.SessionVersionTest do
   end
 
   setup do
-    tmp_dir = Path.join(System.tmp_dir!(), "clawrig-session-version-#{System.unique_integer([:positive])}")
+    tmp_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "clawrig-session-version-#{System.unique_integer([:positive])}"
+      )
+
     File.mkdir_p!(tmp_dir)
     version_file = Path.join(tmp_dir, "VERSION")
     marker_file = Path.join(tmp_dir, ".openclaw/clawrig-session-version")

@@ -252,89 +252,98 @@ defmodule Clawrig.Updater do
           File.rm(@pending_marker)
           broadcast({:error, "update to v#{version} did not complete (still on v#{installed})"})
         else
-        # Give the service a moment to stabilize after restart.
-        # This sleep blocks the GenServer but is acceptable inside handle_continue —
-        # it does not delay supervisor startup or systemd.ready().
-        Process.sleep(5_000)
+          # Give the service a moment to stabilize after restart.
+          # This sleep blocks the GenServer but is acceptable inside handle_continue —
+          # it does not delay supervisor startup or systemd.ready().
+          Process.sleep(5_000)
 
-        service_active? =
-          case System.cmd("sudo", ["systemctl", "is-active", "clawrig"], stderr_to_stdout: true) do
-            {"active\n", 0} -> true
-            _ -> false
+          service_active? =
+            case System.cmd("sudo", ["systemctl", "is-active", "clawrig"], stderr_to_stdout: true) do
+              {"active\n", 0} -> true
+              _ -> false
+            end
+
+          auth_probe_result =
+            if service_active?,
+              do: post_update_auth_probe(version),
+              else: {:error, :service_unhealthy}
+
+          case reconcile_outcome(mode, service_active?, auth_probe_result) do
+            :updated ->
+              Logger.info("[Updater] Post-update health check passed for v#{version}")
+              File.rm(@pending_marker)
+              write_boot_counter(0)
+              sudo_rm_rf(@prev_dir)
+
+              State.merge(%{
+                update_resume_version: nil,
+                update_resume_reason: nil,
+                update_retry_attempts: 0
+              })
+
+              broadcast({:ok, :updated, version})
+
+            :rolled_back_auth_required ->
+              Logger.warning(
+                "[Updater] Post-update auth probe requires re-auth for auto update v#{version}; rolling back"
+              )
+
+              case rollback() do
+                :ok ->
+                  File.rm(@pending_marker)
+
+                  State.merge(%{
+                    update_resume_version: version,
+                    update_resume_reason: :rolled_back_auth_required,
+                    update_retry_attempts: 0
+                  })
+
+                  broadcast({:ok, :rolled_back_auth_required, version})
+
+                {:error, reason} ->
+                  Logger.error(
+                    "[Updater] Rollback failed: #{inspect(reason)} — keeping pending marker for retry"
+                  )
+
+                  broadcast({:error, "rollback failed after auth-required update to v#{version}"})
+              end
+
+            :pending_reauth_post_update ->
+              Logger.warning(
+                "[Updater] Post-update auth probe requires re-auth for manual update v#{version}"
+              )
+
+              File.rm(@pending_marker)
+              write_boot_counter(0)
+              sudo_rm_rf(@prev_dir)
+
+              State.merge(%{
+                update_resume_version: version,
+                update_resume_reason: :pending_reauth_post_update,
+                update_retry_attempts: 0
+              })
+
+              broadcast({:ok, :pending_reauth_post_update, version})
+
+            :health_failed ->
+              Logger.error("[Updater] Post-update health check failed — rolling back")
+
+              case rollback() do
+                :ok ->
+                  File.rm(@pending_marker)
+
+                  broadcast(
+                    {:error, "health check failed after update to v#{version}, rolled back"}
+                  )
+
+                {:error, reason} ->
+                  Logger.error(
+                    "[Updater] Rollback failed: #{inspect(reason)} — keeping pending marker for retry"
+                  )
+
+                  broadcast({:error, "health check failed and rollback failed for v#{version}"})
+              end
           end
-
-        auth_probe_result =
-          if service_active?,
-            do: post_update_auth_probe(version),
-            else: {:error, :service_unhealthy}
-
-        case reconcile_outcome(mode, service_active?, auth_probe_result) do
-          :updated ->
-            Logger.info("[Updater] Post-update health check passed for v#{version}")
-            File.rm(@pending_marker)
-            write_boot_counter(0)
-            sudo_rm_rf(@prev_dir)
-
-            State.merge(%{
-              update_resume_version: nil,
-              update_resume_reason: nil,
-              update_retry_attempts: 0
-            })
-
-            broadcast({:ok, :updated, version})
-
-          :rolled_back_auth_required ->
-            Logger.warning(
-              "[Updater] Post-update auth probe requires re-auth for auto update v#{version}; rolling back"
-            )
-
-            case rollback() do
-              :ok ->
-                File.rm(@pending_marker)
-
-                State.merge(%{
-                  update_resume_version: version,
-                  update_resume_reason: :rolled_back_auth_required,
-                  update_retry_attempts: 0
-                })
-
-                broadcast({:ok, :rolled_back_auth_required, version})
-
-              {:error, reason} ->
-                Logger.error("[Updater] Rollback failed: #{inspect(reason)} — keeping pending marker for retry")
-                broadcast({:error, "rollback failed after auth-required update to v#{version}"})
-            end
-
-          :pending_reauth_post_update ->
-            Logger.warning(
-              "[Updater] Post-update auth probe requires re-auth for manual update v#{version}"
-            )
-
-            File.rm(@pending_marker)
-            write_boot_counter(0)
-            sudo_rm_rf(@prev_dir)
-
-            State.merge(%{
-              update_resume_version: version,
-              update_resume_reason: :pending_reauth_post_update,
-              update_retry_attempts: 0
-            })
-
-            broadcast({:ok, :pending_reauth_post_update, version})
-
-          :health_failed ->
-            Logger.error("[Updater] Post-update health check failed — rolling back")
-
-            case rollback() do
-              :ok ->
-                File.rm(@pending_marker)
-                broadcast({:error, "health check failed after update to v#{version}, rolled back"})
-
-              {:error, reason} ->
-                Logger.error("[Updater] Rollback failed: #{inspect(reason)} — keeping pending marker for retry")
-                broadcast({:error, "health check failed and rollback failed for v#{version}"})
-            end
-        end
         end
 
       {:error, :enoent} ->

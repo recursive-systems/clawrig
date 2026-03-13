@@ -31,7 +31,11 @@ defmodule Clawrig.Integrations.ManagedDefaults do
       _ ->
         _ = Commands.impl().invalidate_agent_sessions()
         _ = Commands.impl().start_gateway()
-        Logger.info("[Integrations.ManagedDefaults] Enabled managed defaults: #{Enum.join(changes, ", ")}")
+
+        Logger.info(
+          "[Integrations.ManagedDefaults] Enabled managed defaults: #{Enum.join(changes, ", ")}"
+        )
+
         {:ok, changes}
     end
   end
@@ -42,7 +46,10 @@ defmodule Clawrig.Integrations.ManagedDefaults do
         changes
 
       Config.search_auto_opt_out?() ->
-        Logger.info("[Integrations.ManagedDefaults] Leaving web search disabled because the user opted out")
+        Logger.info(
+          "[Integrations.ManagedDefaults] Leaving web search disabled because the user opted out"
+        )
+
         changes
 
       true ->
@@ -53,16 +60,25 @@ defmodule Clawrig.Integrations.ManagedDefaults do
                 [:search | changes]
 
               {:error, reason} ->
-                Logger.warning("[Integrations.ManagedDefaults] Could not persist managed web search: #{reason}")
+                Logger.warning(
+                  "[Integrations.ManagedDefaults] Could not persist managed web search: #{reason}"
+                )
+
                 changes
             end
 
           {:ok, _body} ->
-            Logger.warning("[Integrations.ManagedDefaults] Search proxy register response missing token")
+            Logger.warning(
+              "[Integrations.ManagedDefaults] Search proxy register response missing token"
+            )
+
             changes
 
           {:error, reason} ->
-            Logger.warning("[Integrations.ManagedDefaults] Managed web search auto-enable skipped: #{reason}")
+            Logger.warning(
+              "[Integrations.ManagedDefaults] Managed web search auto-enable skipped: #{reason}"
+            )
+
             changes
         end
     end
@@ -74,7 +90,10 @@ defmodule Clawrig.Integrations.ManagedDefaults do
         changes
 
       Config.browser_auto_opt_out?() ->
-        Logger.info("[Integrations.ManagedDefaults] Leaving Browser Use disabled because the user opted out")
+        Logger.info(
+          "[Integrations.ManagedDefaults] Leaving Browser Use disabled because the user opted out"
+        )
+
         changes
 
       true ->
@@ -87,7 +106,10 @@ defmodule Clawrig.Integrations.ManagedDefaults do
                     [:browser | changes]
 
                   {:error, reason} ->
-                    Logger.warning("[Integrations.ManagedDefaults] Could not persist Browser Use trial: #{reason}")
+                    Logger.warning(
+                      "[Integrations.ManagedDefaults] Could not persist Browser Use trial: #{reason}"
+                    )
+
                     changes
                 end
 
@@ -100,7 +122,10 @@ defmodule Clawrig.Integrations.ManagedDefaults do
             end
 
           {:error, reason} ->
-            Logger.warning("[Integrations.ManagedDefaults] Browser Use auto-enable skipped: #{reason}")
+            Logger.warning(
+              "[Integrations.ManagedDefaults] Browser Use auto-enable skipped: #{reason}"
+            )
+
             changes
         end
     end

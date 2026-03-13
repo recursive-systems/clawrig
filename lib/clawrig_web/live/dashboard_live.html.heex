@@ -585,7 +585,9 @@
         <div class="integration-header">
           <h3>Skills</h3>
         </div>
-        <p class="setting-hint">Default skills ship with ClawRig. Optional skills stay off until you enable them.</p>
+        <p class="setting-hint">
+          Default skills ship with ClawRig. Optional skills stay off until you enable them.
+        </p>
         <div class="skills-list">
           <div :for={skill <- @skills_center} class="skill-row">
             <div class="skill-copy">
@@ -720,7 +722,11 @@
           <p>Browser automation enabled with ClawRig trial.</p>
           <div :if={@browser_usage} class="usage-section">
             <div class="usage-bar-label">
-              ${browser_usage_field(@browser_usage, "used_usd", "0.00")} / ${browser_usage_field(@browser_usage, "budget_usd", "3.00")} this month
+              ${browser_usage_field(@browser_usage, "used_usd", "0.00")} / ${browser_usage_field(
+                @browser_usage,
+                "budget_usd",
+                "3.00"
+              )} this month
             </div>
             <div class="usage-bar-track">
               <div

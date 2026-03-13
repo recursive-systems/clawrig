@@ -110,7 +110,11 @@ defmodule Clawrig.Integrations.BrowserUseBroker do
   end
 
   defp http do
-    Application.get_env(:clawrig, :browser_use_broker_http, Clawrig.Integrations.BrowserUseBroker.ReqClient)
+    Application.get_env(
+      :clawrig,
+      :browser_use_broker_http,
+      Clawrig.Integrations.BrowserUseBroker.ReqClient
+    )
   end
 end
 

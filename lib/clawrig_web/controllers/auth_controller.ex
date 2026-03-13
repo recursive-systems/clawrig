@@ -19,7 +19,10 @@ defmodule ClawrigWeb.AuthController do
     case Clawrig.RateLimiter.check(ip) do
       :blocked ->
         conn
-        |> put_session(:auth_error, "Too many login attempts. Please wait a minute and try again.")
+        |> put_session(
+          :auth_error,
+          "Too many login attempts. Please wait a minute and try again."
+        )
         |> redirect(to: "/login")
 
       :ok ->

@@ -174,8 +174,8 @@ defmodule ClawrigWeb.DashboardLiveTest do
            "global_available" => false,
            "message" =>
              "ClawRig's shared Browser Use trial pool is full for this month. Add your own Browser Use Cloud key to continue."
-         }, %{installed: false, running: false, ip: nil, hostname: nil},
-         %{"enabled" => true}, [], %{}}
+         }, %{installed: false, running: false, ip: nil, hostname: nil}, %{"enabled" => true}, [],
+         %{}}
       )
 
       html = render(view)

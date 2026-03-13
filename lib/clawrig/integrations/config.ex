@@ -68,11 +68,11 @@ defmodule Clawrig.Integrations.Config do
 
     cond do
       browser["enabled"] == true and browser_settings["mode"] == "managed_trial" and
-          is_binary(browser_settings["deviceToken"]) and browser_settings["deviceToken"] != "" ->
+        is_binary(browser_settings["deviceToken"]) and browser_settings["deviceToken"] != "" ->
         :managed_trial
 
       browser["enabled"] == true and browser_settings["mode"] == "byok" and
-          is_binary(browser["apiKey"]) and browser["apiKey"] != "" ->
+        is_binary(browser["apiKey"]) and browser["apiKey"] != "" ->
         :byok
 
       true ->

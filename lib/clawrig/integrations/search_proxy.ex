@@ -49,7 +49,7 @@ defmodule Clawrig.Integrations.SearchProxy do
         {:error, "Invalid token"}
 
       {:error, %{reason: reason}} ->
-      {:error, "Connection failed: #{inspect(reason)}"}
+        {:error, "Connection failed: #{inspect(reason)}"}
     end
   end
 

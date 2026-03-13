@@ -149,7 +149,11 @@ defmodule Clawrig.Integrations.ConfigTest do
              "bu_secret_123"
 
     assert is_nil(get_in(config, ["skills", "entries", "clawrig-browser-use", "deviceToken"]))
-    assert is_nil(get_in(config, ["skills", "entries", "clawrig-browser-use", "config", "deviceToken"]))
+
+    assert is_nil(
+             get_in(config, ["skills", "entries", "clawrig-browser-use", "config", "deviceToken"])
+           )
+
     assert get_in(config, ["skills", "entries", "clawrig-browser-use", "config", "mode"]) ==
              "byok"
 
