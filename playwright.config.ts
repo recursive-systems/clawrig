@@ -2,6 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 const port = 4101;
 const tmpDir = ".tmp/e2e";
+const serverCommand =
+  process.env.CLAWRIG_E2E_SERVER_CMD ||
+  (process.env.CI ? "mix phx.server" : "mise exec -- mix phx.server");
 
 export default defineConfig({
   testDir: "./e2e",
@@ -38,7 +41,7 @@ export default defineConfig({
       `CLAWRIG_OOBE_MARKER=${tmpDir}/.oobe-complete`,
       `CLAWRIG_NODE_IDENTITY_PATH=${tmpDir}/node-identity.json`,
       `CLAWRIG_DASHBOARD_AUTH_PATH=${tmpDir}/dashboard-auth.json`,
-      "mise exec -- mix phx.server"
+      serverCommand
     ].join(" "),
     url: `http://127.0.0.1:${port}`,
     reuseExistingServer: false,
